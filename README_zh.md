@@ -123,10 +123,22 @@ ldap:
 
 ## Webhook 配置
 
+### 推荐：统一 Webhook（自动识别）
+
+使用单一 Webhook 地址同时支持 GitLab 和 GitHub：
+
+```
+https://你的域名/webhook
+# 或
+https://你的域名/review/webhook
+```
+
+系统会通过请求头自动识别平台。
+
 ### GitHub
 
 1. 进入仓库设置 > Webhooks > 添加 Webhook
-2. Payload URL: `https://your-domain/api/webhook/github/{project_id}`
+2. Payload URL: `https://你的域名/webhook`
 3. Content type: `application/json`
 4. Secret: 您配置的 Webhook 密钥
 5. Events: 选择 "Pull requests" 和 "Pushes"
@@ -134,7 +146,7 @@ ldap:
 ### GitLab
 
 1. 进入项目设置 > Webhooks
-2. URL: `https://your-domain/api/webhook/gitlab/{project_id}`
+2. URL: `https://你的域名/webhook`
 3. Secret Token: 您配置的 Webhook 密钥
 4. Trigger: Push events, Merge request events
 
@@ -173,10 +185,14 @@ ldap:
 - `DELETE /api/im-bots/:id` - 删除机器人
 
 ### Webhooks
-- `POST /api/webhook/github/:project_id` - GitHub Webhook（指定项目ID）
-- `POST /api/webhook/gitlab/:project_id` - GitLab Webhook（指定项目ID）
-- `POST /api/webhook/github` - GitHub Webhook（自动匹配项目）
+- `POST /webhook` - **统一 Webhook（自动识别 GitLab/GitHub，推荐）**
+- `POST /review/webhook` - 统一 Webhook 别名
+- `POST /api/webhook` - /api 前缀下的统一 Webhook
+- `POST /api/review/webhook` - /api 前缀下的别名
 - `POST /api/webhook/gitlab` - GitLab Webhook（自动匹配项目）
+- `POST /api/webhook/github` - GitHub Webhook（自动匹配项目）
+- `POST /api/webhook/gitlab/:project_id` - GitLab Webhook（指定项目ID）
+- `POST /api/webhook/github/:project_id` - GitHub Webhook（指定项目ID）
 
 ### 系统日志
 - `GET /api/system-logs` - 日志列表

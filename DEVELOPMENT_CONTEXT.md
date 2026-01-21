@@ -113,3 +113,52 @@ docker-compose up --build
 | `/api/system-logs/retention` | GET | 获取保留天数 |
 | `/api/system-logs/retention` | PUT | 设置保留天数 |
 | `/api/system-logs/cleanup` | POST | 手动清理过期日志 |
+
+## Webhook 端点
+
+### 推荐方式：统一 Webhook（自动识别平台）
+
+| 端点 | 说明 |
+|------|------|
+| `POST /webhook` | 统一入口，自动识别 GitLab/GitHub |
+| `POST /review/webhook` | 别名，与上面功能相同 |
+| `POST /api/webhook` | /api 前缀版本 |
+| `POST /api/review/webhook` | /api 前缀版本别名 |
+
+**使用场景**：只需配置一个 Webhook 地址，系统通过 `X-Gitlab-Event` 或 `X-GitHub-Event` 请求头自动识别来源平台。
+
+### 分平台 Webhook（自动匹配项目）
+
+| 端点 | 说明 |
+|------|------|
+| `POST /api/webhook/gitlab` | GitLab 专用，通过 payload 中的项目 URL 自动匹配 |
+| `POST /api/webhook/github` | GitHub 专用，通过 payload 中的仓库 URL 自动匹配 |
+
+**使用场景**：已知平台类型，系统根据 Webhook payload 中的项目/仓库 URL 自动匹配已配置的项目。
+
+### 指定项目 ID 的 Webhook
+
+| 端点 | 说明 |
+|------|------|
+| `POST /api/webhook/gitlab/:project_id` | GitLab，指定 CodeSentry 中的项目 ID |
+| `POST /api/webhook/github/:project_id` | GitHub，指定 CodeSentry 中的项目 ID |
+
+**使用场景**：明确指定 CodeSentry 中的项目 ID，适用于多个代码仓库映射到同一个 CodeSentry 项目的情况。
+
+### Webhook 配置示例
+
+```
+# 推荐：使用统一入口（无需区分平台）
+https://codesentry.example.com/webhook
+
+# 或带 /api 前缀
+https://codesentry.example.com/api/webhook
+
+# 分平台（自动匹配项目）
+https://codesentry.example.com/api/webhook/gitlab
+https://codesentry.example.com/api/webhook/github
+
+# 指定项目 ID
+https://codesentry.example.com/api/webhook/gitlab/1
+https://codesentry.example.com/api/webhook/github/2
+```

@@ -123,10 +123,22 @@ ldap:
 
 ## Webhook Setup
 
+### Recommended: Unified Webhook (Auto-detect)
+
+Use a single webhook URL for both GitLab and GitHub:
+
+```
+https://your-domain/webhook
+# or
+https://your-domain/review/webhook
+```
+
+The system automatically detects the platform via request headers.
+
 ### GitHub
 
 1. Go to Repository Settings > Webhooks > Add webhook
-2. Payload URL: `https://your-domain/api/webhook/github/{project_id}`
+2. Payload URL: `https://your-domain/webhook`
 3. Content type: `application/json`
 4. Secret: Your configured webhook secret
 5. Events: Select "Pull requests" and "Pushes"
@@ -134,7 +146,7 @@ ldap:
 ### GitLab
 
 1. Go to Project Settings > Webhooks
-2. URL: `https://your-domain/api/webhook/gitlab/{project_id}`
+2. URL: `https://your-domain/webhook`
 3. Secret Token: Your configured webhook secret
 4. Trigger: Push events, Merge request events
 
@@ -173,8 +185,10 @@ ldap:
 - `DELETE /api/im-bots/:id` - Delete IM bot
 
 ### Webhooks
-- `POST /api/webhook` - **Unified webhook (auto-detect GitLab/GitHub)**
-- `POST /api/review/webhook` - Alias for unified webhook
+- `POST /webhook` - **Unified webhook (auto-detect GitLab/GitHub, recommended)**
+- `POST /review/webhook` - Alias for unified webhook
+- `POST /api/webhook` - Unified webhook under /api prefix
+- `POST /api/review/webhook` - Alias under /api prefix
 - `POST /api/webhook/gitlab` - GitLab webhook (auto-detect project by URL)
 - `POST /api/webhook/github` - GitHub webhook (auto-detect project by URL)
 - `POST /api/webhook/gitlab/:project_id` - GitLab webhook (with project ID)
