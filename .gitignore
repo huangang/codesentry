@@ -1,0 +1,29 @@
+.DS_Store
+node_modules/
+dist/
+*.log
+
+# Backend
+backend/codesentry
+backend/*.db
+backend/config.yaml
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Data
+data/
+*.db
+backend/tmp/

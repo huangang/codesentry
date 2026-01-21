@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  codesentry:
+    build: .
+    container_name: codesentry
+    ports:
+      - "8080:8080"
+    volumes:
+      - codesentry-data:/app/data
+      - ./config.yaml:/app/config.yaml:ro
+    environment:
+      - SERVER_PORT=8080
+      - SERVER_MODE=release
+      - DB_DRIVER=sqlite
+      - DB_DSN=/app/data/codesentry.db
+      - JWT_SECRET=${JWT_SECRET:-codesentry-secret-key-change-in-production}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4}
+    restart: unless-stopped
+
+  # Optional: Use PostgreSQL instead of SQLite
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: codesentry-db
+  #   environment:
+  #     POSTGRES_DB: codesentry
+  #     POSTGRES_USER: codesentry
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD:-codesentry}
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   restart: unless-stopped
+
+volumes:
+  codesentry-data:
+  # postgres-data:

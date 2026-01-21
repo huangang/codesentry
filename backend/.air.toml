@@ -1,0 +1,49 @@
+# Config file for [Air](https://github.com/cosmtrek/air) in development
+
+root = "."
+tmp_dir = "tmp"
+
+[build]
+# Command to build the project
+cmd = "go build -o ./tmp/main ./cmd/server"
+# Binary file yields from `cmd`
+bin = "tmp/main"
+# Include these file extensions
+include_ext = ["go", "tpl", "tmpl", "html"]
+# Exclude these directories
+exclude_dir = ["assets", "tmp", "vendor", "frontend", "node_modules"]
+# Exclude files matching these patterns
+exclude_file = []
+# Exclude unchanged files
+exclude_unchanged = true
+# Follow symlink for directories
+follow_symlink = false
+# This log file places in your tmp_dir
+log = "air.log"
+# Poll files for changes instead of using fsnotify
+poll = false
+# Poll interval (defaults to minimum interval of 500ms)
+poll_interval = 0
+# It's not necessary to trigger build each time file changes
+delay = 1000 # ms
+# Stop running old binary when build errors occur
+stop_on_error = true
+# Send Interrupt signal before killing process (windows does not support this feature)
+send_interrupt = false
+# Delay after sending Interrupt signal
+kill_delay = 500 # ms
+
+[log]
+# Show log time
+time = false
+
+[color]
+# Customize each part's color
+main = "magenta"
+watcher = "cyan"
+build = "yellow"
+runner = "green"
+
+[misc]
+# Delete tmp directory on exit
+clean_on_exit = true
