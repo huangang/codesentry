@@ -59,7 +59,16 @@ Access the application at `http://localhost:5173`
 ### Docker Deployment
 
 ```bash
-# Build and run
+# Pull from Docker Hub
+docker pull huangangzhang/codesentry:latest
+
+# Or pull from GitHub Container Registry
+docker pull ghcr.io/huangang/codesentry:latest
+
+# Run
+docker run -d -p 8080:8080 -v codesentry-data:/app/data huangangzhang/codesentry:latest
+
+# Or use docker-compose (build locally)
 docker-compose up --build
 
 # Or run in background

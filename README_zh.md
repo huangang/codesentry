@@ -59,7 +59,16 @@ npm run dev
 ### Docker 部署
 
 ```bash
-# 构建并运行
+# 从 Docker Hub 拉取
+docker pull huangangzhang/codesentry:latest
+
+# 或从 GitHub Container Registry 拉取
+docker pull ghcr.io/huangang/codesentry:latest
+
+# 运行
+docker run -d -p 8080:8080 -v codesentry-data:/app/data huangangzhang/codesentry:latest
+
+# 或使用 docker-compose（本地构建）
 docker-compose up --build
 
 # 或后台运行

@@ -14,6 +14,7 @@ env:
   REGISTRY_GITHUB: ghcr.io
   REGISTRY_DOCKER: docker.io
   IMAGE_NAME: ${{ github.repository }}
+  DOCKERHUB_IMAGE: huangangzhang/codesentry
 
 jobs:
   build-and-push:
@@ -54,7 +55,7 @@ jobs:
         with:
           images: |
             ${{ env.REGISTRY_GITHUB }}/${{ env.IMAGE_NAME }}
-            ${{ env.REGISTRY_DOCKER }}/${{ env.IMAGE_NAME }}
+            ${{ env.REGISTRY_DOCKER }}/${{ env.DOCKERHUB_IMAGE }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
