@@ -65,14 +65,16 @@ docker pull huangangzhang/codesentry:latest
 # Or pull from GitHub Container Registry
 docker pull ghcr.io/huangang/codesentry:latest
 
-# Run
+# Run with docker-compose (uses pre-built image)
+docker-compose up -d
+
+# Or run directly
 docker run -d -p 8080:8080 -v codesentry-data:/app/data huangangzhang/codesentry:latest
+```
 
-# Or use docker-compose (build locally)
-docker-compose up --build
-
-# Or run in background
-docker-compose up -d --build
+For local development (build from source):
+```bash
+docker-compose -f docker-compose.dev.yml up --build
 ```
 
 Access the application at `http://localhost:8080`

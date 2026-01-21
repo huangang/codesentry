@@ -65,14 +65,16 @@ docker pull huangangzhang/codesentry:latest
 # 或从 GitHub Container Registry 拉取
 docker pull ghcr.io/huangang/codesentry:latest
 
-# 运行
+# 使用 docker-compose 运行（使用预构建镜像）
+docker-compose up -d
+
+# 或直接运行
 docker run -d -p 8080:8080 -v codesentry-data:/app/data huangangzhang/codesentry:latest
+```
 
-# 或使用 docker-compose（本地构建）
-docker-compose up --build
-
-# 或后台运行
-docker-compose up -d --build
+本地开发（从源码构建）：
+```bash
+docker-compose -f docker-compose.dev.yml up --build
 ```
 
 访问 `http://localhost:8080`

@@ -1,9 +1,10 @@
 version: '3.8'
 
+# For local development - builds from source
 services:
   codesentry:
-    image: huangangzhang/codesentry:latest
-    container_name: codesentry
+    build: .
+    container_name: codesentry-dev
     ports:
       - "8080:8080"
     volumes:
@@ -11,7 +12,7 @@ services:
       - ./config.yaml:/app/config.yaml:ro
     environment:
       - SERVER_PORT=8080
-      - SERVER_MODE=release
+      - SERVER_MODE=debug
       - DB_DRIVER=sqlite
       - DB_DSN=/app/data/codesentry.db
       - JWT_SECRET=${JWT_SECRET:-codesentry-secret-key-change-in-production}
@@ -20,18 +21,5 @@ services:
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4}
     restart: unless-stopped
 
-  # Optional: Use PostgreSQL instead of SQLite
-  # postgres:
-  #   image: postgres:16-alpine
-  #   container_name: codesentry-db
-  #   environment:
-  #     POSTGRES_DB: codesentry
-  #     POSTGRES_USER: codesentry
-  #     POSTGRES_PASSWORD: ${DB_PASSWORD:-codesentry}
-  #   volumes:
-  #     - postgres-data:/var/lib/postgresql/data
-  #   restart: unless-stopped
-
 volumes:
   codesentry-data:
-  # postgres-data:
