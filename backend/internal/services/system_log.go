@@ -2,6 +2,8 @@ package services
 
 import (
 	"encoding/json"
+	"log"
+	"strconv"
 	"time"
 
 	"github.com/huangang/codesentry/backend/internal/models"
@@ -135,4 +137,77 @@ func (s *SystemLogService) GetModules() ([]string, error) {
 
 func (s *SystemLogService) Create(log *models.SystemLog) error {
 	return s.db.Create(log).Error
+}
+
+// CleanupOldLogs deletes logs older than the specified number of days
+// Returns the number of deleted records
+func (s *SystemLogService) CleanupOldLogs(retentionDays int) (int64, error) {
+	if retentionDays <= 0 {
+		return 0, nil
+	}
+
+	cutoffTime := time.Now().AddDate(0, 0, -retentionDays)
+	result := s.db.Where("created_at < ?", cutoffTime).Delete(&models.SystemLog{})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	return result.RowsAffected, nil
+}
+
+// GetRetentionDays gets the log retention days from system config
+func (s *SystemLogService) GetRetentionDays() int {
+	var cfg models.SystemConfig
+	if err := s.db.Where("key = ?", "log_retention_days").First(&cfg).Error; err != nil {
+		return 30 // default 30 days
+	}
+
+	days, err := strconv.Atoi(cfg.Value)
+	if err != nil {
+		return 30
+	}
+	return days
+}
+
+// SetRetentionDays sets the log retention days in system config
+func (s *SystemLogService) SetRetentionDays(days int) error {
+	return s.db.Model(&models.SystemConfig{}).
+		Where("key = ?", "log_retention_days").
+		Update("value", strconv.Itoa(days)).Error
+}
+
+// StartCleanupScheduler starts a goroutine that periodically cleans up old logs
+func StartLogCleanupScheduler(db *gorm.DB) {
+	go func() {
+		service := NewSystemLogService(db)
+
+		// Run cleanup immediately on startup
+		runCleanup(service)
+
+		// Then run every 24 hours
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			runCleanup(service)
+		}
+	}()
+}
+
+func runCleanup(service *SystemLogService) {
+	retentionDays := service.GetRetentionDays()
+	if retentionDays <= 0 {
+		log.Println("[SystemLog] Log cleanup disabled (retention_days <= 0)")
+		return
+	}
+
+	deleted, err := service.CleanupOldLogs(retentionDays)
+	if err != nil {
+		log.Printf("[SystemLog] Failed to cleanup old logs: %v", err)
+		return
+	}
+
+	if deleted > 0 {
+		log.Printf("[SystemLog] Cleaned up %d logs older than %d days", deleted, retentionDays)
+	}
 }

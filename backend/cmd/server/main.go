@@ -47,6 +47,9 @@ func main() {
 	// Initialize system logger
 	services.InitSystemLogger(models.GetDB())
 
+	// Start system log cleanup scheduler
+	services.StartLogCleanupScheduler(models.GetDB())
+
 	// Create default admin user
 	authHandler := handlers.NewAuthHandler(models.GetDB(), cfg)
 	if err := authHandler.CreateAdminIfNotExists(); err != nil {
@@ -144,6 +147,9 @@ func main() {
 			systemLogHandler := handlers.NewSystemLogHandler(models.GetDB())
 			protected.GET("/system-logs", systemLogHandler.List)
 			protected.GET("/system-logs/modules", systemLogHandler.GetModules)
+			protected.GET("/system-logs/retention", systemLogHandler.GetRetentionDays)
+			protected.PUT("/system-logs/retention", systemLogHandler.SetRetentionDays)
+			protected.POST("/system-logs/cleanup", systemLogHandler.Cleanup)
 		}
 
 		// Webhook routes (public with signature verification)

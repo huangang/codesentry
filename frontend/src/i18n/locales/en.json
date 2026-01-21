@@ -240,7 +240,11 @@
     "ip": "IP Address",
     "userAgent": "User Agent",
     "extra": "Extra Data",
-    "searchMessage": "Search message"
+    "searchMessage": "Search message",
+    "retentionDays": "Retention Days",
+    "cleanup": "Cleanup",
+    "cleanupConfirm": "Are you sure you want to cleanup logs older than {{days}} days?",
+    "cleanupSuccess": "Cleaned up {{count}} logs"
   },
   "prompts": {
     "title": "Prompts",

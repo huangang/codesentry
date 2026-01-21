@@ -12,8 +12,11 @@ import {
   Descriptions,
   message,
   Typography,
+  InputNumber,
+  Popconfirm,
+  Divider,
 } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined, SettingOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
@@ -31,6 +34,9 @@ const SystemLogs: React.FC = () => {
   const [modules, setModules] = useState<string[]>([]);
   const [selectedLog, setSelectedLog] = useState<SystemLog | null>(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [retentionDays, setRetentionDays] = useState(30);
+  const [retentionLoading, setRetentionLoading] = useState(false);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
   const { t } = useTranslation();
 
   const [level, setLevel] = useState<string>('');
@@ -70,9 +76,42 @@ const SystemLogs: React.FC = () => {
     } catch {}
   };
 
+  const fetchRetentionDays = async () => {
+    try {
+      const res = await systemLogApi.getRetentionDays();
+      setRetentionDays(res.data.retention_days);
+    } catch {}
+  };
+
+  const handleSaveRetention = async () => {
+    setRetentionLoading(true);
+    try {
+      await systemLogApi.setRetentionDays(retentionDays);
+      message.success(t('common.success'));
+    } catch {
+      message.error(t('common.error'));
+    } finally {
+      setRetentionLoading(false);
+    }
+  };
+
+  const handleCleanup = async () => {
+    setCleanupLoading(true);
+    try {
+      const res = await systemLogApi.cleanup();
+      message.success(t('systemLogs.cleanupSuccess', { count: res.data.deleted }));
+      fetchData();
+    } catch {
+      message.error(t('common.error'));
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
     fetchModules();
+    fetchRetentionDays();
   }, [page, pageSize]);
 
   const handleSearch = () => {
@@ -204,6 +243,40 @@ const SystemLogs: React.FC = () => {
           <Button icon={<ReloadOutlined />} onClick={handleReset}>
             {t('common.reset')}
           </Button>
+
+          <Divider type="vertical" />
+
+          <SettingOutlined style={{ color: '#666' }} />
+          <span style={{ color: '#666', fontSize: 13 }}>{t('systemLogs.retentionDays')}:</span>
+          <InputNumber
+            min={1}
+            max={365}
+            value={retentionDays}
+            onChange={(val) => setRetentionDays(val || 30)}
+            style={{ width: 80 }}
+          />
+          <Button 
+            size="small" 
+            onClick={handleSaveRetention} 
+            loading={retentionLoading}
+          >
+            {t('common.save')}
+          </Button>
+          <Popconfirm
+            title={t('systemLogs.cleanupConfirm', { days: retentionDays })}
+            onConfirm={handleCleanup}
+            okText={t('common.confirm')}
+            cancelText={t('common.cancel')}
+          >
+            <Button 
+              size="small" 
+              danger 
+              icon={<DeleteOutlined />} 
+              loading={cleanupLoading}
+            >
+              {t('systemLogs.cleanup')}
+            </Button>
+          </Popconfirm>
         </Space>
 
         <Table

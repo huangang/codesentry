@@ -37,16 +37,21 @@ CodeSentry 是一个 AI 代码审查平台，支持 GitHub 和 GitLab，使用 G
 
 ## 当前正在进行的工作
 
-### ✅ IM 通知消息分段发送（已完成）
-用户需求：当企业微信或其他机器人消息超长时，分成多条消息发送，而不是截断。
+（暂无）
 
-已完成：
-- ✅ 添加 `splitMessage` 辅助函数（在换行处智能分割）
-- ✅ 企业微信：超过 4000 字符时分段发送，带 `[1/N]` 标识
-- ✅ 钉钉：超过 19000 字符时分段发送
-- ✅ 飞书：超过 4000 字符时分段发送
-- ✅ Slack：超过 3000 字符时分段发送
-- ✅ 移除 `buildMessage` 中的 2000 字符截断逻辑
+## 最近完成的优化
+
+### 系统日志定时清理
+- ✅ 后端：`log_retention_days` 配置（默认30天）
+- ✅ 后端：`StartLogCleanupScheduler` 每24小时自动清理过期日志
+- ✅ 后端：手动清理 API `POST /api/system-logs/cleanup`
+- ✅ 后端：保留天数配置 API `GET/PUT /api/system-logs/retention`
+- ✅ 前端：SystemLogs 页面添加保留天数配置和手动清理按钮
+
+### 审查详情 Markdown 渲染
+- ✅ 安装 `react-markdown` 和 `remark-gfm`
+- ✅ ReviewLogs 详情页的审查结果使用 Markdown 渲染
+- ✅ 支持表格、代码块、列表等格式
 
 ## 待解决问题
 
@@ -56,19 +61,20 @@ CodeSentry 是一个 AI 代码审查平台，支持 GitHub 和 GitLab，使用 G
 
 ### 后端
 - `backend/cmd/server/main.go` - 主入口和路由
-- `backend/internal/services/notification.go` - IM 通知服务
-- `backend/internal/services/webhook.go` - Webhook 处理
-- `backend/internal/services/ai.go` - AI 审查服务
+- `backend/internal/services/notification.go` - IM 通知服务（含分段发送）
+- `backend/internal/services/webhook.go` - Webhook 处理（含 diff 过滤）
+- `backend/internal/services/ai.go` - AI 审查服务（含多语言评分提取）
 - `backend/internal/services/member.go` - 成员分析服务
 - `backend/internal/services/dashboard.go` - 仪表盘服务
-- `backend/internal/services/system_log.go` - 系统日志服务
+- `backend/internal/services/system_log.go` - 系统日志服务（含定时清理）
 - `backend/internal/handlers/` - API handlers
 
 ### 前端
-- `frontend/src/pages/` - 页面组件
+- `frontend/src/pages/ReviewLogs.tsx` - 审查记录（Markdown 渲染）
+- `frontend/src/pages/SystemLogs.tsx` - 系统日志（保留天数配置和清理）
+- `frontend/src/pages/` - 其他页面组件
 - `frontend/src/services/index.ts` - API 服务
-- `frontend/src/i18n/locales/en.json` - 英文语言包
-- `frontend/src/i18n/locales/zh.json` - 中文语言包
+- `frontend/src/i18n/locales/` - 中英文语言包
 
 ## 重要约束
 
@@ -97,3 +103,13 @@ docker-compose up --build
 | 钉钉 | Markdown | 20000 |
 | 飞书 | Text | 4096 |
 | Slack | Text | 40000 |
+
+## 系统日志 API
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/system-logs` | GET | 查询日志列表 |
+| `/api/system-logs/modules` | GET | 获取模块列表 |
+| `/api/system-logs/retention` | GET | 获取保留天数 |
+| `/api/system-logs/retention` | PUT | 设置保留天数 |
+| `/api/system-logs/cleanup` | POST | 手动清理过期日志 |

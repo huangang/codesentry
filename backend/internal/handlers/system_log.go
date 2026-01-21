@@ -42,3 +42,51 @@ func (h *SystemLogHandler) GetModules(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"modules": modules})
 }
+
+func (h *SystemLogHandler) Cleanup(c *gin.Context) {
+	var req struct {
+		Days int `json:"days"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	days := req.Days
+	if days <= 0 {
+		days = h.systemLogService.GetRetentionDays()
+	}
+
+	deleted, err := h.systemLogService.CleanupOldLogs(days)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"deleted":        deleted,
+		"retention_days": days,
+	})
+}
+
+func (h *SystemLogHandler) GetRetentionDays(c *gin.Context) {
+	days := h.systemLogService.GetRetentionDays()
+	c.JSON(http.StatusOK, gin.H{"retention_days": days})
+}
+
+func (h *SystemLogHandler) SetRetentionDays(c *gin.Context) {
+	var req struct {
+		Days int `json:"days" binding:"required,min=1,max=365"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.systemLogService.SetRetentionDays(req.Days); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"retention_days": req.Days})
+}

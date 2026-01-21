@@ -119,6 +119,7 @@ func SeedDefaultData() error {
 		{Key: "ldap_bind_password", Value: "", Type: "string", Group: "ldap", Label: "LDAP Bind Password"},
 		{Key: "ldap_user_filter", Value: "(uid=%s)", Type: "string", Group: "ldap", Label: "LDAP User Filter"},
 		{Key: "ldap_use_ssl", Value: "false", Type: "bool", Group: "ldap", Label: "Use SSL/TLS"},
+		{Key: "log_retention_days", Value: "30", Type: "int", Group: "system", Label: "System Log Retention Days"},
 	}
 
 	for _, cfg := range defaultConfigs {

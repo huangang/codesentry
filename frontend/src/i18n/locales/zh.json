@@ -240,7 +240,11 @@
     "ip": "IP 地址",
     "userAgent": "用户代理",
     "extra": "附加数据",
-    "searchMessage": "搜索消息"
+    "searchMessage": "搜索消息",
+    "retentionDays": "保留天数",
+    "cleanup": "清理日志",
+    "cleanupConfirm": "确定要清理 {{days}} 天前的日志吗？",
+    "cleanupSuccess": "已清理 {{count}} 条日志"
   },
   "prompts": {
     "title": "提示词管理",

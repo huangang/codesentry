@@ -164,4 +164,10 @@ export const systemLogApi = {
   }) => api.get<{ total: number; page: number; page_size: number; items: SystemLog[] }>('/system-logs', { params }),
 
   getModules: () => api.get<{ modules: string[] }>('/system-logs/modules'),
+
+  getRetentionDays: () => api.get<{ retention_days: number }>('/system-logs/retention'),
+
+  setRetentionDays: (days: number) => api.put<{ retention_days: number }>('/system-logs/retention', { days }),
+
+  cleanup: (days?: number) => api.post<{ deleted: number; retention_days: number }>('/system-logs/cleanup', { days }),
 };
