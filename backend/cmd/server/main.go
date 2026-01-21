@@ -12,6 +12,7 @@ import (
 	"github.com/huangang/codesentry/backend/internal/handlers"
 	"github.com/huangang/codesentry/backend/internal/middleware"
 	"github.com/huangang/codesentry/backend/internal/models"
+	"github.com/huangang/codesentry/backend/internal/services"
 	"github.com/huangang/codesentry/backend/internal/utils"
 )
 
@@ -43,6 +44,9 @@ func main() {
 		log.Printf("Warning: Failed to seed default data: %v", err)
 	}
 
+	// Initialize system logger
+	services.InitSystemLogger(models.GetDB())
+
 	// Create default admin user
 	authHandler := handlers.NewAuthHandler(models.GetDB(), cfg)
 	if err := authHandler.CreateAdminIfNotExists(); err != nil {
@@ -61,6 +65,11 @@ func main() {
 
 	// Apply CORS middleware
 	r.Use(middleware.CORS())
+
+	// Health check endpoint
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok", "service": "codesentry"})
+	})
 
 	// API routes
 	api := r.Group("/api")
@@ -141,6 +150,8 @@ func main() {
 		webhookHandler := handlers.NewWebhookHandler(models.GetDB(), &cfg.OpenAI)
 		api.POST("/webhook/gitlab/:project_id", webhookHandler.HandleGitLabWebhook)
 		api.POST("/webhook/github/:project_id", webhookHandler.HandleGitHubWebhook)
+		api.POST("/webhook/gitlab", webhookHandler.HandleGitLabWebhookGeneric)
+		api.POST("/webhook/github", webhookHandler.HandleGitHubWebhookGeneric)
 	}
 
 	// Serve static files (embedded frontend)

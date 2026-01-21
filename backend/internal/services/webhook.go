@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/huangang/codesentry/backend/internal/config"
@@ -239,6 +240,12 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 	log.Printf("[Webhook] Processing GitLab push: %d commits, checkout_sha=%s, using commit=%s",
 		len(event.Commits), event.CheckoutSHA, commitSHA)
 
+	LogInfo("Webhook", "GitLabPush", fmt.Sprintf("Processing push from %s: %d commits", event.UserName, len(event.Commits)), nil, "", "", map[string]interface{}{
+		"project_id": project.ID,
+		"branch":     strings.TrimPrefix(event.Ref, "refs/heads/"),
+		"commit":     commitSHA,
+	})
+
 	var allDiffs strings.Builder
 	for _, c := range event.Commits {
 		diff, err := s.getGitLabDiff(project, c.ID)
@@ -274,18 +281,33 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 	s.reviewService.Create(reviewLog)
 
 	log.Printf("[Webhook] Starting AI review for project %d, commit %s", project.ID, commitSHA)
+
+	filteredDiff := s.filterDiffByExtensions(diff, project.FileExtensions)
+	if filteredDiff != diff {
+		log.Printf("[Webhook] Filtered diff by extensions (%s): %d -> %d bytes", project.FileExtensions, len(diff), len(filteredDiff))
+	}
+
 	result, err := s.aiService.Review(ctx, &ReviewRequest{
 		ProjectID: project.ID,
-		Diffs:     diff,
+		Diffs:     filteredDiff,
 		Commits:   strings.Join(commits, "\n"),
 	})
 
 	if err != nil {
 		log.Printf("[Webhook] AI review failed: %v", err)
+		LogError("AIReview", "ReviewFailed", err.Error(), nil, "", "", map[string]interface{}{
+			"project_id": project.ID,
+			"commit":     commitSHA,
+		})
 		reviewLog.ReviewStatus = "failed"
 		reviewLog.ErrorMessage = err.Error()
 	} else {
 		log.Printf("[Webhook] AI review completed, score: %.1f, result length: %d", result.Score, len(result.Content))
+		LogInfo("AIReview", "ReviewCompleted", fmt.Sprintf("Review completed with score %.0f", result.Score), nil, "", "", map[string]interface{}{
+			"project_id": project.ID,
+			"commit":     commitSHA,
+			"score":      result.Score,
+		})
 		reviewLog.ReviewStatus = "completed"
 		reviewLog.ReviewResult = result.Content
 		reviewLog.Score = &result.Score
@@ -331,10 +353,10 @@ func (s *WebhookService) processGitLabMR(ctx context.Context, project *models.Pr
 		diff = "Failed to get diff: " + err.Error()
 	}
 
-	// Perform AI review
+	filteredDiff := s.filterDiffByExtensions(diff, project.FileExtensions)
 	result, err := s.aiService.Review(ctx, &ReviewRequest{
 		ProjectID: project.ID,
-		Diffs:     diff,
+		Diffs:     filteredDiff,
 		Commits:   event.ObjectAttributes.Title + "\n" + event.ObjectAttributes.Description,
 	})
 
@@ -396,9 +418,10 @@ func (s *WebhookService) processGitHubPush(ctx context.Context, project *models.
 		diff = "Failed to get diff: " + err.Error()
 	}
 
+	filteredDiff := s.filterDiffByExtensions(diff, project.FileExtensions)
 	result, err := s.aiService.Review(ctx, &ReviewRequest{
 		ProjectID: project.ID,
-		Diffs:     diff,
+		Diffs:     filteredDiff,
 		Commits:   strings.Join(commits, "\n"),
 	})
 
@@ -449,9 +472,10 @@ func (s *WebhookService) processGitHubPR(ctx context.Context, project *models.Pr
 		diff = "Failed to get diff: " + err.Error()
 	}
 
+	filteredDiff := s.filterDiffByExtensions(diff, project.FileExtensions)
 	result, err := s.aiService.Review(ctx, &ReviewRequest{
 		ProjectID: project.ID,
-		Diffs:     diff,
+		Diffs:     filteredDiff,
 		Commits:   event.PullRequest.Title + "\n" + event.PullRequest.Body,
 	})
 
@@ -618,6 +642,55 @@ func (s *WebhookService) fetchDiff(apiURL, token, tokenHeader string) (string, e
 	}
 
 	return result.String(), nil
+}
+
+func (s *WebhookService) filterDiffByExtensions(diff string, extensions string) string {
+	if extensions == "" {
+		return diff
+	}
+
+	extList := strings.Split(extensions, ",")
+	extMap := make(map[string]bool)
+	for _, ext := range extList {
+		ext = strings.TrimSpace(ext)
+		if ext != "" {
+			if !strings.HasPrefix(ext, ".") {
+				ext = "." + ext
+			}
+			extMap[strings.ToLower(ext)] = true
+		}
+	}
+
+	if len(extMap) == 0 {
+		return diff
+	}
+
+	lines := strings.Split(diff, "\n")
+	var result strings.Builder
+	var include bool
+
+	for _, line := range lines {
+		if strings.HasPrefix(line, "--- ") || strings.HasPrefix(line, "+++ ") {
+			filePath := strings.TrimPrefix(strings.TrimPrefix(line, "--- "), "+++ ")
+			filePath = strings.TrimPrefix(filePath, "a/")
+			filePath = strings.TrimPrefix(filePath, "b/")
+			ext := strings.ToLower(filepath.Ext(filePath))
+			if strings.HasPrefix(line, "--- ") {
+				include = extMap[ext]
+			}
+			if include {
+				result.WriteString(line + "\n")
+			}
+		} else if include {
+			result.WriteString(line + "\n")
+		}
+	}
+
+	filtered := result.String()
+	if filtered == "" {
+		return diff
+	}
+	return filtered
 }
 
 // VerifyGitLabSignature verifies GitLab webhook signature

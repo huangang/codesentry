@@ -206,6 +206,17 @@ func (s *ProjectService) GetByWebhookSecret(secret string) (*models.Project, err
 	return &project, nil
 }
 
+func (s *ProjectService) GetByURL(url string) (*models.Project, error) {
+	url = strings.TrimSuffix(url, ".git")
+	url = strings.TrimSuffix(url, "/")
+
+	var project models.Project
+	if err := s.db.Where("url = ? OR url = ?", url, url+".git").First(&project).Error; err != nil {
+		return nil, err
+	}
+	return &project, nil
+}
+
 // GetDefaultPrompt returns the default AI review prompt
 func (s *ProjectService) GetDefaultPrompt() string {
 	return `你是一位资深软件开发工程师，专注于代码审查。请根据以下维度对代码变更进行评审：

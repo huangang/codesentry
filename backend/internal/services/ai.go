@@ -81,6 +81,11 @@ func (s *AIService) Review(ctx context.Context, req *ReviewRequest) (*ReviewResu
 	}
 	client := openai.NewClientWithConfig(clientConfig)
 
+	temperature := float32(0.3)
+	if llmConfig.Temperature > 0 {
+		temperature = float32(llmConfig.Temperature)
+	}
+
 	resp, err := client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
 		Model: llmConfig.Model,
 		Messages: []openai.ChatCompletionMessage{
@@ -89,7 +94,7 @@ func (s *AIService) Review(ctx context.Context, req *ReviewRequest) (*ReviewResu
 				Content: prompt,
 			},
 		},
-		Temperature: 0.3,
+		Temperature: temperature,
 	})
 
 	if err != nil {
@@ -114,12 +119,23 @@ func (s *AIService) Review(ctx context.Context, req *ReviewRequest) (*ReviewResu
 
 // extractScore extracts the score from review content
 func extractScore(content string) float64 {
-	// Match patterns like "总分: 85分" or "总分：85"
-	re := regexp.MustCompile(`总分[:：]\s*(\d+)分?`)
-	matches := re.FindStringSubmatch(content)
-	if len(matches) >= 2 {
-		if score, err := strconv.ParseFloat(matches[1], 64); err == nil {
-			return score
+	patterns := []string{
+		`总分[:：]\s*(\d+)分?`,
+		`[Tt]otal\s*[Ss]core[:：]?\s*(\d+)`,
+		`[Ss]core[:：]?\s*(\d+)\s*/\s*100`,
+		`(\d+)\s*/\s*100\s*分?`,
+		`评分[:：]\s*(\d+)`,
+	}
+
+	for _, pattern := range patterns {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindStringSubmatch(content)
+		if len(matches) >= 2 {
+			if score, err := strconv.ParseFloat(matches[1], 64); err == nil {
+				if score >= 0 && score <= 100 {
+					return score
+				}
+			}
 		}
 	}
 	return 0

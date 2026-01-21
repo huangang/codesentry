@@ -2,9 +2,12 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -109,4 +112,111 @@ func (h *WebhookHandler) HandleGitHubWebhook(c *gin.Context) {
 	}()
 
 	c.JSON(http.StatusOK, gin.H{"message": "webhook received"})
+}
+
+func (h *WebhookHandler) HandleGitLabWebhookGeneric(c *gin.Context) {
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read body"})
+		return
+	}
+
+	var payload struct {
+		Project struct {
+			WebURL     string `json:"web_url"`
+			GitHTTPURL string `json:"git_http_url"`
+			GitSSHURL  string `json:"git_ssh_url"`
+		} `json:"project"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to parse body"})
+		return
+	}
+
+	projectURL := payload.Project.WebURL
+	if projectURL == "" {
+		projectURL = payload.Project.GitHTTPURL
+	}
+	projectURL = strings.TrimSuffix(projectURL, ".git")
+
+	if projectURL == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "project URL not found in webhook payload"})
+		return
+	}
+
+	project, err := h.projectService.GetByURL(projectURL)
+	if err != nil {
+		log.Printf("[Webhook] Project not found for URL: %s", projectURL)
+		c.JSON(http.StatusNotFound, gin.H{"error": "project not found for URL: " + projectURL})
+		return
+	}
+
+	token := c.GetHeader("X-Gitlab-Token")
+	if project.WebhookSecret != "" && !services.VerifyGitLabSignature(project.WebhookSecret, token) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid webhook token"})
+		return
+	}
+
+	eventType := c.GetHeader("X-Gitlab-Event")
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		_ = h.webhookService.HandleGitLabWebhook(ctx, project.ID, eventType, body)
+	}()
+
+	c.JSON(http.StatusOK, gin.H{"message": "webhook received", "project_id": project.ID})
+}
+
+func (h *WebhookHandler) HandleGitHubWebhookGeneric(c *gin.Context) {
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read body"})
+		return
+	}
+
+	var payload struct {
+		Repository struct {
+			HTMLURL string `json:"html_url"`
+			URL     string `json:"url"`
+		} `json:"repository"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to parse body"})
+		return
+	}
+
+	projectURL := payload.Repository.HTMLURL
+	if projectURL == "" {
+		projectURL = payload.Repository.URL
+	}
+	projectURL = strings.TrimSuffix(projectURL, ".git")
+
+	if projectURL == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "repository URL not found in webhook payload"})
+		return
+	}
+
+	project, err := h.projectService.GetByURL(projectURL)
+	if err != nil {
+		log.Printf("[Webhook] Project not found for URL: %s", projectURL)
+		c.JSON(http.StatusNotFound, gin.H{"error": "project not found for URL: " + projectURL})
+		return
+	}
+
+	signature := c.GetHeader("X-Hub-Signature-256")
+	if project.WebhookSecret != "" && !services.VerifyGitHubSignature(project.WebhookSecret, body, signature) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid webhook signature"})
+		return
+	}
+
+	eventType := c.GetHeader("X-GitHub-Event")
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		_ = h.webhookService.HandleGitHubWebhook(ctx, project.ID, eventType, body)
+	}()
+
+	c.JSON(http.StatusOK, gin.H{"message": "webhook received", "project_id": project.ID})
 }

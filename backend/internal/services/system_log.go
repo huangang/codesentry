@@ -1,9 +1,56 @@
 package services
 
 import (
+	"encoding/json"
+	"time"
+
 	"github.com/huangang/codesentry/backend/internal/models"
 	"gorm.io/gorm"
 )
+
+var globalDB *gorm.DB
+
+func InitSystemLogger(db *gorm.DB) {
+	globalDB = db
+}
+
+func LogInfo(module, action, message string, userID *uint, ip, userAgent string, extra interface{}) {
+	writeLog("info", module, action, message, userID, ip, userAgent, extra)
+}
+
+func LogWarning(module, action, message string, userID *uint, ip, userAgent string, extra interface{}) {
+	writeLog("warning", module, action, message, userID, ip, userAgent, extra)
+}
+
+func LogError(module, action, message string, userID *uint, ip, userAgent string, extra interface{}) {
+	writeLog("error", module, action, message, userID, ip, userAgent, extra)
+}
+
+func writeLog(level, module, action, message string, userID *uint, ip, userAgent string, extra interface{}) {
+	if globalDB == nil {
+		return
+	}
+
+	var extraStr string
+	if extra != nil {
+		if b, err := json.Marshal(extra); err == nil {
+			extraStr = string(b)
+		}
+	}
+
+	log := &models.SystemLog{
+		Level:     level,
+		Module:    module,
+		Action:    action,
+		Message:   message,
+		UserID:    userID,
+		IP:        ip,
+		UserAgent: userAgent,
+		Extra:     extraStr,
+		CreatedAt: time.Now(),
+	}
+	globalDB.Create(log)
+}
 
 type SystemLogService struct {
 	db *gorm.DB

@@ -1,22 +1,28 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, Spin } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
+import enUS from 'antd/locale/en_US';
+import { useTranslation } from 'react-i18next';
 import MainLayout from './layouts/MainLayout';
-import { 
-  Login, 
-  Dashboard, 
-  ReviewLogs, 
-  Projects, 
-  MemberAnalysis, 
-  LLMModels, 
-  IMBots, 
-  SystemLogs,
-  Prompts 
-} from './pages';
+import Login from './pages/Login';
 import { useAuthStore } from './stores/authStore';
 
-// Protected Route wrapper
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const ReviewLogs = React.lazy(() => import('./pages/ReviewLogs'));
+const Projects = React.lazy(() => import('./pages/Projects'));
+const MemberAnalysis = React.lazy(() => import('./pages/MemberAnalysis'));
+const LLMModels = React.lazy(() => import('./pages/LLMModels'));
+const IMBots = React.lazy(() => import('./pages/IMBots'));
+const Prompts = React.lazy(() => import('./pages/Prompts'));
+const SystemLogs = React.lazy(() => import('./pages/SystemLogs'));
+
+const PageLoader: React.FC = () => (
+  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', minHeight: 300 }}>
+    <Spin size="large" />
+  </div>
+);
+
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useAuthStore();
   
@@ -28,8 +34,11 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 };
 
 const App: React.FC = () => {
+  const { i18n } = useTranslation();
+  const locale = i18n.language === 'zh' ? zhCN : enUS;
+
   return (
-    <ConfigProvider locale={zhCN}>
+    <ConfigProvider locale={locale}>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -42,14 +51,14 @@ const App: React.FC = () => {
             }
           >
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="review-logs" element={<ReviewLogs />} />
-            <Route path="projects" element={<Projects />} />
-            <Route path="member-analysis" element={<MemberAnalysis />} />
-            <Route path="llm-models" element={<LLMModels />} />
-            <Route path="im-bots" element={<IMBots />} />
-            <Route path="prompts" element={<Prompts />} />
-            <Route path="sys-logs" element={<SystemLogs />} />
+            <Route path="dashboard" element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
+            <Route path="review-logs" element={<Suspense fallback={<PageLoader />}><ReviewLogs /></Suspense>} />
+            <Route path="projects" element={<Suspense fallback={<PageLoader />}><Projects /></Suspense>} />
+            <Route path="member-analysis" element={<Suspense fallback={<PageLoader />}><MemberAnalysis /></Suspense>} />
+            <Route path="llm-models" element={<Suspense fallback={<PageLoader />}><LLMModels /></Suspense>} />
+            <Route path="im-bots" element={<Suspense fallback={<PageLoader />}><IMBots /></Suspense>} />
+            <Route path="prompts" element={<Suspense fallback={<PageLoader />}><Prompts /></Suspense>} />
+            <Route path="sys-logs" element={<Suspense fallback={<PageLoader />}><SystemLogs /></Suspense>} />
           </Route>
           <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
