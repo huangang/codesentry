@@ -27,3 +27,5 @@ frontend/dist/
 data/
 *.db
 backend/tmp/
+backend/cmd/server/static/*
+codesentry
