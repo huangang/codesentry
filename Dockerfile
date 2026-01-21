@@ -1,3 +1,14 @@
+# Frontend builder
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /app
+
+COPY frontend/package*.json ./
+RUN npm ci
+
+COPY frontend/ ./
+RUN npm run build
+
 # Backend builder
 FROM golang:1.23-alpine AS backend-builder
 
@@ -10,22 +21,14 @@ RUN apk add --no-cache gcc musl-dev
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 
-# Copy source code
+# Copy backend source code
 COPY backend/ ./
 
-# Build
+# Copy frontend build to static folder (before go build, so go:embed works)
+COPY --from=frontend-builder /app/dist ./cmd/server/static/
+
+# Build with embedded frontend
 RUN CGO_ENABLED=1 GOOS=linux go build -o codesentry ./cmd/server/
-
-# Frontend builder
-FROM node:20-alpine AS frontend-builder
-
-WORKDIR /app
-
-COPY frontend/package*.json ./
-RUN npm ci
-
-COPY frontend/ ./
-RUN npm run build
 
 # Final stage
 FROM alpine:3.19
@@ -35,11 +38,8 @@ WORKDIR /app
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates tzdata
 
-# Copy backend binary
+# Copy backend binary (with embedded frontend)
 COPY --from=backend-builder /app/codesentry ./
-
-# Copy frontend build to static folder
-COPY --from=frontend-builder /app/dist ./cmd/server/static/
 
 # Create data directory
 RUN mkdir -p /app/data
