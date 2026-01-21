@@ -21,8 +21,8 @@
 
 ### 前置要求
 
-- Go 1.23+
-- Node.js 18+
+- Go 1.24+
+- Node.js 20+
 - Docker (可选)
 
 ### 开发环境
@@ -67,6 +67,18 @@ docker-compose up -d --build
 ```
 
 访问 `http://localhost:8080`
+
+### 构建脚本（本地）
+
+```bash
+# 一键构建（前端+后端打包）
+./build.sh
+
+# 运行
+./codesentry
+```
+
+这将构建前端并嵌入到 Go 二进制文件中，生成单个可执行文件。
 
 ## 配置说明
 
@@ -150,8 +162,20 @@ ldap:
 - `DELETE /api/im-bots/:id` - 删除机器人
 
 ### Webhooks
-- `POST /api/webhook/github/:project_id` - GitHub Webhook
-- `POST /api/webhook/gitlab/:project_id` - GitLab Webhook
+- `POST /api/webhook/github/:project_id` - GitHub Webhook（指定项目ID）
+- `POST /api/webhook/gitlab/:project_id` - GitLab Webhook（指定项目ID）
+- `POST /api/webhook/github` - GitHub Webhook（自动匹配项目）
+- `POST /api/webhook/gitlab` - GitLab Webhook（自动匹配项目）
+
+### 系统日志
+- `GET /api/system-logs` - 日志列表
+- `GET /api/system-logs/modules` - 获取模块列表
+- `GET /api/system-logs/retention` - 获取日志保留天数
+- `PUT /api/system-logs/retention` - 设置日志保留天数
+- `POST /api/system-logs/cleanup` - 手动清理过期日志
+
+### 健康检查
+- `GET /health` - 服务健康检查
 
 ## 项目结构
 
@@ -186,20 +210,21 @@ codesentry/
 ## 技术栈
 
 ### 后端
-- Go 1.23
-- Gin (HTTP 框架)
-- GORM (ORM)
+- Go 1.24
+- Gin v1.11 (HTTP 框架)
+- GORM v1.31 (ORM)
 - JWT 认证
 - LDAP 支持
 
 ### 前端
-- React 18
-- TypeScript
+- React 19
+- TypeScript 5.9
 - Ant Design 5
 - Recharts
 - Zustand (状态管理)
 - React Router 7
 - react-i18next (国际化)
+- react-markdown (审查结果渲染)
 
 ## 许可证
 

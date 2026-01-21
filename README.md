@@ -21,8 +21,8 @@ AI-powered Code Review Platform for GitHub and GitLab.
 
 ### Prerequisites
 
-- Go 1.23+
-- Node.js 18+
+- Go 1.24+
+- Node.js 20+
 - Docker (optional)
 
 ### Development Setup
@@ -67,6 +67,18 @@ docker-compose up -d --build
 ```
 
 Access the application at `http://localhost:8080`
+
+### Build Script (Local)
+
+```bash
+# One-command build (frontend + backend combined)
+./build.sh
+
+# Run the binary
+./codesentry
+```
+
+This builds frontend, embeds it into the Go binary, producing a single executable.
 
 ## Configuration
 
@@ -150,8 +162,20 @@ ldap:
 - `DELETE /api/im-bots/:id` - Delete IM bot
 
 ### Webhooks
-- `POST /api/webhook/github/:project_id` - GitHub webhook
-- `POST /api/webhook/gitlab/:project_id` - GitLab webhook
+- `POST /api/webhook/github/:project_id` - GitHub webhook (with project ID)
+- `POST /api/webhook/gitlab/:project_id` - GitLab webhook (with project ID)
+- `POST /api/webhook/github` - GitHub webhook (auto-detect project by URL)
+- `POST /api/webhook/gitlab` - GitLab webhook (auto-detect project by URL)
+
+### System Logs
+- `GET /api/system-logs` - List system logs
+- `GET /api/system-logs/modules` - Get module list
+- `GET /api/system-logs/retention` - Get log retention days
+- `PUT /api/system-logs/retention` - Set log retention days
+- `POST /api/system-logs/cleanup` - Manually cleanup old logs
+
+### Health Check
+- `GET /health` - Service health check
 
 ## Project Structure
 
@@ -186,20 +210,21 @@ codesentry/
 ## Tech Stack
 
 ### Backend
-- Go 1.23
-- Gin (HTTP framework)
-- GORM (ORM)
+- Go 1.24
+- Gin v1.11 (HTTP framework)
+- GORM v1.31 (ORM)
 - JWT authentication
 - LDAP support
 
 ### Frontend
-- React 18
-- TypeScript
+- React 19
+- TypeScript 5.9
 - Ant Design 5
 - Recharts
 - Zustand (state management)
 - React Router 7
 - react-i18next (internationalization)
+- react-markdown (review result rendering)
 
 ## License
 
