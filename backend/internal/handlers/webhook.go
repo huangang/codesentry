@@ -168,6 +168,19 @@ func (h *WebhookHandler) HandleGitLabWebhookGeneric(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "webhook received", "project_id": project.ID})
 }
 
+func (h *WebhookHandler) HandleUnifiedWebhook(c *gin.Context) {
+	gitlabEvent := c.GetHeader("X-Gitlab-Event")
+	githubEvent := c.GetHeader("X-GitHub-Event")
+
+	if gitlabEvent != "" {
+		h.HandleGitLabWebhookGeneric(c)
+	} else if githubEvent != "" {
+		h.HandleGitHubWebhookGeneric(c)
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unknown webhook source, missing X-Gitlab-Event or X-GitHub-Event header"})
+	}
+}
+
 func (h *WebhookHandler) HandleGitHubWebhookGeneric(c *gin.Context) {
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {

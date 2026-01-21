@@ -173,10 +173,12 @@ ldap:
 - `DELETE /api/im-bots/:id` - Delete IM bot
 
 ### Webhooks
-- `POST /api/webhook/github/:project_id` - GitHub webhook (with project ID)
-- `POST /api/webhook/gitlab/:project_id` - GitLab webhook (with project ID)
-- `POST /api/webhook/github` - GitHub webhook (auto-detect project by URL)
+- `POST /api/webhook` - **Unified webhook (auto-detect GitLab/GitHub)**
+- `POST /api/review/webhook` - Alias for unified webhook
 - `POST /api/webhook/gitlab` - GitLab webhook (auto-detect project by URL)
+- `POST /api/webhook/github` - GitHub webhook (auto-detect project by URL)
+- `POST /api/webhook/gitlab/:project_id` - GitLab webhook (with project ID)
+- `POST /api/webhook/github/:project_id` - GitHub webhook (with project ID)
 
 ### System Logs
 - `GET /api/system-logs` - List system logs

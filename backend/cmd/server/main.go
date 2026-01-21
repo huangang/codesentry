@@ -74,6 +74,11 @@ func main() {
 		c.JSON(200, gin.H{"status": "ok", "service": "codesentry"})
 	})
 
+	// Root-level webhook routes (without /api prefix for compatibility)
+	webhookHandler := handlers.NewWebhookHandler(models.GetDB(), &cfg.OpenAI)
+	r.POST("/webhook", webhookHandler.HandleUnifiedWebhook)
+	r.POST("/review/webhook", webhookHandler.HandleUnifiedWebhook)
+
 	// API routes
 	api := r.Group("/api")
 	{
@@ -158,6 +163,8 @@ func main() {
 		api.POST("/webhook/github/:project_id", webhookHandler.HandleGitHubWebhook)
 		api.POST("/webhook/gitlab", webhookHandler.HandleGitLabWebhookGeneric)
 		api.POST("/webhook/github", webhookHandler.HandleGitHubWebhookGeneric)
+		api.POST("/webhook", webhookHandler.HandleUnifiedWebhook)
+		api.POST("/review/webhook", webhookHandler.HandleUnifiedWebhook)
 	}
 
 	// Serve static files (embedded frontend)
