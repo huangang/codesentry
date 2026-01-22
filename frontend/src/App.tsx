@@ -35,7 +35,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 const App: React.FC = () => {
   const { i18n } = useTranslation();
-  const locale = i18n.language === 'zh' ? zhCN : enUS;
+  const locale = i18n.language?.startsWith('zh') ? zhCN : enUS;
 
   return (
     <ConfigProvider locale={locale}>

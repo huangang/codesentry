@@ -30,9 +30,9 @@ i18n
   });
 
 i18n.on('languageChanged', (lng) => {
-  dayjs.locale(lng === 'zh' ? 'zh-cn' : 'en');
+  dayjs.locale(lng?.startsWith('zh') ? 'zh-cn' : 'en');
 });
 
-dayjs.locale(i18n.language === 'zh' ? 'zh-cn' : 'en');
+dayjs.locale(i18n.language?.startsWith('zh') ? 'zh-cn' : 'en');
 
 export default i18n;
