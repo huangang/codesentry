@@ -144,20 +144,34 @@ func (h *WebhookHandler) HandleGitLabWebhookGeneric(c *gin.Context) {
 		return
 	}
 
+	eventType := c.GetHeader("X-Gitlab-Event")
+
 	project, err := h.projectService.GetByURL(projectURL)
 	if err != nil {
 		log.Printf("[Webhook] Project not found for URL: %s", projectURL)
+		services.LogError("Webhook", "ProjectNotFound", "Project not registered: "+projectURL, nil, c.ClientIP(), c.GetHeader("User-Agent"), map[string]interface{}{
+			"project_url": projectURL,
+			"event_type":  eventType,
+		})
 		c.JSON(http.StatusNotFound, gin.H{"error": "project not found for URL: " + projectURL})
 		return
 	}
 
 	token := c.GetHeader("X-Gitlab-Token")
 	if project.WebhookSecret != "" && !services.VerifyGitLabSignature(project.WebhookSecret, token) {
+		services.LogWarning("Webhook", "InvalidToken", "Invalid webhook token", nil, c.ClientIP(), c.GetHeader("User-Agent"), map[string]interface{}{
+			"project_id":  project.ID,
+			"project_url": projectURL,
+		})
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid webhook token"})
 		return
 	}
 
-	eventType := c.GetHeader("X-Gitlab-Event")
+	services.LogInfo("Webhook", "Received", "Webhook received from GitLab", nil, c.ClientIP(), c.GetHeader("User-Agent"), map[string]interface{}{
+		"project_id":   project.ID,
+		"project_name": project.Name,
+		"event_type":   eventType,
+	})
 
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -210,20 +224,34 @@ func (h *WebhookHandler) HandleGitHubWebhookGeneric(c *gin.Context) {
 		return
 	}
 
+	eventType := c.GetHeader("X-GitHub-Event")
+
 	project, err := h.projectService.GetByURL(projectURL)
 	if err != nil {
 		log.Printf("[Webhook] Project not found for URL: %s", projectURL)
+		services.LogError("Webhook", "ProjectNotFound", "Project not registered: "+projectURL, nil, c.ClientIP(), c.GetHeader("User-Agent"), map[string]interface{}{
+			"project_url": projectURL,
+			"event_type":  eventType,
+		})
 		c.JSON(http.StatusNotFound, gin.H{"error": "project not found for URL: " + projectURL})
 		return
 	}
 
 	signature := c.GetHeader("X-Hub-Signature-256")
 	if project.WebhookSecret != "" && !services.VerifyGitHubSignature(project.WebhookSecret, body, signature) {
+		services.LogWarning("Webhook", "InvalidSignature", "Invalid webhook signature", nil, c.ClientIP(), c.GetHeader("User-Agent"), map[string]interface{}{
+			"project_id":  project.ID,
+			"project_url": projectURL,
+		})
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid webhook signature"})
 		return
 	}
 
-	eventType := c.GetHeader("X-GitHub-Event")
+	services.LogInfo("Webhook", "Received", "Webhook received from GitHub", nil, c.ClientIP(), c.GetHeader("User-Agent"), map[string]interface{}{
+		"project_id":   project.ID,
+		"project_name": project.Name,
+		"event_type":   eventType,
+	})
 
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
