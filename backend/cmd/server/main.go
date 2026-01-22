@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/huangang/codesentry/backend/internal/config"
@@ -18,14 +19,21 @@ import (
 //go:embed static/*
 var staticFiles embed.FS
 
+func maskDSN(dsn string) string {
+	if idx := strings.Index(dsn, "@"); idx > 0 {
+		return "***@" + dsn[idx+1:]
+	}
+	return "***"
+}
+
 func main() {
-	// Load configuration
 	cfg, err := config.Load(os.Getenv("CONFIG_PATH"))
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Initialize JWT secret
+	log.Printf("Config loaded: driver=%s, dsn=%s", cfg.Database.Driver, maskDSN(cfg.Database.DSN))
+
 	utils.SetJWTSecret(cfg.JWT.Secret)
 
 	// Initialize database
