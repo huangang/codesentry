@@ -295,6 +295,11 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 		commitSHA = event.Commits[len(event.Commits)-1].ID
 	}
 
+	if s.isCommitAlreadyReviewed(project.ID, commitSHA) {
+		log.Printf("[Webhook] Commit %s already reviewed, skipping", commitSHA[:8])
+		return nil
+	}
+
 	log.Printf("[Webhook] Processing GitLab push: %d commits, checkout_sha=%s, using commit=%s",
 		len(event.Commits), event.CheckoutSHA, commitSHA)
 
@@ -394,6 +399,15 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 			EventType:     "push",
 		})
 
+		if project.CommentEnabled {
+			comment := s.formatReviewComment(result.Score, result.Content)
+			if err := s.postGitLabCommitComment(project, commitSHA, comment); err != nil {
+				log.Printf("[Webhook] Failed to post GitLab commit comment: %v", err)
+			} else {
+				reviewLog.CommentPosted = true
+			}
+		}
+
 		// Set final status
 		minScore := s.getEffectiveMinScore(project)
 		if result.Score >= minScore {
@@ -472,6 +486,8 @@ func (s *WebhookService) processGitLabMR(ctx context.Context, project *models.Pr
 			comment := s.formatReviewComment(result.Score, result.Content)
 			if err := s.postGitLabMRComment(project, mrNumber, comment); err != nil {
 				log.Printf("[Webhook] Failed to post GitLab MR comment: %v", err)
+			} else {
+				reviewLog.CommentPosted = true
 			}
 		}
 	}
@@ -496,6 +512,11 @@ func (s *WebhookService) processGitLabMR(ctx context.Context, project *models.Pr
 
 func (s *WebhookService) processGitHubPush(ctx context.Context, project *models.Project, event *GitHubPushEvent) error {
 	if len(event.Commits) == 0 {
+		return nil
+	}
+
+	if s.isCommitAlreadyReviewed(project.ID, event.After) {
+		log.Printf("[Webhook] Commit %s already reviewed, skipping", event.After[:8])
 		return nil
 	}
 
@@ -558,6 +579,15 @@ func (s *WebhookService) processGitHubPush(ctx context.Context, project *models.
 			ReviewResult:  result.Content,
 			EventType:     "push",
 		})
+
+		if project.CommentEnabled {
+			comment := s.formatReviewComment(result.Score, result.Content)
+			if err := s.postGitHubCommitComment(project, event.After, comment); err != nil {
+				log.Printf("[Webhook] Failed to post GitHub commit comment: %v", err)
+			} else {
+				reviewLog.CommentPosted = true
+			}
+		}
 	}
 
 	return s.reviewService.Update(reviewLog)
@@ -625,6 +655,8 @@ func (s *WebhookService) processGitHubPR(ctx context.Context, project *models.Pr
 			comment := s.formatReviewComment(result.Score, result.Content)
 			if err := s.postGitHubPRComment(project, mrNumber, comment); err != nil {
 				log.Printf("[Webhook] Failed to post GitHub PR comment: %v", err)
+			} else {
+				reviewLog.CommentPosted = true
 			}
 		}
 	}
@@ -1058,6 +1090,74 @@ func (s *WebhookService) postGitHubPRComment(project *models.Project, prNumber i
 	return nil
 }
 
+func (s *WebhookService) postGitLabCommitComment(project *models.Project, commitSHA string, comment string) error {
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		return err
+	}
+
+	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/repository/commits/%s/comments",
+		info.baseURL, strings.ReplaceAll(info.projectPath, "/", "%2F"), commitSHA)
+
+	body := fmt.Sprintf(`{"note": %q}`, comment)
+	req, err := http.NewRequest("POST", apiURL, strings.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if project.AccessToken != "" {
+		req.Header.Set("PRIVATE-TOKEN", project.AccessToken)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("GitLab API returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	log.Printf("[Webhook] Posted comment to GitLab commit %s", commitSHA[:8])
+	return nil
+}
+
+func (s *WebhookService) postGitHubCommitComment(project *models.Project, commitSHA string, comment string) error {
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		return err
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits/%s/comments", info.owner, info.repo, commitSHA)
+
+	body := fmt.Sprintf(`{"body": %q}`, comment)
+	req, err := http.NewRequest("POST", apiURL, strings.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	if project.AccessToken != "" {
+		req.Header.Set("Authorization", "token "+project.AccessToken)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("GitHub API returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	log.Printf("[Webhook] Posted comment to GitHub commit %s", commitSHA[:8])
+	return nil
+}
+
 func (s *WebhookService) formatReviewComment(score float64, reviewResult string) string {
 	return fmt.Sprintf("## 🤖 AI Code Review\n\n**Score: %.0f/100**\n\n%s\n\n---\n*Powered by CodeSentry*", score, reviewResult)
 }
@@ -1086,4 +1186,12 @@ func parseDiffStats(diff string) (additions, deletions, filesChanged int) {
 
 	filesChanged = len(fileSet)
 	return
+}
+
+func (s *WebhookService) isCommitAlreadyReviewed(projectID uint, commitSHA string) bool {
+	var count int64
+	s.db.Model(&models.ReviewLog{}).
+		Where("project_id = ? AND commit_hash = ? AND review_status = ?", projectID, commitSHA, "completed").
+		Count(&count)
+	return count > 0
 }

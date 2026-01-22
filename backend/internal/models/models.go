@@ -54,7 +54,7 @@ type ReviewLog struct {
 	ProjectID     uint           `gorm:"index;not null" json:"project_id"`
 	Project       *Project       `gorm:"foreignKey:ProjectID" json:"project,omitempty"`
 	EventType     string         `gorm:"size:50;not null" json:"event_type"` // push, merge_request
-	CommitHash    string         `gorm:"size:100" json:"commit_hash"`
+	CommitHash    string         `gorm:"size:100;index" json:"commit_hash"`
 	CommitURL     string         `gorm:"size:500" json:"commit_url"`
 	Branch        string         `gorm:"size:200" json:"branch"`
 	Author        string         `gorm:"size:200" json:"author"`
@@ -68,6 +68,7 @@ type ReviewLog struct {
 	Score         *float64       `json:"score"`
 	ReviewResult  string         `gorm:"type:text" json:"review_result"`
 	ReviewStatus  string         `gorm:"size:50;default:pending" json:"review_status"` // pending, completed, failed
+	CommentPosted bool           `gorm:"default:false" json:"comment_posted"`
 	ErrorMessage  string         `gorm:"type:text" json:"error_message"`
 	RetryCount    int            `gorm:"default:0" json:"retry_count"`
 	LLMConfigID   *uint          `json:"llm_config_id"` // Which LLM was used
