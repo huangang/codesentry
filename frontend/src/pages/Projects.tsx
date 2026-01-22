@@ -153,8 +153,8 @@ const Projects: React.FC = () => {
   };
 
   const getPromptMode = (project: Project): PromptMode => {
-    if (project.ai_prompt) return 'custom';
-    if (project.ai_prompt_id) return 'template';
+    if (project.ai_prompt && project.ai_prompt.length > 0) return 'custom';
+    if (project.ai_prompt_id !== null && project.ai_prompt_id !== undefined) return 'template';
     return 'default';
   };
 
