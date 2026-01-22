@@ -121,6 +121,7 @@ func main() {
 			// LLM Configs
 			llmConfigHandler := handlers.NewLLMConfigHandler(models.GetDB())
 			protected.GET("/llm-configs", llmConfigHandler.List)
+			protected.GET("/llm-configs/active", llmConfigHandler.GetActive)
 			protected.GET("/llm-configs/:id", llmConfigHandler.GetByID)
 			protected.POST("/llm-configs", llmConfigHandler.Create)
 			protected.PUT("/llm-configs/:id", llmConfigHandler.Update)

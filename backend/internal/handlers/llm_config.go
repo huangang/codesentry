@@ -113,3 +113,14 @@ func (h *LLMConfigHandler) Delete(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "config deleted successfully"})
 }
+
+// GetActive returns all active LLM configs
+// GET /api/llm-configs/active
+func (h *LLMConfigHandler) GetActive(c *gin.Context) {
+	configs, err := h.llmConfigService.GetActive()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, configs)
+}

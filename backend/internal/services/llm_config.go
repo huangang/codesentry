@@ -223,3 +223,14 @@ func (s *LLMConfigService) Delete(id uint) error {
 	}
 	return nil
 }
+
+func (s *LLMConfigService) GetActive() ([]models.LLMConfig, error) {
+	var configs []models.LLMConfig
+	if err := s.db.Where("is_active = ?", true).Order("is_default DESC, created_at DESC").Find(&configs).Error; err != nil {
+		return nil, err
+	}
+	for i := range configs {
+		configs[i].APIKeyMask = configs[i].MaskAPIKey()
+	}
+	return configs, nil
+}

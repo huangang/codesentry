@@ -96,8 +96,8 @@ const Projects: React.FC = () => {
 
   const fetchLLMConfigs = useCallback(async () => {
     try {
-      const res = await llmConfigApi.list({ page_size: 100 });
-      setLLMConfigs(res.data.items.filter(c => c.is_active));
+      const res = await llmConfigApi.getActive();
+      setLLMConfigs(res.data);
     } catch (error) {
       console.error('Failed to fetch LLM configs:', error);
     }

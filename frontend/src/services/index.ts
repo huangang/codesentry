@@ -73,6 +73,8 @@ export const llmConfigApi = {
   
   getById: (id: number) => api.get<LLMConfig>(`/llm-configs/${id}`),
   
+  getActive: () => api.get<LLMConfig[]>('/llm-configs/active'),
+  
   create: (data: Partial<LLMConfig> & { api_key: string }) =>
     api.post<LLMConfig>('/llm-configs', data),
   
