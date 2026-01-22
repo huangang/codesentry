@@ -34,9 +34,11 @@ type Project struct {
 	FileExtensions string         `gorm:"size:1000" json:"file_extensions"` // .js,.ts,.go,...
 	ReviewEvents   string         `gorm:"size:200" json:"review_events"`    // push,merge_request
 	AIEnabled      bool           `gorm:"default:true" json:"ai_enabled"`
-	AIPromptID     *uint          `json:"ai_prompt_id"`               // Reference to PromptTemplate
-	AIPrompt       string         `gorm:"type:text" json:"ai_prompt"` // Custom prompt override
-	LLMConfigID    *uint          `json:"llm_config_id"`              // Reference to LLMConfig
+	AIPromptID     *uint          `json:"ai_prompt_id"`                     // Reference to PromptTemplate
+	AIPrompt       string         `gorm:"type:text" json:"ai_prompt"`       // Custom prompt override
+	LLMConfigID    *uint          `json:"llm_config_id"`                    // Reference to LLMConfig
+	IgnorePatterns string         `gorm:"size:2000" json:"ignore_patterns"` // Patterns to ignore: vendor/,node_modules/,*.min.js
+	CommentEnabled bool           `gorm:"default:false" json:"comment_enabled"`
 	IMEnabled      bool           `gorm:"default:false" json:"im_enabled"`
 	IMBotID        *uint          `json:"im_bot_id"`
 	CreatedBy      uint           `json:"created_by"`
@@ -52,9 +54,12 @@ type ReviewLog struct {
 	Project       *Project       `gorm:"foreignKey:ProjectID" json:"project,omitempty"`
 	EventType     string         `gorm:"size:50;not null" json:"event_type"` // push, merge_request
 	CommitHash    string         `gorm:"size:100" json:"commit_hash"`
+	CommitURL     string         `gorm:"size:500" json:"commit_url"`
 	Branch        string         `gorm:"size:200" json:"branch"`
 	Author        string         `gorm:"size:200" json:"author"`
 	AuthorEmail   string         `gorm:"size:255" json:"author_email"`
+	AuthorAvatar  string         `gorm:"size:500" json:"author_avatar"`
+	AuthorURL     string         `gorm:"size:500" json:"author_url"`
 	CommitMessage string         `gorm:"type:text" json:"commit_message"`
 	FilesChanged  int            `json:"files_changed"`
 	Additions     int            `json:"additions"`
@@ -63,6 +68,7 @@ type ReviewLog struct {
 	ReviewResult  string         `gorm:"type:text" json:"review_result"`
 	ReviewStatus  string         `gorm:"size:50;default:pending" json:"review_status"` // pending, completed, failed
 	ErrorMessage  string         `gorm:"type:text" json:"error_message"`
+	RetryCount    int            `gorm:"default:0" json:"retry_count"`
 	LLMConfigID   *uint          `json:"llm_config_id"` // Which LLM was used
 	MRNumber      *int           `json:"mr_number"`     // Merge Request number
 	MRURL         string         `gorm:"size:500" json:"mr_url"`

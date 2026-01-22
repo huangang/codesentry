@@ -115,8 +115,11 @@
     "webhookUrl": "Webhook URL",
     "fileExtensions": "File Extensions",
     "fileExtensionsPlaceholder": "e.g., .js,.ts,.go,.py",
+    "ignorePatterns": "Ignore Patterns",
+    "ignorePatternsPlaceholder": "e.g., vendor/,node_modules/,*.min.js",
     "reviewEvents": "Review Events",
     "aiEnabled": "AI Review Enabled",
+    "commentEnabled": "MR/PR Comment",
     "aiPrompt": "AI Prompt",
     "llmConfig": "LLM Configuration",
     "imEnabled": "IM Notification Enabled",
@@ -156,7 +159,10 @@
     "failed": "Failed",
     "push": "Push",
     "mergeRequest": "Merge Request",
-    "pullRequest": "Pull Request"
+    "pullRequest": "Pull Request",
+    "retry": "Retry",
+    "retryCount": "Retries",
+    "retryInitiated": "Retry initiated"
   },
   "llmModels": {
     "title": "LLM Models",

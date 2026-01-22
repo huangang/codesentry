@@ -50,6 +50,9 @@ func main() {
 	// Start system log cleanup scheduler
 	services.StartLogCleanupScheduler(models.GetDB())
 
+	// Start retry scheduler for failed reviews
+	services.StartRetryScheduler(models.GetDB(), &cfg.OpenAI)
+
 	// Create default admin user
 	authHandler := handlers.NewAuthHandler(models.GetDB(), cfg)
 	if err := authHandler.CreateAdminIfNotExists(); err != nil {
@@ -111,9 +114,10 @@ func main() {
 			protected.DELETE("/projects/:id", projectHandler.Delete)
 
 			// Review Logs
-			reviewLogHandler := handlers.NewReviewLogHandler(models.GetDB())
+			reviewLogHandler := handlers.NewReviewLogHandler(models.GetDB(), &cfg.OpenAI)
 			protected.GET("/review-logs", reviewLogHandler.List)
 			protected.GET("/review-logs/:id", reviewLogHandler.GetByID)
+			protected.POST("/review-logs/:id/retry", reviewLogHandler.Retry)
 
 			// LLM Configs
 			llmConfigHandler := handlers.NewLLMConfigHandler(models.GetDB())

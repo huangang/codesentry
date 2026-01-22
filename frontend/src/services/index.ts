@@ -62,6 +62,8 @@ export const reviewLogApi = {
   }) => api.get<PaginatedResponse<ReviewLog>>('/review-logs', { params }),
   
   getById: (id: number) => api.get<ReviewLog>(`/review-logs/${id}`),
+
+  retry: (id: number) => api.post<{ message: string }>(`/review-logs/${id}/retry`),
 };
 
 // LLM Configs

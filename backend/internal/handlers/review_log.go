@@ -4,18 +4,23 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/huangang/codesentry/backend/internal/services"
 	"github.com/gin-gonic/gin"
+	"github.com/huangang/codesentry/backend/internal/config"
+	"github.com/huangang/codesentry/backend/internal/services"
 	"gorm.io/gorm"
 )
 
 type ReviewLogHandler struct {
+	db               *gorm.DB
 	reviewLogService *services.ReviewLogService
+	retryService     *services.RetryService
 }
 
-func NewReviewLogHandler(db *gorm.DB) *ReviewLogHandler {
+func NewReviewLogHandler(db *gorm.DB, aiCfg *config.OpenAIConfig) *ReviewLogHandler {
 	return &ReviewLogHandler{
+		db:               db,
 		reviewLogService: services.NewReviewLogService(db),
+		retryService:     services.NewRetryService(db, aiCfg),
 	}
 }
 
@@ -53,4 +58,19 @@ func (h *ReviewLogHandler) GetByID(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, log)
+}
+
+func (h *ReviewLogHandler) Retry(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid review log id"})
+		return
+	}
+
+	if err := h.retryService.ManualRetry(uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "retry initiated"})
 }

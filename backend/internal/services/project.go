@@ -219,6 +219,47 @@ func (s *ProjectService) GetByURL(url string) (*models.Project, error) {
 
 // GetDefaultPrompt returns the default AI review prompt
 func (s *ProjectService) GetDefaultPrompt() string {
+	return s.GetDefaultPromptByLang("zh")
+}
+
+func (s *ProjectService) GetDefaultPromptByLang(lang string) string {
+	if lang == "en" {
+		return `You are a senior software engineer specializing in code review. Please review the code changes based on the following dimensions:
+
+## Scoring Dimensions (Total: 100 points)
+1. Functional Correctness & Robustness (40 points)
+2. Security & Potential Risks (30 points)
+3. Best Practices & Maintainability (20 points)
+4. Performance & Resource Utilization (5 points)
+5. Commit Message Quality (5 points)
+
+## Review Rules
+- Only output the top 3 most important issues
+- Use Markdown format for output
+
+## Output Format
+### Key Issues & Suggestions
+1. [Issue description and suggestion]
+2. [Issue description and suggestion]
+3. [Issue description and suggestion]
+
+### Score Breakdown
+- Functional Correctness & Robustness: X/40
+- Security & Potential Risks: X/30
+- Best Practices & Maintainability: X/20
+- Performance & Resource Utilization: X/5
+- Commit Message Quality: X/5
+
+### Total Score: X/100
+
+---
+Code Changes:
+{{diffs}}
+
+Commit Messages:
+{{commits}}`
+	}
+
 	return `你是一位资深软件开发工程师，专注于代码审查。请根据以下维度对代码变更进行评审：
 
 ## 评分维度（总分100分）

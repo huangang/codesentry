@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
   Card,
   Table,
@@ -21,93 +21,95 @@ import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import { llmConfigApi } from '../services';
 import type { LLMConfig } from '../types';
+import { usePaginatedList, useModal } from '../hooks';
+import { LLM_PROVIDERS } from '../constants';
+
+interface LLMConfigFilters {
+  name?: string;
+  provider?: string;
+}
 
 const LLMModels: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<LLMConfig[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [currentConfig, setCurrentConfig] = useState<LLMConfig | null>(null);
-  const [form] = Form.useForm();
   const { t } = useTranslation();
+  const [form] = Form.useForm();
+  const [searchName, setSearchName] = React.useState('');
+  const [provider, setProvider] = React.useState<string>('');
 
-  // Filters
-  const [searchName, setSearchName] = useState('');
-  const [provider, setProvider] = useState<string>('');
+  const modal = useModal<LLMConfig>();
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const params: any = { page, page_size: pageSize };
-      if (searchName) params.name = searchName;
-      if (provider) params.provider = provider;
-      const res = await llmConfigApi.list(params);
-      setData(res.data.items);
-      setTotal(res.data.total);
-    } catch (error) {
-      message.error(t('common.error'));
-    } finally {
-      setLoading(false);
-    }
+  const {
+    loading,
+    data,
+    total,
+    page,
+    pageSize,
+    setPage,
+    fetchData,
+    handlePageChange,
+  } = usePaginatedList<LLMConfig, LLMConfigFilters>({
+    fetchApi: llmConfigApi.list,
+    onError: () => message.error(t('common.error')),
+  });
+
+  const buildFilters = (): LLMConfigFilters => {
+    const filters: LLMConfigFilters = {};
+    if (searchName) filters.name = searchName;
+    if (provider) filters.provider = provider;
+    return filters;
   };
 
   useEffect(() => {
-    fetchData();
+    fetchData(buildFilters());
   }, [page, pageSize]);
 
   const handleSearch = () => {
     setPage(1);
-    fetchData();
+    fetchData(buildFilters());
   };
 
   const handleReset = () => {
     setSearchName('');
     setProvider('');
     setPage(1);
-    setTimeout(fetchData, 0);
+    fetchData({});
   };
 
   const showCreateModal = () => {
-    setCurrentConfig(null);
+    modal.open();
     form.resetFields();
     form.setFieldsValue({
-      provider: 'openai',
+      provider: LLM_PROVIDERS.OPENAI,
       max_tokens: 4096,
       temperature: 0.3,
       is_active: true,
       is_default: false,
     });
-    setModalVisible(true);
   };
 
   const showEditModal = (record: LLMConfig) => {
-    setCurrentConfig(record);
+    modal.open(record);
     form.setFieldsValue({
       ...record,
-      api_key: '', // Don't show actual key
+      api_key: '',
     });
-    setModalVisible(true);
   };
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      // Remove empty api_key for update
-      if (currentConfig && !values.api_key) {
+      if (modal.current && !values.api_key) {
         delete values.api_key;
       }
       
-      if (currentConfig) {
-        await llmConfigApi.update(currentConfig.id, values);
+      if (modal.current) {
+        await llmConfigApi.update(modal.current.id, values);
         message.success(t('llmModels.updateSuccess'));
       } else {
         await llmConfigApi.create(values);
         message.success(t('llmModels.createSuccess'));
       }
-      setModalVisible(false);
-      fetchData();
+      modal.close();
+      fetchData(buildFilters());
     } catch (error: any) {
       message.error(error.response?.data?.error || t('common.error'));
     }
@@ -117,11 +119,18 @@ const LLMModels: React.FC = () => {
     try {
       await llmConfigApi.delete(id);
       message.success(t('llmModels.deleteSuccess'));
-      fetchData();
+      fetchData(buildFilters());
     } catch (error) {
       message.error(t('common.error'));
     }
   };
+
+  const providerOptions = [
+    { value: LLM_PROVIDERS.OPENAI, label: t('llmModels.openai') },
+    { value: LLM_PROVIDERS.AZURE, label: t('llmModels.azure') },
+    { value: LLM_PROVIDERS.ANTHROPIC, label: 'Anthropic' },
+    { value: LLM_PROVIDERS.OTHER, label: t('llmModels.custom') },
+  ];
 
   const columns: ColumnsType<LLMConfig> = [
     {
@@ -195,12 +204,7 @@ const LLMModels: React.FC = () => {
             style={{ width: 120 }}
             value={provider || undefined}
             onChange={setProvider}
-            options={[
-              { value: 'openai', label: t('llmModels.openai') },
-              { value: 'azure', label: t('llmModels.azure') },
-              { value: 'anthropic', label: 'Anthropic' },
-              { value: 'other', label: t('llmModels.custom') },
-            ]}
+            options={providerOptions}
           />
           <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
             {t('common.search')}
@@ -224,19 +228,16 @@ const LLMModels: React.FC = () => {
             total,
             showSizeChanger: true,
             showTotal: (total) => `${t('common.total')} ${total}`,
-            onChange: (p, ps) => {
-              setPage(p);
-              setPageSize(ps);
-            },
+            onChange: handlePageChange,
           }}
         />
       </Card>
 
       <Modal
-        title={currentConfig ? t('llmModels.editModel') : t('llmModels.createModel')}
-        open={modalVisible}
+        title={modal.isEdit ? t('llmModels.editModel') : t('llmModels.createModel')}
+        open={modal.visible}
         onOk={handleSubmit}
-        onCancel={() => setModalVisible(false)}
+        onCancel={modal.close}
         width={560}
       >
         <Form form={form} layout="vertical">
@@ -244,12 +245,7 @@ const LLMModels: React.FC = () => {
             <Input placeholder="GPT-4 Turbo" />
           </Form.Item>
           <Form.Item name="provider" label={t('llmModels.provider')} rules={[{ required: true }]}>
-            <Select options={[
-              { value: 'openai', label: t('llmModels.openai') },
-              { value: 'azure', label: t('llmModels.azure') },
-              { value: 'anthropic', label: 'Anthropic' },
-              { value: 'other', label: t('llmModels.custom') },
-            ]} />
+            <Select options={providerOptions} />
           </Form.Item>
           <Form.Item name="base_url" label={t('llmModels.baseUrl')} rules={[{ required: true, message: t('llmModels.pleaseInputBaseUrl') }]}>
             <Input placeholder="https://api.openai.com/v1" />
@@ -257,8 +253,8 @@ const LLMModels: React.FC = () => {
           <Form.Item 
             name="api_key" 
             label={t('llmModels.apiKey')} 
-            rules={[{ required: !currentConfig }]}
-            extra={currentConfig ? t('llmModels.keepExistingKey', 'Leave empty to keep existing key') : undefined}
+            rules={[{ required: !modal.current }]}
+            extra={modal.current ? t('llmModels.keepExistingKey', 'Leave empty to keep existing key') : undefined}
           >
             <Input.Password placeholder="sk-..." />
           </Form.Item>

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/huangang/codesentry/backend/internal/config"
 	"github.com/huangang/codesentry/backend/internal/models"
@@ -24,6 +25,7 @@ type WebhookService struct {
 	reviewService       *ReviewLogService
 	aiService           *AIService
 	notificationService *NotificationService
+	httpClient          *http.Client
 }
 
 func NewWebhookService(db *gorm.DB, aiCfg *config.OpenAIConfig) *WebhookService {
@@ -33,7 +35,29 @@ func NewWebhookService(db *gorm.DB, aiCfg *config.OpenAIConfig) *WebhookService 
 		reviewService:       NewReviewLogService(db),
 		aiService:           NewAIService(db, aiCfg),
 		notificationService: NewNotificationService(db),
+		httpClient:          &http.Client{Timeout: 30 * time.Second},
 	}
+}
+
+type repoInfo struct {
+	owner       string
+	repo        string
+	projectPath string
+	baseURL     string
+}
+
+func parseRepoInfo(projectURL string) (*repoInfo, error) {
+	url := strings.TrimSuffix(projectURL, ".git")
+	parts := strings.Split(url, "/")
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("invalid project URL: %s", projectURL)
+	}
+	return &repoInfo{
+		owner:       parts[len(parts)-2],
+		repo:        parts[len(parts)-1],
+		projectPath: parts[len(parts)-2] + "/" + parts[len(parts)-1],
+		baseURL:     strings.TrimSuffix(url, "/"+parts[len(parts)-2]+"/"+parts[len(parts)-1]),
+	}, nil
 }
 
 // GitLabPushEvent represents a GitLab push webhook event
@@ -44,16 +68,19 @@ type GitLabPushEvent struct {
 	CheckoutSHA string `json:"checkout_sha"`
 	UserName    string `json:"user_name"`
 	UserEmail   string `json:"user_email"`
+	UserAvatar  string `json:"user_avatar"`
 	ProjectID   int    `json:"project_id"`
 	Project     struct {
 		Name      string `json:"name"`
 		URL       string `json:"url"`
+		WebURL    string `json:"web_url"`
 		Namespace string `json:"namespace"`
 	} `json:"project"`
 	Commits []struct {
 		ID        string `json:"id"`
 		Message   string `json:"message"`
 		Timestamp string `json:"timestamp"`
+		URL       string `json:"url"`
 		Author    struct {
 			Name  string `json:"name"`
 			Email string `json:"email"`
@@ -69,14 +96,16 @@ type GitLabPushEvent struct {
 type GitLabMREvent struct {
 	ObjectKind string `json:"object_kind"`
 	User       struct {
-		Name     string `json:"name"`
-		Username string `json:"username"`
-		Email    string `json:"email"`
+		Name      string `json:"name"`
+		Username  string `json:"username"`
+		Email     string `json:"email"`
+		AvatarURL string `json:"avatar_url"`
 	} `json:"user"`
 	Project struct {
 		ID        int    `json:"id"`
 		Name      string `json:"name"`
 		URL       string `json:"url"`
+		WebURL    string `json:"web_url"`
 		Namespace string `json:"namespace"`
 	} `json:"project"`
 	ObjectAttributes struct {
@@ -99,6 +128,11 @@ type GitHubPushEvent struct {
 		Name  string `json:"name"`
 		Email string `json:"email"`
 	} `json:"pusher"`
+	Sender struct {
+		Login     string `json:"login"`
+		AvatarURL string `json:"avatar_url"`
+		HTMLURL   string `json:"html_url"`
+	} `json:"sender"`
 	Repository struct {
 		ID       int    `json:"id"`
 		Name     string `json:"name"`
@@ -109,9 +143,11 @@ type GitHubPushEvent struct {
 		ID        string `json:"id"`
 		Message   string `json:"message"`
 		Timestamp string `json:"timestamp"`
+		URL       string `json:"url"`
 		Author    struct {
-			Name  string `json:"name"`
-			Email string `json:"email"`
+			Name     string `json:"name"`
+			Email    string `json:"email"`
+			Username string `json:"username"`
 		} `json:"author"`
 		Added    []string `json:"added"`
 		Modified []string `json:"modified"`
@@ -136,7 +172,9 @@ type GitHubPREvent struct {
 			Ref string `json:"ref"`
 		} `json:"base"`
 		User struct {
-			Login string `json:"login"`
+			Login     string `json:"login"`
+			AvatarURL string `json:"avatar_url"`
+			HTMLURL   string `json:"html_url"`
 		} `json:"user"`
 		HTMLURL string `json:"html_url"`
 	} `json:"pull_request"`
@@ -265,13 +303,21 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 	}
 
 	branch := strings.TrimPrefix(event.Ref, "refs/heads/")
+
+	var commitURL string
+	if len(event.Commits) > 0 && event.Commits[len(event.Commits)-1].URL != "" {
+		commitURL = event.Commits[len(event.Commits)-1].URL
+	}
+
 	reviewLog := &models.ReviewLog{
 		ProjectID:     project.ID,
 		EventType:     "push",
 		CommitHash:    commitSHA,
+		CommitURL:     commitURL,
 		Branch:        branch,
 		Author:        event.UserName,
 		AuthorEmail:   event.UserEmail,
+		AuthorAvatar:  event.UserAvatar,
 		CommitMessage: strings.Join(commits, "\n"),
 		FilesChanged:  additions + deletions,
 		Additions:     additions,
@@ -282,9 +328,10 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 
 	log.Printf("[Webhook] Starting AI review for project %d, commit %s", project.ID, commitSHA)
 
-	filteredDiff := s.filterDiffByExtensions(diff, project.FileExtensions)
+	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
 	if filteredDiff != diff {
-		log.Printf("[Webhook] Filtered diff by extensions (%s): %d -> %d bytes", project.FileExtensions, len(diff), len(filteredDiff))
+		log.Printf("[Webhook] Filtered diff by extensions (%s) and ignore patterns (%s): %d -> %d bytes",
+			project.FileExtensions, project.IgnorePatterns, len(diff), len(filteredDiff))
 	}
 
 	result, err := s.aiService.Review(ctx, &ReviewRequest{
@@ -333,13 +380,13 @@ func (s *WebhookService) processGitLabMR(ctx context.Context, project *models.Pr
 
 	mrNumber := event.ObjectAttributes.IID
 
-	// Create review log
 	reviewLog := &models.ReviewLog{
 		ProjectID:     project.ID,
 		EventType:     "merge_request",
 		Branch:        event.ObjectAttributes.SourceBranch,
 		Author:        event.User.Name,
 		AuthorEmail:   event.User.Email,
+		AuthorAvatar:  event.User.AvatarURL,
 		CommitMessage: event.ObjectAttributes.Title,
 		MRNumber:      &mrNumber,
 		MRURL:         event.ObjectAttributes.URL,
@@ -353,7 +400,7 @@ func (s *WebhookService) processGitLabMR(ctx context.Context, project *models.Pr
 		diff = "Failed to get diff: " + err.Error()
 	}
 
-	filteredDiff := s.filterDiffByExtensions(diff, project.FileExtensions)
+	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
 	result, err := s.aiService.Review(ctx, &ReviewRequest{
 		ProjectID: project.ID,
 		Diffs:     filteredDiff,
@@ -378,6 +425,13 @@ func (s *WebhookService) processGitLabMR(ctx context.Context, project *models.Pr
 			EventType:     "merge_request",
 			MRURL:         event.ObjectAttributes.URL,
 		})
+
+		if project.CommentEnabled {
+			comment := s.formatReviewComment(result.Score, result.Content)
+			if err := s.postGitLabMRComment(project, mrNumber, comment); err != nil {
+				log.Printf("[Webhook] Failed to post GitLab MR comment: %v", err)
+			}
+		}
 	}
 
 	return s.reviewService.Update(reviewLog)
@@ -390,10 +444,14 @@ func (s *WebhookService) processGitHubPush(ctx context.Context, project *models.
 
 	var commits []string
 	var additions, deletions int
+	var commitURL string
 	for _, c := range event.Commits {
 		commits = append(commits, fmt.Sprintf("%s: %s", c.ID[:8], c.Message))
 		additions += len(c.Added) + len(c.Modified)
 		deletions += len(c.Removed)
+		if commitURL == "" && c.URL != "" {
+			commitURL = c.URL
+		}
 	}
 
 	branch := strings.TrimPrefix(event.Ref, "refs/heads/")
@@ -401,9 +459,12 @@ func (s *WebhookService) processGitHubPush(ctx context.Context, project *models.
 		ProjectID:     project.ID,
 		EventType:     "push",
 		CommitHash:    event.After,
+		CommitURL:     commitURL,
 		Branch:        branch,
-		Author:        event.Pusher.Name,
+		Author:        event.Sender.Login,
 		AuthorEmail:   event.Pusher.Email,
+		AuthorAvatar:  event.Sender.AvatarURL,
+		AuthorURL:     event.Sender.HTMLURL,
 		CommitMessage: strings.Join(commits, "\n"),
 		FilesChanged:  additions + deletions,
 		Additions:     additions,
@@ -418,7 +479,7 @@ func (s *WebhookService) processGitHubPush(ctx context.Context, project *models.
 		diff = "Failed to get diff: " + err.Error()
 	}
 
-	filteredDiff := s.filterDiffByExtensions(diff, project.FileExtensions)
+	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
 	result, err := s.aiService.Review(ctx, &ReviewRequest{
 		ProjectID: project.ID,
 		Diffs:     filteredDiff,
@@ -460,6 +521,8 @@ func (s *WebhookService) processGitHubPR(ctx context.Context, project *models.Pr
 		CommitHash:    event.PullRequest.Head.SHA,
 		Branch:        event.PullRequest.Head.Ref,
 		Author:        event.PullRequest.User.Login,
+		AuthorAvatar:  event.PullRequest.User.AvatarURL,
+		AuthorURL:     event.PullRequest.User.HTMLURL,
 		CommitMessage: event.PullRequest.Title,
 		MRNumber:      &mrNumber,
 		MRURL:         event.PullRequest.HTMLURL,
@@ -472,7 +535,7 @@ func (s *WebhookService) processGitHubPR(ctx context.Context, project *models.Pr
 		diff = "Failed to get diff: " + err.Error()
 	}
 
-	filteredDiff := s.filterDiffByExtensions(diff, project.FileExtensions)
+	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
 	result, err := s.aiService.Review(ctx, &ReviewRequest{
 		ProjectID: project.ID,
 		Diffs:     filteredDiff,
@@ -497,6 +560,13 @@ func (s *WebhookService) processGitHubPR(ctx context.Context, project *models.Pr
 			EventType:     "merge_request",
 			MRURL:         event.PullRequest.HTMLURL,
 		})
+
+		if project.CommentEnabled {
+			comment := s.formatReviewComment(result.Score, result.Content)
+			if err := s.postGitHubPRComment(project, mrNumber, comment); err != nil {
+				log.Printf("[Webhook] Failed to post GitHub PR comment: %v", err)
+			}
+		}
 	}
 
 	return s.reviewService.Update(reviewLog)
@@ -505,89 +575,63 @@ func (s *WebhookService) processGitHubPR(ctx context.Context, project *models.Pr
 // Helper functions for getting diffs from Git platforms
 
 func (s *WebhookService) getGitLabDiff(project *models.Project, commitSHA string) (string, error) {
-	url := strings.TrimSuffix(project.URL, ".git")
-	parts := strings.Split(url, "/")
-	if len(parts) < 2 {
-		return "", fmt.Errorf("invalid project URL")
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		return "", err
 	}
-	projectPath := strings.Join(parts[len(parts)-2:], "/")
 
-	baseURL := strings.TrimSuffix(url, "/"+projectPath)
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/repository/commits/%s/diff",
-		baseURL, strings.ReplaceAll(projectPath, "/", "%2F"), commitSHA)
+		info.baseURL, strings.ReplaceAll(info.projectPath, "/", "%2F"), commitSHA)
 
-	log.Printf("[Webhook] GitLab project URL: %s, projectPath: %s, baseURL: %s", project.URL, projectPath, baseURL)
+	log.Printf("[Webhook] GitLab project URL: %s, projectPath: %s, baseURL: %s", project.URL, info.projectPath, info.baseURL)
 	log.Printf("[Webhook] GitLab Access Token configured: %v", project.AccessToken != "")
 
 	return s.fetchDiff(apiURL, project.AccessToken, "PRIVATE-TOKEN")
 }
 
 func (s *WebhookService) getGitLabMRDiff(project *models.Project, mrIID int) (string, error) {
-	url := strings.TrimSuffix(project.URL, ".git")
-	parts := strings.Split(url, "/")
-	if len(parts) < 2 {
-		return "", fmt.Errorf("invalid project URL")
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		return "", err
 	}
-	projectPath := strings.Join(parts[len(parts)-2:], "/")
-	baseURL := strings.TrimSuffix(url, "/"+projectPath)
 
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/merge_requests/%d/changes",
-		baseURL, strings.ReplaceAll(projectPath, "/", "%2F"), mrIID)
+		info.baseURL, strings.ReplaceAll(info.projectPath, "/", "%2F"), mrIID)
 
 	return s.fetchDiff(apiURL, project.AccessToken, "PRIVATE-TOKEN")
 }
 
 func (s *WebhookService) getGitHubDiff(project *models.Project, commitSHA string) (string, error) {
-	url := strings.TrimSuffix(project.URL, ".git")
-	parts := strings.Split(url, "/")
-	if len(parts) < 2 {
-		return "", fmt.Errorf("invalid project URL")
-	}
-	owner := parts[len(parts)-2]
-	repo := parts[len(parts)-1]
-
-	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits/%s", owner, repo, commitSHA)
-
-	req, _ := http.NewRequest("GET", apiURL, nil)
-	req.Header.Set("Accept", "application/vnd.github.v3.diff")
-	if project.AccessToken != "" {
-		req.Header.Set("Authorization", "token "+project.AccessToken)
-	}
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
+	info, err := parseRepoInfo(project.URL)
 	if err != nil {
 		return "", err
 	}
 
-	return string(body), nil
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits/%s", info.owner, info.repo, commitSHA)
+	return s.fetchGitHubDiff(apiURL, project.AccessToken)
 }
 
 func (s *WebhookService) getGitHubPRDiff(project *models.Project, prNumber int) (string, error) {
-	url := strings.TrimSuffix(project.URL, ".git")
-	parts := strings.Split(url, "/")
-	if len(parts) < 2 {
-		return "", fmt.Errorf("invalid project URL")
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		return "", err
 	}
-	owner := parts[len(parts)-2]
-	repo := parts[len(parts)-1]
 
-	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls/%d", owner, repo, prNumber)
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls/%d", info.owner, info.repo, prNumber)
+	return s.fetchGitHubDiff(apiURL, project.AccessToken)
+}
 
-	req, _ := http.NewRequest("GET", apiURL, nil)
+func (s *WebhookService) fetchGitHubDiff(apiURL, accessToken string) (string, error) {
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Accept", "application/vnd.github.v3.diff")
-	if project.AccessToken != "" {
-		req.Header.Set("Authorization", "token "+project.AccessToken)
+	if accessToken != "" {
+		req.Header.Set("Authorization", "token "+accessToken)
 	}
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -609,8 +653,7 @@ func (s *WebhookService) fetchDiff(apiURL, token, tokenHeader string) (string, e
 		req.Header.Set(tokenHeader, token)
 	}
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -644,24 +687,31 @@ func (s *WebhookService) fetchDiff(apiURL, token, tokenHeader string) (string, e
 	return result.String(), nil
 }
 
-func (s *WebhookService) filterDiffByExtensions(diff string, extensions string) string {
-	if extensions == "" {
-		return diff
-	}
-
-	extList := strings.Split(extensions, ",")
+func (s *WebhookService) filterDiff(diff string, extensions string, ignorePatterns string) string {
 	extMap := make(map[string]bool)
-	for _, ext := range extList {
-		ext = strings.TrimSpace(ext)
-		if ext != "" {
-			if !strings.HasPrefix(ext, ".") {
-				ext = "." + ext
+	if extensions != "" {
+		for _, ext := range strings.Split(extensions, ",") {
+			ext = strings.TrimSpace(ext)
+			if ext != "" {
+				if !strings.HasPrefix(ext, ".") {
+					ext = "." + ext
+				}
+				extMap[strings.ToLower(ext)] = true
 			}
-			extMap[strings.ToLower(ext)] = true
 		}
 	}
 
-	if len(extMap) == 0 {
+	var ignoreList []string
+	if ignorePatterns != "" {
+		for _, pattern := range strings.Split(ignorePatterns, ",") {
+			pattern = strings.TrimSpace(pattern)
+			if pattern != "" {
+				ignoreList = append(ignoreList, pattern)
+			}
+		}
+	}
+
+	if len(extMap) == 0 && len(ignoreList) == 0 {
 		return diff
 	}
 
@@ -674,9 +724,9 @@ func (s *WebhookService) filterDiffByExtensions(diff string, extensions string) 
 			filePath := strings.TrimPrefix(strings.TrimPrefix(line, "--- "), "+++ ")
 			filePath = strings.TrimPrefix(filePath, "a/")
 			filePath = strings.TrimPrefix(filePath, "b/")
-			ext := strings.ToLower(filepath.Ext(filePath))
+
 			if strings.HasPrefix(line, "--- ") {
-				include = extMap[ext]
+				include = s.shouldIncludeFile(filePath, extMap, ignoreList)
 			}
 			if include {
 				result.WriteString(line + "\n")
@@ -691,6 +741,46 @@ func (s *WebhookService) filterDiffByExtensions(diff string, extensions string) 
 		return diff
 	}
 	return filtered
+}
+
+func (s *WebhookService) shouldIncludeFile(filePath string, extMap map[string]bool, ignoreList []string) bool {
+	for _, pattern := range ignoreList {
+		if s.matchIgnorePattern(filePath, pattern) {
+			return false
+		}
+	}
+
+	if len(extMap) == 0 {
+		return true
+	}
+
+	ext := strings.ToLower(filepath.Ext(filePath))
+	return extMap[ext]
+}
+
+func (s *WebhookService) matchIgnorePattern(filePath, pattern string) bool {
+	pattern = strings.ToLower(pattern)
+	filePath = strings.ToLower(filePath)
+
+	if strings.HasSuffix(pattern, "/") {
+		dir := strings.TrimSuffix(pattern, "/")
+		if strings.HasPrefix(filePath, dir+"/") || strings.Contains(filePath, "/"+dir+"/") {
+			return true
+		}
+	}
+
+	if strings.HasPrefix(pattern, "*") {
+		suffix := strings.TrimPrefix(pattern, "*")
+		if strings.HasSuffix(filePath, suffix) {
+			return true
+		}
+	}
+
+	if matched, _ := filepath.Match(pattern, filepath.Base(filePath)); matched {
+		return true
+	}
+
+	return strings.Contains(filePath, pattern)
 }
 
 // VerifyGitLabSignature verifies GitLab webhook signature
@@ -709,4 +799,76 @@ func VerifyGitHubSignature(secret string, body []byte, signature string) bool {
 	expectedMAC := hex.EncodeToString(mac.Sum(nil))
 
 	return hmac.Equal([]byte(signature[7:]), []byte(expectedMAC))
+}
+
+func (s *WebhookService) postGitLabMRComment(project *models.Project, mrIID int, comment string) error {
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		return err
+	}
+
+	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/merge_requests/%d/notes",
+		info.baseURL, strings.ReplaceAll(info.projectPath, "/", "%2F"), mrIID)
+
+	body := fmt.Sprintf(`{"body": %q}`, comment)
+	req, err := http.NewRequest("POST", apiURL, strings.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if project.AccessToken != "" {
+		req.Header.Set("PRIVATE-TOKEN", project.AccessToken)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("GitLab API returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	log.Printf("[Webhook] Posted comment to GitLab MR %d", mrIID)
+	return nil
+}
+
+func (s *WebhookService) postGitHubPRComment(project *models.Project, prNumber int, comment string) error {
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		return err
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/comments", info.owner, info.repo, prNumber)
+
+	body := fmt.Sprintf(`{"body": %q}`, comment)
+	req, err := http.NewRequest("POST", apiURL, strings.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	if project.AccessToken != "" {
+		req.Header.Set("Authorization", "token "+project.AccessToken)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("GitHub API returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	log.Printf("[Webhook] Posted comment to GitHub PR %d", prNumber)
+	return nil
+}
+
+func (s *WebhookService) formatReviewComment(score float64, reviewResult string) string {
+	return fmt.Sprintf("## 🤖 AI Code Review\n\n**Score: %.0f/100**\n\n%s\n\n---\n*Powered by CodeSentry*", score, reviewResult)
 }

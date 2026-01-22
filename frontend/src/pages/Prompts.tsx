@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
   Card,
   Table,
@@ -31,65 +31,68 @@ import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import { promptApi } from '../services';
 import type { PromptTemplate } from '../types';
+import { usePaginatedList, useModal } from '../hooks';
 
 const { TextArea } = Input;
 const { Paragraph } = Typography;
 
+interface PromptFilters {
+  name?: string;
+  is_system?: boolean;
+}
+
 const Prompts: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<PromptTemplate[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [currentPrompt, setCurrentPrompt] = useState<PromptTemplate | null>(null);
-  const [form] = Form.useForm();
   const { t } = useTranslation();
+  const [form] = Form.useForm();
+  const [searchName, setSearchName] = React.useState('');
+  const [filterType, setFilterType] = React.useState<string>('');
+  const [drawerVisible, setDrawerVisible] = React.useState(false);
+  const [viewingPrompt, setViewingPrompt] = React.useState<PromptTemplate | null>(null);
 
-  const [searchName, setSearchName] = useState('');
-  const [filterType, setFilterType] = useState<string>('');
+  const modal = useModal<PromptTemplate>();
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const params: any = { page, page_size: pageSize };
-      if (searchName) params.name = searchName;
-      if (filterType === 'system') params.is_system = true;
-      if (filterType === 'custom') params.is_system = false;
-      const res = await promptApi.list(params);
-      setData(res.data.items);
-      setTotal(res.data.total);
-    } catch (error) {
-      message.error(t('common.error'));
-    } finally {
-      setLoading(false);
-    }
+  const {
+    loading,
+    data,
+    total,
+    page,
+    pageSize,
+    setPage,
+    fetchData,
+    handlePageChange,
+  } = usePaginatedList<PromptTemplate, PromptFilters>({
+    fetchApi: promptApi.list,
+    onError: () => message.error(t('common.error')),
+  });
+
+  const buildFilters = (): PromptFilters => {
+    const filters: PromptFilters = {};
+    if (searchName) filters.name = searchName;
+    if (filterType === 'system') filters.is_system = true;
+    if (filterType === 'custom') filters.is_system = false;
+    return filters;
   };
 
   useEffect(() => {
-    fetchData();
+    fetchData(buildFilters());
   }, [page, pageSize]);
 
   const handleSearch = () => {
     setPage(1);
-    fetchData();
+    fetchData(buildFilters());
   };
 
   const handleReset = () => {
     setSearchName('');
     setFilterType('');
     setPage(1);
-    setTimeout(fetchData, 0);
+    fetchData({});
   };
 
   const showCreateModal = () => {
-    setCurrentPrompt(null);
+    modal.open();
     form.resetFields();
-    form.setFieldsValue({
-      is_default: false,
-    });
-    setModalVisible(true);
+    form.setFieldsValue({ is_default: false });
   };
 
   const showEditModal = (record: PromptTemplate) => {
@@ -97,28 +100,27 @@ const Prompts: React.FC = () => {
       message.warning(t('prompts.cannotEditSystem'));
       return;
     }
-    setCurrentPrompt(record);
+    modal.open(record);
     form.setFieldsValue(record);
-    setModalVisible(true);
   };
 
   const showViewDrawer = (record: PromptTemplate) => {
-    setCurrentPrompt(record);
+    setViewingPrompt(record);
     setDrawerVisible(true);
   };
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      if (currentPrompt) {
-        await promptApi.update(currentPrompt.id, values);
+      if (modal.current) {
+        await promptApi.update(modal.current.id, values);
         message.success(t('prompts.updateSuccess'));
       } else {
         await promptApi.create(values);
         message.success(t('prompts.createSuccess'));
       }
-      setModalVisible(false);
-      fetchData();
+      modal.close();
+      fetchData(buildFilters());
     } catch (error: any) {
       message.error(error.response?.data?.error || t('common.error'));
     }
@@ -128,7 +130,7 @@ const Prompts: React.FC = () => {
     try {
       await promptApi.delete(id);
       message.success(t('prompts.deleteSuccess'));
-      fetchData();
+      fetchData(buildFilters());
     } catch (error: any) {
       message.error(error.response?.data?.error || t('common.error'));
     }
@@ -138,7 +140,7 @@ const Prompts: React.FC = () => {
     try {
       await promptApi.setDefault(id);
       message.success(t('prompts.setDefaultSuccess'));
-      fetchData();
+      fetchData(buildFilters());
     } catch (error: any) {
       message.error(error.response?.data?.error || t('common.error'));
     }
@@ -291,19 +293,16 @@ const Prompts: React.FC = () => {
             total,
             showSizeChanger: true,
             showTotal: (total) => `${t('common.total')} ${total}`,
-            onChange: (p, ps) => {
-              setPage(p);
-              setPageSize(ps);
-            },
+            onChange: handlePageChange,
           }}
         />
       </Card>
 
       <Modal
-        title={currentPrompt ? t('prompts.editPrompt') : t('prompts.createPrompt')}
-        open={modalVisible}
+        title={modal.isEdit ? t('prompts.editPrompt') : t('prompts.createPrompt')}
+        open={modal.visible}
         onOk={handleSubmit}
-        onCancel={() => setModalVisible(false)}
+        onCancel={modal.close}
         width={720}
       >
         <Form form={form} layout="vertical">
@@ -341,24 +340,24 @@ const Prompts: React.FC = () => {
         open={drawerVisible}
         onClose={() => setDrawerVisible(false)}
       >
-        {currentPrompt && (
+        {viewingPrompt && (
           <div>
             <div style={{ marginBottom: 16 }}>
-              <strong>{t('prompts.name')}:</strong> {currentPrompt.name}
-              {currentPrompt.is_system && (
+              <strong>{t('prompts.name')}:</strong> {viewingPrompt.name}
+              {viewingPrompt.is_system && (
                 <Tag color="blue" style={{ marginLeft: 8 }}>
                   {t('prompts.system')}
                 </Tag>
               )}
-              {currentPrompt.is_default && (
+              {viewingPrompt.is_default && (
                 <Tag color="gold" style={{ marginLeft: 8 }}>
                   {t('prompts.isDefault')}
                 </Tag>
               )}
             </div>
-            {currentPrompt.description && (
+            {viewingPrompt.description && (
               <div style={{ marginBottom: 16 }}>
-                <strong>{t('prompts.description')}:</strong> {currentPrompt.description}
+                <strong>{t('prompts.description')}:</strong> {viewingPrompt.description}
               </div>
             )}
             <div style={{ marginBottom: 8 }}>
@@ -375,7 +374,7 @@ const Prompts: React.FC = () => {
                 overflow: 'auto',
               }}
             >
-              {currentPrompt.content}
+              {viewingPrompt.content}
             </Paragraph>
           </div>
         )}

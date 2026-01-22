@@ -115,8 +115,11 @@
     "webhookUrl": "Webhook 地址",
     "fileExtensions": "文件扩展名",
     "fileExtensionsPlaceholder": "例如: .js,.ts,.go,.py",
+    "ignorePatterns": "忽略路径",
+    "ignorePatternsPlaceholder": "例如: vendor/,node_modules/,*.min.js",
     "reviewEvents": "审查事件",
     "aiEnabled": "启用 AI 审查",
+    "commentEnabled": "MR/PR 评论",
     "aiPrompt": "AI 提示词",
     "llmConfig": "大模型配置",
     "imEnabled": "启用 IM 通知",
@@ -156,7 +159,10 @@
     "failed": "失败",
     "push": "推送",
     "mergeRequest": "合并请求",
-    "pullRequest": "拉取请求"
+    "pullRequest": "拉取请求",
+    "retry": "重试",
+    "retryCount": "重试次数",
+    "retryInitiated": "已发起重试"
   },
   "llmModels": {
     "title": "大模型管理",

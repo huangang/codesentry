@@ -44,13 +44,7 @@ func (s *AIService) Review(ctx context.Context, req *ReviewRequest) (*ReviewResu
 		return nil, fmt.Errorf("project not found: %w", err)
 	}
 
-	prompt := req.CustomPrompt
-	if prompt == "" {
-		prompt = project.AIPrompt
-	}
-	if prompt == "" {
-		prompt = NewProjectService(s.db).GetDefaultPrompt()
-	}
+	prompt := s.getPromptForProject(&project, req.CustomPrompt)
 
 	prompt = strings.ReplaceAll(prompt, "{{diffs}}", req.Diffs)
 	prompt = strings.ReplaceAll(prompt, "{{commits}}", req.Commits)
@@ -64,15 +58,70 @@ func (s *AIService) Review(ctx context.Context, req *ReviewRequest) (*ReviewResu
 		log.Printf("[AI] Prompt: %s", prompt)
 	}
 
-	var llmConfig models.LLMConfig
-	if err := s.db.Where("is_default = ? AND is_active = ?", true, true).First(&llmConfig).Error; err != nil {
-		llmConfig = models.LLMConfig{
-			BaseURL: s.config.BaseURL,
-			APIKey:  s.config.APIKey,
-			Model:   s.config.Model,
+	llmConfigs := s.getOrderedLLMConfigs(&project)
+	if len(llmConfigs) == 0 {
+		return nil, fmt.Errorf("no LLM configuration available")
+	}
+
+	var lastErr error
+	for i, llmConfig := range llmConfigs {
+		log.Printf("[AI] Attempting LLM %d/%d: %s (model: %s)", i+1, len(llmConfigs), llmConfig.Name, llmConfig.Model)
+
+		result, err := s.callLLM(ctx, &llmConfig, prompt)
+		if err == nil {
+			log.Printf("[AI] Success with LLM: %s", llmConfig.Name)
+			return result, nil
+		}
+
+		lastErr = err
+		log.Printf("[AI] LLM %s failed: %v, trying next...", llmConfig.Name, err)
+	}
+
+	return nil, fmt.Errorf("all LLMs failed, last error: %w", lastErr)
+}
+
+func (s *AIService) getOrderedLLMConfigs(project *models.Project) []models.LLMConfig {
+	var configs []models.LLMConfig
+
+	if project.LLMConfigID != nil {
+		var projectConfig models.LLMConfig
+		if err := s.db.Where("id = ? AND is_active = ?", *project.LLMConfigID, true).First(&projectConfig).Error; err == nil {
+			configs = append(configs, projectConfig)
 		}
 	}
 
+	var defaultConfig models.LLMConfig
+	if err := s.db.Where("is_default = ? AND is_active = ?", true, true).First(&defaultConfig).Error; err == nil {
+		if len(configs) == 0 || configs[0].ID != defaultConfig.ID {
+			configs = append(configs, defaultConfig)
+		}
+	}
+
+	var backupConfigs []models.LLMConfig
+	existingIDs := make(map[uint]bool)
+	for _, c := range configs {
+		existingIDs[c.ID] = true
+	}
+	s.db.Where("is_active = ?", true).Order("id ASC").Find(&backupConfigs)
+	for _, c := range backupConfigs {
+		if !existingIDs[c.ID] {
+			configs = append(configs, c)
+		}
+	}
+
+	if len(configs) == 0 {
+		configs = append(configs, models.LLMConfig{
+			Name:    "fallback",
+			BaseURL: s.config.BaseURL,
+			APIKey:  s.config.APIKey,
+			Model:   s.config.Model,
+		})
+	}
+
+	return configs
+}
+
+func (s *AIService) callLLM(ctx context.Context, llmConfig *models.LLMConfig, prompt string) (*ReviewResult, error) {
 	log.Printf("[AI] Using LLM: %s, model: %s", llmConfig.BaseURL, llmConfig.Model)
 
 	clientConfig := openai.DefaultConfig(llmConfig.APIKey)
@@ -115,6 +164,35 @@ func (s *AIService) Review(ctx context.Context, req *ReviewRequest) (*ReviewResu
 		Content: content,
 		Score:   score,
 	}, nil
+}
+
+func (s *AIService) getPromptForProject(project *models.Project, customPrompt string) string {
+	if customPrompt != "" {
+		log.Printf("[AI] Using custom prompt from request")
+		return customPrompt
+	}
+
+	if project.AIPrompt != "" {
+		log.Printf("[AI] Using project custom prompt")
+		return project.AIPrompt
+	}
+
+	if project.AIPromptID != nil {
+		var promptTemplate models.PromptTemplate
+		if err := s.db.First(&promptTemplate, *project.AIPromptID).Error; err == nil {
+			log.Printf("[AI] Using linked prompt template: %s (ID: %d)", promptTemplate.Name, promptTemplate.ID)
+			return promptTemplate.Content
+		}
+	}
+
+	var defaultPrompt models.PromptTemplate
+	if err := s.db.Where("is_default = ?", true).First(&defaultPrompt).Error; err == nil {
+		log.Printf("[AI] Using system default prompt: %s (ID: %d)", defaultPrompt.Name, defaultPrompt.ID)
+		return defaultPrompt.Content
+	}
+
+	log.Printf("[AI] Using hardcoded default prompt")
+	return NewProjectService(s.db).GetDefaultPrompt()
 }
 
 // extractScore extracts the score from review content

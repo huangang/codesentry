@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   Table,
@@ -28,99 +28,104 @@ import type { ColumnsType } from 'antd/es/table';
 import { useTranslation } from 'react-i18next';
 import { projectApi, imBotApi } from '../services';
 import type { Project, IMBot } from '../types';
+import { usePaginatedList, useModal } from '../hooks';
+import { PLATFORMS } from '../constants';
 
 const { TextArea } = Input;
 
+interface ProjectFilters {
+  name?: string;
+}
+
 const Projects: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<Project[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [promptDrawerVisible, setPromptDrawerVisible] = useState(false);
-  const [currentProject, setCurrentProject] = useState<Project | null>(null);
-  const [imBots, setImBots] = useState<IMBot[]>([]);
-  const [defaultPrompt, setDefaultPrompt] = useState('');
+  const { t, i18n } = useTranslation();
   const [form] = Form.useForm();
   const [promptForm] = Form.useForm();
-  const { t, i18n } = useTranslation();
 
-  // Filters
+  const [imBots, setImBots] = useState<IMBot[]>([]);
+  const [defaultPrompt, setDefaultPrompt] = useState('');
   const [searchName, setSearchName] = useState('');
+
+  const modal = useModal<Project>();
+  const [promptDrawerVisible, setPromptDrawerVisible] = useState(false);
+  const [currentProjectForPrompt, setCurrentProjectForPrompt] = useState<Project | null>(null);
+
+  const {
+    loading,
+    data,
+    total,
+    page,
+    pageSize,
+    setPage,
+    fetchData,
+    handlePageChange,
+  } = usePaginatedList<Project, ProjectFilters>({
+    fetchApi: projectApi.list,
+    onError: () => message.error(t('common.error')),
+  });
 
   const getWebhookUrl = (record: Project) => {
     const baseUrl = window.location.origin;
     return `${baseUrl}/api/webhook/${record.platform}/${record.id}`;
   };
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const params: any = { page, page_size: pageSize };
-      if (searchName) params.name = searchName;
-      const res = await projectApi.list(params);
-      setData(res.data.items);
-      setTotal(res.data.total);
-    } catch (error) {
-      message.error(t('common.error'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchImBots = async () => {
+  const fetchImBots = useCallback(async () => {
     try {
       const res = await imBotApi.getActive();
       setImBots(res.data);
-    } catch (error) {}
-  };
+    } catch (error) {
+      console.error('Failed to fetch IM bots:', error);
+    }
+  }, []);
 
-  const fetchDefaultPrompt = async () => {
+  const fetchDefaultPrompt = useCallback(async () => {
     try {
       const res = await projectApi.getDefaultPrompt();
       setDefaultPrompt(res.data.prompt);
-    } catch (error) {}
-  };
+    } catch (error) {
+      console.error('Failed to fetch default prompt:', error);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchData();
+    fetchData({ name: searchName || undefined });
+  }, [page, pageSize]);
+
+  useEffect(() => {
     fetchImBots();
     fetchDefaultPrompt();
-  }, [page, pageSize]);
+  }, [fetchImBots, fetchDefaultPrompt]);
 
   const handleSearch = () => {
     setPage(1);
-    fetchData();
+    fetchData({ name: searchName || undefined });
   };
 
   const handleReset = () => {
     setSearchName('');
     setPage(1);
-    setTimeout(fetchData, 0);
+    fetchData({});
   };
 
   const showCreateModal = () => {
-    setCurrentProject(null);
+    modal.open();
     form.resetFields();
     form.setFieldsValue({
-      platform: 'gitlab',
+      platform: PLATFORMS.GITLAB,
       ai_enabled: true,
       im_enabled: false,
       file_extensions: '.go,.js,.ts,.jsx,.tsx,.py,.java,.c,.cpp,.h,.hpp,.cs,.rb,.php,.swift,.kt,.rs,.vue,.svelte',
       review_events: 'push,merge_request',
     });
-    setModalVisible(true);
   };
 
   const showEditModal = (record: Project) => {
-    setCurrentProject(record);
+    modal.open(record);
     form.setFieldsValue(record);
-    setModalVisible(true);
   };
 
   const showPromptDrawer = (record: Project) => {
-    setCurrentProject(record);
+    setCurrentProjectForPrompt(record);
     promptForm.setFieldsValue({
       ai_prompt: record.ai_prompt || defaultPrompt,
       use_default: !record.ai_prompt,
@@ -131,15 +136,15 @@ const Projects: React.FC = () => {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      if (currentProject) {
-        await projectApi.update(currentProject.id, values);
+      if (modal.current) {
+        await projectApi.update(modal.current.id, values);
         message.success(t('projects.updateSuccess'));
       } else {
         await projectApi.create(values);
         message.success(t('projects.createSuccess'));
       }
-      setModalVisible(false);
-      fetchData();
+      modal.close();
+      fetchData({ name: searchName || undefined });
     } catch (error: any) {
       message.error(error.response?.data?.error || t('common.error'));
     }
@@ -148,13 +153,13 @@ const Projects: React.FC = () => {
   const handlePromptSubmit = async () => {
     try {
       const values = await promptForm.validateFields();
-      if (currentProject) {
-        await projectApi.update(currentProject.id, {
+      if (currentProjectForPrompt) {
+        await projectApi.update(currentProjectForPrompt.id, {
           ai_prompt: values.use_default ? '' : values.ai_prompt,
         });
         message.success(t('common.success'));
         setPromptDrawerVisible(false);
-        fetchData();
+        fetchData({ name: searchName || undefined });
       }
     } catch (error: any) {
       message.error(error.response?.data?.error || t('common.error'));
@@ -165,7 +170,7 @@ const Projects: React.FC = () => {
     try {
       await projectApi.delete(id);
       message.success(t('projects.deleteSuccess'));
-      fetchData();
+      fetchData({ name: searchName || undefined });
     } catch (error) {
       message.error(t('common.error'));
     }
@@ -197,7 +202,7 @@ const Projects: React.FC = () => {
       key: 'platform',
       width: 100,
       render: (platform: string) => (
-        <Tag color={platform === 'github' ? 'geekblue' : 'orange'}>
+        <Tag color={platform === PLATFORMS.GITHUB ? 'geekblue' : 'orange'}>
           {platform.toUpperCase()}
         </Tag>
       ),
@@ -279,19 +284,16 @@ const Projects: React.FC = () => {
             total,
             showSizeChanger: true,
             showTotal: (total) => `${t('common.total')} ${total}`,
-            onChange: (p, ps) => {
-              setPage(p);
-              setPageSize(ps);
-            },
+            onChange: handlePageChange,
           }}
         />
       </Card>
 
       <Modal
-        title={currentProject ? t('projects.editProject') : t('projects.createProject')}
-        open={modalVisible}
+        title={modal.isEdit ? t('projects.editProject') : t('projects.createProject')}
+        open={modal.visible}
         onOk={handleSubmit}
-        onCancel={() => setModalVisible(false)}
+        onCancel={modal.close}
         width={640}
       >
         <Form form={form} layout="vertical">
@@ -303,8 +305,8 @@ const Projects: React.FC = () => {
           </Form.Item>
           <Form.Item name="platform" label={t('projects.platform')} rules={[{ required: true, message: t('projects.pleaseSelectPlatform') }]}>
             <Select options={[
-              { value: 'github', label: 'GitHub' },
-              { value: 'gitlab', label: 'GitLab' },
+              { value: PLATFORMS.GITHUB, label: 'GitHub' },
+              { value: PLATFORMS.GITLAB, label: 'GitLab' },
             ]} />
           </Form.Item>
           <Form.Item 
@@ -324,10 +326,25 @@ const Projects: React.FC = () => {
           <Form.Item name="file_extensions" label={t('projects.fileExtensions')}>
             <Input placeholder={t('projects.fileExtensionsPlaceholder')} />
           </Form.Item>
+          <Form.Item 
+            name="ignore_patterns" 
+            label={t('projects.ignorePatterns')}
+            extra={i18n.language?.startsWith('zh') ? '忽略的文件路径，逗号分隔（如：vendor/,node_modules/,*.min.js）' : 'File paths to ignore, comma-separated (e.g., vendor/,node_modules/,*.min.js)'}
+          >
+            <Input placeholder="vendor/,node_modules/,*.min.js,*.lock" />
+          </Form.Item>
           <Form.Item name="review_events" label={t('projects.reviewEvents')}>
             <Input placeholder="push,merge_request" />
           </Form.Item>
           <Form.Item name="ai_enabled" label={t('projects.aiEnabled')} valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item 
+            name="comment_enabled" 
+            label={t('projects.commentEnabled')} 
+            valuePropName="checked"
+            extra={i18n.language?.startsWith('zh') ? '审查完成后自动评论到 MR/PR' : 'Auto-comment review result to MR/PR'}
+          >
             <Switch />
           </Form.Item>
           <Form.Item name="im_enabled" label={t('projects.imEnabled')} valuePropName="checked">

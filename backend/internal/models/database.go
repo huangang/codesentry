@@ -59,13 +59,13 @@ func GetDB() *gorm.DB {
 
 // SeedDefaultData creates default data if not exists
 func SeedDefaultData() error {
-	// Create default prompt template
+	// Create default prompt templates (Chinese and English)
 	var promptCount int64
 	DB.Model(&PromptTemplate{}).Where("is_system = ?", true).Count(&promptCount)
 	if promptCount == 0 {
-		defaultPrompt := PromptTemplate{
-			Name:        "Default Code Review",
-			Description: "Default AI code review prompt with scoring",
+		defaultPromptZh := PromptTemplate{
+			Name:        "Default Code Review (Chinese)",
+			Description: "Default AI code review prompt with scoring (Chinese)",
 			Content: `你是一位资深软件开发工程师，专注于代码审查。请根据以下维度对代码变更进行评审：
 
 ## 评分维度（总分100分）
@@ -104,7 +104,52 @@ func SeedDefaultData() error {
 			IsDefault: true,
 			IsSystem:  true,
 		}
-		if err := DB.Create(&defaultPrompt).Error; err != nil {
+		if err := DB.Create(&defaultPromptZh).Error; err != nil {
+			return err
+		}
+
+		defaultPromptEn := PromptTemplate{
+			Name:        "Default Code Review (English)",
+			Description: "Default AI code review prompt with scoring (English)",
+			Content: `You are a senior software engineer specializing in code review. Please review the code changes based on the following dimensions:
+
+## Scoring Dimensions (Total: 100 points)
+1. Functional Correctness & Robustness (40 points)
+2. Security & Potential Risks (30 points)
+3. Best Practices & Maintainability (20 points)
+4. Performance & Resource Utilization (5 points)
+5. Commit Message Quality (5 points)
+
+## Review Rules
+- Only output the top 3 most important issues
+- Use Markdown format for output
+
+## Output Format
+### Key Issues & Suggestions
+1. [Issue description and suggestion]
+2. [Issue description and suggestion]
+3. [Issue description and suggestion]
+
+### Score Breakdown
+- Functional Correctness & Robustness: X/40
+- Security & Potential Risks: X/30
+- Best Practices & Maintainability: X/20
+- Performance & Resource Utilization: X/5
+- Commit Message Quality: X/5
+
+### Total Score: X/100
+
+---
+Code Changes:
+{{diffs}}
+
+Commit Messages:
+{{commits}}`,
+			Variables: `["diffs", "commits"]`,
+			IsDefault: false,
+			IsSystem:  true,
+		}
+		if err := DB.Create(&defaultPromptEn).Error; err != nil {
 			return err
 		}
 	}

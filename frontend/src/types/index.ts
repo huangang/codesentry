@@ -20,6 +20,7 @@ export interface Project {
   url: string;
   platform: 'github' | 'gitlab';
   file_extensions: string;
+  ignore_patterns: string;
   review_events: string;
   ai_enabled: boolean;
   ai_prompt: string;
@@ -27,6 +28,7 @@ export interface Project {
   llm_config_id: number | null;
   im_enabled: boolean;
   im_bot_id: number | null;
+  comment_enabled: boolean;
   created_by: number;
   created_at: string;
   updated_at: string;
@@ -38,9 +40,12 @@ export interface ReviewLog {
   project?: Project;
   event_type: 'push' | 'merge_request';
   commit_hash: string;
+  commit_url: string;
   branch: string;
   author: string;
   author_email: string;
+  author_avatar: string;
+  author_url: string;
   commit_message: string;
   files_changed: number;
   additions: number;
@@ -49,6 +54,7 @@ export interface ReviewLog {
   review_result: string;
   review_status: 'pending' | 'completed' | 'failed';
   error_message: string;
+  retry_count: number;
   mr_number: number | null;
   mr_url: string;
   created_at: string;

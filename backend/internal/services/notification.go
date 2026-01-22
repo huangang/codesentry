@@ -18,11 +18,15 @@ import (
 )
 
 type NotificationService struct {
-	db *gorm.DB
+	db           *gorm.DB
+	emailService *EmailService
 }
 
 func NewNotificationService(db *gorm.DB) *NotificationService {
-	return &NotificationService{db: db}
+	return &NotificationService{
+		db:           db,
+		emailService: NewEmailService(db),
+	}
 }
 
 type ReviewNotification struct {
@@ -37,44 +41,56 @@ type ReviewNotification struct {
 }
 
 func (s *NotificationService) SendReviewNotification(project *models.Project, notification *ReviewNotification) error {
-	if !project.IMEnabled || project.IMBotID == nil {
-		log.Printf("[Notification] IM notification disabled for project %d", project.ID)
-		return nil
+	var imErr, emailErr error
+
+	if project.IMEnabled && project.IMBotID != nil {
+		var bot models.IMBot
+		if err := s.db.First(&bot, *project.IMBotID).Error; err != nil {
+			imErr = fmt.Errorf("IM bot not found: %w", err)
+		} else if !bot.IsActive {
+			log.Printf("[Notification] IM bot %d is not active", bot.ID)
+		} else {
+			log.Printf("[Notification] Sending notification to bot %s (type: %s)", bot.Name, bot.Type)
+
+			switch bot.Type {
+			case "wechat_work":
+				imErr = s.sendWeComNotification(&bot, notification)
+			case "dingtalk":
+				imErr = s.sendDingTalkNotification(&bot, notification)
+			case "feishu":
+				imErr = s.sendFeishuNotification(&bot, notification)
+			case "slack":
+				imErr = s.sendSlackNotification(&bot, notification)
+			default:
+				imErr = s.sendGenericWebhook(&bot, notification)
+			}
+		}
 	}
 
-	var bot models.IMBot
-	if err := s.db.First(&bot, *project.IMBotID).Error; err != nil {
-		return fmt.Errorf("IM bot not found: %w", err)
+	if notification.Author != "" {
+		var recipients []string
+		var reviewLog models.ReviewLog
+		s.db.Where("project_id = ? AND author = ?", project.ID, notification.Author).
+			Order("created_at DESC").First(&reviewLog)
+		if reviewLog.AuthorEmail != "" {
+			recipients = append(recipients, reviewLog.AuthorEmail)
+		}
+		if len(recipients) > 0 {
+			emailErr = s.emailService.SendReviewNotification(notification, recipients)
+		}
 	}
 
-	if !bot.IsActive {
-		log.Printf("[Notification] IM bot %d is not active", bot.ID)
-		return nil
+	if imErr != nil {
+		log.Printf("[Notification] IM notification failed: %v", imErr)
+	}
+	if emailErr != nil {
+		log.Printf("[Notification] Email notification failed: %v", emailErr)
 	}
 
-	log.Printf("[Notification] Sending notification to bot %s (type: %s)", bot.Name, bot.Type)
-
-	var err error
-	switch bot.Type {
-	case "wechat_work":
-		err = s.sendWeComNotification(&bot, notification)
-	case "dingtalk":
-		err = s.sendDingTalkNotification(&bot, notification)
-	case "feishu":
-		err = s.sendFeishuNotification(&bot, notification)
-	case "slack":
-		err = s.sendSlackNotification(&bot, notification)
-	default:
-		err = s.sendGenericWebhook(&bot, notification)
+	if imErr != nil {
+		return imErr
 	}
-
-	if err != nil {
-		log.Printf("[Notification] Failed to send notification: %v", err)
-		return err
-	}
-
-	log.Printf("[Notification] Notification sent successfully")
-	return nil
+	return emailErr
 }
 
 func (s *NotificationService) buildMessage(n *ReviewNotification) string {

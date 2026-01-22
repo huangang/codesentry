@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   Table,
@@ -17,73 +17,83 @@ import { SearchOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { reviewLogApi, projectApi } from '../services';
 import type { ReviewLog, Project } from '../types';
+import { usePaginatedList } from '../hooks';
+import { MarkdownContent } from '../components';
+import { REVIEW_STATUS, EVENT_TYPES, getScoreColor, getStatusColor } from '../constants';
 
 const { RangePicker } = DatePicker;
 const { Paragraph } = Typography;
 
+interface ReviewLogFilters {
+  event_type?: string;
+  project_id?: number;
+  author?: string;
+  start_date?: string;
+  end_date?: string;
+  search_text?: string;
+}
+
 const ReviewLogs: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<ReviewLog[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const { t } = useTranslation();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedLog, setSelectedLog] = useState<ReviewLog | null>(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
-  const { t } = useTranslation();
   
-  // Filters
   const [eventType, setEventType] = useState<string>('');
   const [projectId, setProjectId] = useState<number | undefined>();
   const [author, setAuthor] = useState('');
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
   const [searchText, setSearchText] = useState('');
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const params: any = {
-        page,
-        page_size: pageSize,
-      };
-      if (eventType) params.event_type = eventType;
-      if (projectId) params.project_id = projectId;
-      if (author) params.author = author;
-      if (searchText) params.search_text = searchText;
-      if (dateRange) {
-        params.start_date = dateRange[0].format('YYYY-MM-DD');
-        params.end_date = dateRange[1].format('YYYY-MM-DD');
-      }
+  const {
+    loading,
+    data,
+    total,
+    page,
+    pageSize,
+    setPage,
+    fetchData,
+    handlePageChange,
+  } = usePaginatedList<ReviewLog, ReviewLogFilters>({
+    fetchApi: reviewLogApi.list,
+    onError: () => message.error(t('common.error')),
+  });
 
-      const res = await reviewLogApi.list(params);
-      setData(res.data.items);
-      setTotal(res.data.total);
-    } catch (error) {
-      message.error(t('common.error'));
-    } finally {
-      setLoading(false);
+  const buildFilters = useCallback((): ReviewLogFilters => {
+    const filters: ReviewLogFilters = {};
+    if (eventType) filters.event_type = eventType;
+    if (projectId) filters.project_id = projectId;
+    if (author) filters.author = author;
+    if (searchText) filters.search_text = searchText;
+    if (dateRange) {
+      filters.start_date = dateRange[0].format('YYYY-MM-DD');
+      filters.end_date = dateRange[1].format('YYYY-MM-DD');
     }
-  };
+    return filters;
+  }, [eventType, projectId, author, searchText, dateRange]);
 
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     try {
       const res = await projectApi.list({ page_size: 100 });
       setProjects(res.data.items);
-    } catch (error) {}
-  };
+    } catch (error) {
+      console.error('Failed to fetch projects:', error);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchData();
-    fetchProjects();
+    fetchData(buildFilters());
   }, [page, pageSize]);
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
 
   const handleSearch = () => {
     setPage(1);
-    fetchData();
+    fetchData(buildFilters());
   };
 
   const handleReset = () => {
@@ -93,7 +103,7 @@ const ReviewLogs: React.FC = () => {
     setDateRange(null);
     setSearchText('');
     setPage(1);
-    setTimeout(fetchData, 0);
+    fetchData({});
   };
 
   const showDetail = (record: ReviewLog) => {
@@ -101,19 +111,23 @@ const ReviewLogs: React.FC = () => {
     setDrawerVisible(true);
   };
 
-  const getScoreColor = (score: number | null) => {
-    if (score === null) return 'default';
-    if (score >= 80) return 'success';
-    if (score >= 60) return 'warning';
-    return 'error';
+  const handleRetry = async (id: number) => {
+    try {
+      await reviewLogApi.retry(id);
+      message.success(t('reviewLogs.retryInitiated', 'Retry initiated'));
+      fetchData(buildFilters());
+      setDrawerVisible(false);
+    } catch (error) {
+      message.error(t('common.error'));
+    }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'pending': return t('reviewLogs.pending');
-      case 'processing': return t('reviewLogs.processing');
-      case 'completed': return t('reviewLogs.completed');
-      case 'failed': return t('reviewLogs.failed');
+      case REVIEW_STATUS.PENDING: return t('reviewLogs.pending');
+      case REVIEW_STATUS.PROCESSING: return t('reviewLogs.processing');
+      case REVIEW_STATUS.COMPLETED: return t('reviewLogs.completed');
+      case REVIEW_STATUS.FAILED: return t('reviewLogs.failed');
       default: return status;
     }
   };
@@ -206,8 +220,8 @@ const ReviewLogs: React.FC = () => {
             value={eventType || undefined}
             onChange={setEventType}
             options={[
-              { value: 'push', label: t('reviewLogs.push') },
-              { value: 'merge_request', label: t('reviewLogs.mergeRequest') },
+              { value: EVENT_TYPES.PUSH, label: t('reviewLogs.push') },
+              { value: EVENT_TYPES.MERGE_REQUEST, label: t('reviewLogs.mergeRequest') },
             ]}
           />
           <Select
@@ -251,10 +265,7 @@ const ReviewLogs: React.FC = () => {
             total,
             showSizeChanger: true,
             showTotal: (total) => `${t('common.total')} ${total}`,
-            onChange: (p, ps) => {
-              setPage(p);
-              setPageSize(ps);
-            },
+            onChange: handlePageChange,
           }}
         />
       </Card>
@@ -280,9 +291,25 @@ const ReviewLogs: React.FC = () => {
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label={t('reviewLogs.reviewStatus')}>
-                <Tag color={selectedLog.review_status === 'completed' ? 'success' : selectedLog.review_status === 'failed' ? 'error' : 'processing'}>
+                <Tag color={getStatusColor(selectedLog.review_status)}>
                   {getStatusText(selectedLog.review_status)}
                 </Tag>
+                {selectedLog.review_status === REVIEW_STATUS.FAILED && selectedLog.retry_count > 0 && (
+                  <Tag color="orange" style={{ marginLeft: 8 }}>
+                    {t('reviewLogs.retryCount', 'Retries')}: {selectedLog.retry_count}/3
+                  </Tag>
+                )}
+                {selectedLog.review_status === REVIEW_STATUS.FAILED && (
+                  <Button 
+                    type="link" 
+                    size="small" 
+                    icon={<ReloadOutlined />}
+                    onClick={() => handleRetry(selectedLog.id)}
+                    style={{ marginLeft: 8 }}
+                  >
+                    {t('reviewLogs.retry', 'Retry')}
+                  </Button>
+                )}
               </Descriptions.Item>
               <Descriptions.Item label={t('reviewLogs.changes', 'Changes')} span={2}>
                 <span style={{ color: '#52c41a' }}>+{selectedLog.additions}</span>
@@ -302,104 +329,7 @@ const ReviewLogs: React.FC = () => {
 
             <Card title={t('reviewLogs.reviewResult')} size="small" style={{ marginTop: 16 }}>
               {selectedLog.review_result ? (
-                <div className="markdown-body" style={{ 
-                  padding: 16, 
-                  background: '#fafafa', 
-                  borderRadius: 4,
-                  lineHeight: 1.6,
-                }}>
-                  <ReactMarkdown 
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      pre: ({ children }) => (
-                        <pre style={{ 
-                          background: '#f0f0f0', 
-                          padding: 12, 
-                          borderRadius: 4, 
-                          overflow: 'auto',
-                          fontSize: 13,
-                        }}>
-                          {children}
-                        </pre>
-                      ),
-                      code: ({ children, className }) => {
-                        const isInline = !className;
-                        return isInline ? (
-                          <code style={{ 
-                            background: '#f0f0f0', 
-                            padding: '2px 6px', 
-                            borderRadius: 3,
-                            fontSize: 13,
-                          }}>
-                            {children}
-                          </code>
-                        ) : (
-                          <code style={{ fontSize: 13 }}>{children}</code>
-                        );
-                      },
-                      table: ({ children }) => (
-                        <table style={{ 
-                          borderCollapse: 'collapse', 
-                          width: '100%', 
-                          marginBottom: 16 
-                        }}>
-                          {children}
-                        </table>
-                      ),
-                      th: ({ children }) => (
-                        <th style={{ 
-                          border: '1px solid #d9d9d9', 
-                          padding: '8px 12px', 
-                          background: '#fafafa',
-                          textAlign: 'left',
-                        }}>
-                          {children}
-                        </th>
-                      ),
-                      td: ({ children }) => (
-                        <td style={{ 
-                          border: '1px solid #d9d9d9', 
-                          padding: '8px 12px' 
-                        }}>
-                          {children}
-                        </td>
-                      ),
-                      ul: ({ children }) => (
-                        <ul style={{ paddingLeft: 20, marginBottom: 8 }}>{children}</ul>
-                      ),
-                      ol: ({ children }) => (
-                        <ol style={{ paddingLeft: 20, marginBottom: 8 }}>{children}</ol>
-                      ),
-                      li: ({ children }) => (
-                        <li style={{ marginBottom: 4 }}>{children}</li>
-                      ),
-                      h1: ({ children }) => (
-                        <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 12, marginTop: 16 }}>{children}</h1>
-                      ),
-                      h2: ({ children }) => (
-                        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 10, marginTop: 14 }}>{children}</h2>
-                      ),
-                      h3: ({ children }) => (
-                        <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, marginTop: 12 }}>{children}</h3>
-                      ),
-                      p: ({ children }) => (
-                        <p style={{ marginBottom: 8 }}>{children}</p>
-                      ),
-                      blockquote: ({ children }) => (
-                        <blockquote style={{ 
-                          borderLeft: '4px solid #d9d9d9', 
-                          paddingLeft: 16, 
-                          margin: '8px 0',
-                          color: '#666',
-                        }}>
-                          {children}
-                        </blockquote>
-                      ),
-                    }}
-                  >
-                    {selectedLog.review_result}
-                  </ReactMarkdown>
-                </div>
+                <MarkdownContent content={selectedLog.review_result} />
               ) : (
                 <Paragraph type="secondary">{t('common.noData')}</Paragraph>
               )}

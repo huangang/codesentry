@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
   Card,
   Table,
@@ -19,45 +19,63 @@ import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import { imBotApi } from '../services';
 import type { IMBot } from '../types';
+import { usePaginatedList, useModal } from '../hooks';
+import { IM_BOT_TYPES } from '../constants';
+
+interface IMBotFilters {
+  name?: string;
+  type?: string;
+}
 
 const IMBots: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<IMBot[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [currentBot, setCurrentBot] = useState<IMBot | null>(null);
-  const [form] = Form.useForm();
   const { t, i18n } = useTranslation();
+  const [form] = Form.useForm();
+  const [searchName, setSearchName] = React.useState('');
+  const [botType, setBotType] = React.useState<string>('');
 
-  // Filters
-  const [searchName, setSearchName] = useState('');
-  const [botType, setBotType] = useState<string>('');
+  const modal = useModal<IMBot>();
+
+  const {
+    loading,
+    data,
+    total,
+    page,
+    pageSize,
+    setPage,
+    fetchData,
+    handlePageChange,
+  } = usePaginatedList<IMBot, IMBotFilters>({
+    fetchApi: imBotApi.list,
+    onError: () => message.error(t('common.error')),
+  });
+
+  const buildFilters = (): IMBotFilters => {
+    const filters: IMBotFilters = {};
+    if (searchName) filters.name = searchName;
+    if (botType) filters.type = botType;
+    return filters;
+  };
 
   const getBotTypeLabel = (type: string) => {
     switch (type) {
-      case 'wechat_work': return t('imBots.wecom');
-      case 'dingtalk': return t('imBots.dingtalk');
-      case 'feishu': return t('imBots.feishu');
-      case 'slack': return t('imBots.slack');
+      case IM_BOT_TYPES.WECHAT_WORK: return t('imBots.wecom');
+      case IM_BOT_TYPES.DINGTALK: return t('imBots.dingtalk');
+      case IM_BOT_TYPES.FEISHU: return t('imBots.feishu');
+      case IM_BOT_TYPES.SLACK: return t('imBots.slack');
       default: return type;
     }
   };
 
-  // Check if the bot type requires a secret
   const needsSecret = (type: string) => {
-    // DingTalk and Feishu support signing secret (optional)
-    // WeChat Work and Slack don't need it (key is in webhook URL)
-    return type === 'dingtalk' || type === 'feishu';
+    return type === IM_BOT_TYPES.DINGTALK || type === IM_BOT_TYPES.FEISHU;
   };
 
   const getSecretHelpText = (type: string) => {
     const isZh = i18n.language?.startsWith('zh');
     switch (type) {
-      case 'dingtalk':
+      case IM_BOT_TYPES.DINGTALK:
         return isZh ? '钉钉加签密钥（可选，用于安全验证）' : 'DingTalk signing secret (optional, for security)';
-      case 'feishu':
+      case IM_BOT_TYPES.FEISHU:
         return isZh ? '飞书签名密钥（可选，用于安全验证）' : 'Feishu signing secret (optional, for security)';
       default:
         return '';
@@ -66,79 +84,68 @@ const IMBots: React.FC = () => {
 
   const getWebhookPlaceholder = (type: string) => {
     switch (type) {
-      case 'wechat_work':
+      case IM_BOT_TYPES.WECHAT_WORK:
         return 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx';
-      case 'dingtalk':
+      case IM_BOT_TYPES.DINGTALK:
         return 'https://oapi.dingtalk.com/robot/send?access_token=xxx';
-      case 'feishu':
+      case IM_BOT_TYPES.FEISHU:
         return 'https://open.feishu.cn/open-apis/bot/v2/hook/xxx';
-      case 'slack':
+      case IM_BOT_TYPES.SLACK:
         return 'https://hooks.slack.com/services/xxx/xxx/xxx';
       default:
         return 'https://...';
     }
   };
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const params: any = { page, page_size: pageSize };
-      if (searchName) params.name = searchName;
-      if (botType) params.type = botType;
-      const res = await imBotApi.list(params);
-      setData(res.data.items);
-      setTotal(res.data.total);
-    } catch (error) {
-      message.error(t('common.error'));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const botTypeOptions = [
+    { value: IM_BOT_TYPES.WECHAT_WORK, label: t('imBots.wecom') },
+    { value: IM_BOT_TYPES.DINGTALK, label: t('imBots.dingtalk') },
+    { value: IM_BOT_TYPES.FEISHU, label: t('imBots.feishu') },
+    { value: IM_BOT_TYPES.SLACK, label: t('imBots.slack') },
+  ];
 
   useEffect(() => {
-    fetchData();
+    fetchData(buildFilters());
   }, [page, pageSize]);
 
   const handleSearch = () => {
     setPage(1);
-    fetchData();
+    fetchData(buildFilters());
   };
 
   const handleReset = () => {
     setSearchName('');
     setBotType('');
     setPage(1);
-    setTimeout(fetchData, 0);
+    fetchData({});
   };
 
   const showCreateModal = () => {
-    setCurrentBot(null);
+    modal.open();
     form.resetFields();
     form.setFieldsValue({
-      type: 'wechat_work',
+      type: IM_BOT_TYPES.WECHAT_WORK,
       is_active: true,
     });
-    setModalVisible(true);
   };
 
   const showEditModal = (record: IMBot) => {
-    setCurrentBot(record);
+    modal.open(record);
     form.setFieldsValue(record);
-    setModalVisible(true);
   };
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      if (currentBot) {
-        await imBotApi.update(currentBot.id, values);
+      if (modal.current) {
+        await imBotApi.update(modal.current.id, values);
         message.success(t('imBots.updateSuccess'));
       } else {
         await imBotApi.create(values);
         message.success(t('imBots.createSuccess'));
       }
-      setModalVisible(false);
-      fetchData();
+      modal.close();
+      fetchData(buildFilters());
     } catch (error: any) {
       message.error(error.response?.data?.error || t('common.error'));
     }
@@ -148,7 +155,7 @@ const IMBots: React.FC = () => {
     try {
       await imBotApi.delete(id);
       message.success(t('imBots.deleteSuccess'));
-      fetchData();
+      fetchData(buildFilters());
     } catch (error) {
       message.error(t('common.error'));
     }
@@ -223,12 +230,7 @@ const IMBots: React.FC = () => {
             style={{ width: 120 }}
             value={botType || undefined}
             onChange={setBotType}
-            options={[
-              { value: 'wechat_work', label: t('imBots.wecom') },
-              { value: 'dingtalk', label: t('imBots.dingtalk') },
-              { value: 'feishu', label: t('imBots.feishu') },
-              { value: 'slack', label: t('imBots.slack') },
-            ]}
+            options={botTypeOptions}
           />
           <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
             {t('common.search')}
@@ -252,19 +254,16 @@ const IMBots: React.FC = () => {
             total,
             showSizeChanger: true,
             showTotal: (total) => `${t('common.total')} ${total}`,
-            onChange: (p, ps) => {
-              setPage(p);
-              setPageSize(ps);
-            },
+            onChange: handlePageChange,
           }}
         />
       </Card>
 
       <Modal
-        title={currentBot ? t('imBots.editBot') : t('imBots.createBot')}
-        open={modalVisible}
+        title={modal.isEdit ? t('imBots.editBot') : t('imBots.createBot')}
+        open={modal.visible}
         onOk={handleSubmit}
-        onCancel={() => setModalVisible(false)}
+        onCancel={modal.close}
         width={520}
       >
         <Form form={form} layout="vertical">
@@ -272,12 +271,7 @@ const IMBots: React.FC = () => {
             <Input placeholder="AI Code Review Bot" />
           </Form.Item>
           <Form.Item name="type" label={t('imBots.botType')} rules={[{ required: true, message: t('imBots.pleaseSelectType') }]}>
-            <Select options={[
-              { value: 'wechat_work', label: t('imBots.wecom') },
-              { value: 'dingtalk', label: t('imBots.dingtalk') },
-              { value: 'feishu', label: t('imBots.feishu') },
-              { value: 'slack', label: t('imBots.slack') },
-            ]} />
+            <Select options={botTypeOptions} />
           </Form.Item>
           <Form.Item
             noStyle
