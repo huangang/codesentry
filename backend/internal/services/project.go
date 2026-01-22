@@ -54,7 +54,9 @@ type UpdateProjectRequest struct {
 	FileExtensions string   `json:"file_extensions"`
 	ReviewEvents   string   `json:"review_events"`
 	AIEnabled      *bool    `json:"ai_enabled"`
-	AIPrompt       string   `json:"ai_prompt"`
+	AIPromptID     *uint    `json:"ai_prompt_id"`
+	AIPrompt       *string  `json:"ai_prompt"`
+	LLMConfigID    *uint    `json:"llm_config_id"`
 	IMEnabled      *bool    `json:"im_enabled"`
 	IMBotID        *uint    `json:"im_bot_id"`
 	MinScore       *float64 `json:"min_score"`
@@ -171,8 +173,14 @@ func (s *ProjectService) Update(id uint, req *UpdateProjectRequest) (*models.Pro
 	if req.AIEnabled != nil {
 		updates["ai_enabled"] = *req.AIEnabled
 	}
-	if req.AIPrompt != "" {
-		updates["ai_prompt"] = req.AIPrompt
+	if req.AIPromptID != nil {
+		updates["ai_prompt_id"] = req.AIPromptID
+	}
+	if req.AIPrompt != nil {
+		updates["ai_prompt"] = *req.AIPrompt
+	}
+	if req.LLMConfigID != nil {
+		updates["llm_config_id"] = req.LLMConfigID
 	}
 	if req.IMEnabled != nil {
 		updates["im_enabled"] = *req.IMEnabled
