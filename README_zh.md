@@ -8,15 +8,19 @@
 
 - **AI 代码审查**: 使用 OpenAI 兼容模型自动审查代码变更
 - **自动打分**: 自定义提示词缺少打分指令时，系统自动追加评分要求
-- **多平台支持**: GitHub 和 GitLab Webhook 集成
+- **Commit 评论**: 将 AI 审查结果作为评论发布到 commit（支持 GitLab/GitHub）
+- **防重复审查**: 跳过已审查的 commit，避免重复处理
+- **多平台支持**: GitHub 和 GitLab Webhook 集成，支持多级项目路径
 - **可视化看板**: 代码审查活动的统计指标和图表
-- **审查历史**: 详细的审查记录追踪
+- **审查历史**: 详细的审查记录追踪，支持直接跳转到 commit/MR 页面
 - **项目管理**: 管理多个代码仓库
 - **大模型配置**: 配置多个 AI 模型和自定义接口
+- **提示词模板**: 系统和自定义提示词模板，支持复制为新模板
 - **IM 通知**: 发送审查结果到钉钉、飞书、企业微信、Slack 或自定义 Webhook
+- **系统日志**: 完整记录 Webhook 事件、错误和系统操作
 - **认证支持**: 本地认证和 LDAP 登录
 - **多数据库**: SQLite 开发环境，MySQL/PostgreSQL 生产环境
-- **国际化**: 支持中英文切换
+- **国际化**: 支持中英文切换（包括日期选择器本地化）
 
 ## 快速开始
 
@@ -169,15 +173,24 @@ https://你的域名/review/webhook
 ### 审查记录
 - `GET /api/review-logs` - 审查记录列表
 - `GET /api/review-logs/:id` - 审查详情
+- `POST /api/review-logs/:id/retry` - 重试失败的审查
 
 ### 看板
 - `GET /api/dashboard/stats` - 获取统计数据
 
 ### 大模型配置
 - `GET /api/llm-configs` - 模型列表
+- `GET /api/llm-configs/active` - 获取激活的模型列表（用于项目选择）
 - `POST /api/llm-configs` - 创建模型
 - `PUT /api/llm-configs/:id` - 更新模型
 - `DELETE /api/llm-configs/:id` - 删除模型
+
+### 提示词模板
+- `GET /api/prompts` - 提示词列表
+- `POST /api/prompts` - 创建提示词
+- `PUT /api/prompts/:id` - 更新提示词
+- `DELETE /api/prompts/:id` - 删除提示词
+- `PUT /api/prompts/:id/default` - 设为默认模板
 
 ### IM 机器人
 - `GET /api/im-bots` - 机器人列表

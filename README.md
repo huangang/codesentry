@@ -8,15 +8,19 @@ AI-powered Code Review Platform for GitHub and GitLab.
 
 - **AI Code Review**: Automatically review code changes using OpenAI-compatible models
 - **Auto-Scoring**: Automatically appends scoring instructions if custom prompts lack them
-- **Multi-Platform Support**: GitHub and GitLab webhook integration
+- **Commit Comments**: Post AI review results as comments on commits (GitLab/GitHub)
+- **Duplicate Prevention**: Skip already reviewed commits to avoid redundant processing
+- **Multi-Platform Support**: GitHub and GitLab webhook integration with multi-level project path support
 - **Dashboard**: Visual statistics and metrics for code review activities
-- **Review History**: Track all code reviews with detailed logs
+- **Review History**: Track all code reviews with detailed logs and direct links to commits/MRs
 - **Project Management**: Manage multiple repositories
 - **LLM Configuration**: Configure multiple AI models with custom endpoints
+- **Prompt Templates**: System and custom prompt templates with copy functionality
 - **IM Notifications**: Send review results to DingTalk, Feishu, WeCom, Slack, or custom webhooks
+- **System Logging**: Comprehensive logging for webhook events, errors, and system operations
 - **Authentication**: Local authentication and LDAP support
 - **Multi-Database**: SQLite for development, MySQL/PostgreSQL for production
-- **Internationalization**: Support for English and Chinese
+- **Internationalization**: Support for English and Chinese (including DatePicker localization)
 
 ## Quick Start
 
@@ -169,15 +173,24 @@ The system automatically detects the platform via request headers.
 ### Review Logs
 - `GET /api/review-logs` - List review logs
 - `GET /api/review-logs/:id` - Get review detail
+- `POST /api/review-logs/:id/retry` - Retry failed review
 
 ### Dashboard
 - `GET /api/dashboard/stats` - Get statistics
 
 ### LLM Config
 - `GET /api/llm-configs` - List LLM configs
+- `GET /api/llm-configs/active` - List active LLM configs (for project selection)
 - `POST /api/llm-configs` - Create LLM config
 - `PUT /api/llm-configs/:id` - Update LLM config
 - `DELETE /api/llm-configs/:id` - Delete LLM config
+
+### Prompt Templates
+- `GET /api/prompts` - List prompt templates
+- `POST /api/prompts` - Create prompt template
+- `PUT /api/prompts/:id` - Update prompt template
+- `DELETE /api/prompts/:id` - Delete prompt template
+- `PUT /api/prompts/:id/default` - Set as default template
 
 ### IM Bots
 - `GET /api/im-bots` - List IM bots
