@@ -41,6 +41,7 @@ type Project struct {
 	CommentEnabled bool           `gorm:"default:false" json:"comment_enabled"`
 	IMEnabled      bool           `gorm:"default:false" json:"im_enabled"`
 	IMBotID        *uint          `json:"im_bot_id"`
+	MinScore       float64        `gorm:"default:0" json:"min_score"` // Minimum score to pass (0 = use system default)
 	CreatedBy      uint           `json:"created_by"`
 	CreatedAt      time.Time      `json:"created_at"`
 	UpdatedAt      time.Time      `json:"updated_at"`

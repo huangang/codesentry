@@ -16,6 +16,7 @@ import {
   Tooltip,
   Radio,
   Divider,
+  InputNumber,
 } from 'antd';
 import {
   PlusOutlined,
@@ -142,6 +143,7 @@ const Projects: React.FC = () => {
       im_enabled: false,
       file_extensions: '.go,.js,.ts,.jsx,.tsx,.py,.java,.c,.cpp,.h,.hpp,.cs,.rb,.php,.swift,.kt,.rs,.vue,.svelte',
       review_events: 'push,merge_request',
+      min_score: 0,
     });
   };
 
@@ -189,7 +191,7 @@ const Projects: React.FC = () => {
       const values = await promptForm.validateFields();
       if (currentProjectForPrompt) {
         const updateData: Partial<Project> = {};
-        
+
         switch (values.prompt_mode) {
           case 'default':
             updateData.ai_prompt = '';
@@ -204,7 +206,7 @@ const Projects: React.FC = () => {
             updateData.ai_prompt_id = null;
             break;
         }
-        
+
         await projectApi.update(currentProjectForPrompt.id, updateData);
         message.success(t('common.success'));
         setPromptDrawerVisible(false);
@@ -265,6 +267,13 @@ const Projects: React.FC = () => {
           {record.ai_enabled ? t('common.yes') : t('common.no')}
         </Tag>
       ),
+    },
+    {
+      title: t('projects.minScore', 'Min Score'),
+      dataIndex: 'min_score',
+      key: 'min_score',
+      width: 100,
+      render: (score: number) => score > 0 ? score : t('common.default', 'Default'),
     },
     {
       title: t('projects.imEnabled'),
@@ -358,15 +367,15 @@ const Projects: React.FC = () => {
               { value: PLATFORMS.GITLAB, label: 'GitLab' },
             ]} />
           </Form.Item>
-          <Form.Item 
-            name="access_token" 
+          <Form.Item
+            name="access_token"
             label={t('projects.accessToken')}
             extra={i18n.language?.startsWith('zh') ? '用于获取代码差异，需要有仓库读取权限' : 'Used to fetch code diff, requires repo read access'}
           >
             <Input.Password placeholder={t('projects.accessToken')} />
           </Form.Item>
-          <Form.Item 
-            name="webhook_secret" 
+          <Form.Item
+            name="webhook_secret"
             label={t('projects.webhookSecret')}
             extra={i18n.language?.startsWith('zh') ? '用于验证 Webhook 请求签名（可选）' : 'Used to verify webhook signature (optional)'}
           >
@@ -375,8 +384,8 @@ const Projects: React.FC = () => {
           <Form.Item name="file_extensions" label={t('projects.fileExtensions')}>
             <Input placeholder={t('projects.fileExtensionsPlaceholder')} />
           </Form.Item>
-          <Form.Item 
-            name="ignore_patterns" 
+          <Form.Item
+            name="ignore_patterns"
             label={t('projects.ignorePatterns')}
             extra={i18n.language?.startsWith('zh') ? '忽略的文件路径，逗号分隔（如：vendor/,node_modules/,*.min.js）' : 'File paths to ignore, comma-separated (e.g., vendor/,node_modules/,*.min.js)'}
           >
@@ -388,23 +397,30 @@ const Projects: React.FC = () => {
           <Form.Item name="ai_enabled" label={t('projects.aiEnabled')} valuePropName="checked">
             <Switch />
           </Form.Item>
-          <Form.Item 
-            name="llm_config_id" 
+          <Form.Item
+            name="llm_config_id"
             label={t('projects.llmConfig', 'LLM Model')}
             extra={i18n.language?.startsWith('zh') ? '选择用于此项目的 AI 模型（不选则使用默认模型）' : 'Select AI model for this project (uses default if not set)'}
           >
             <Select
               allowClear
               placeholder={t('projects.selectLLM', 'Select LLM Model')}
-              options={llmConfigs.map(c => ({ 
-                value: c.id, 
-                label: `${c.name} (${c.model})${c.is_default ? ' ★' : ''}` 
+              options={llmConfigs.map(c => ({
+                value: c.id,
+                label: `${c.name} (${c.model})${c.is_default ? ' ★' : ''}`
               }))}
             />
           </Form.Item>
-          <Form.Item 
-            name="comment_enabled" 
-            label={t('projects.commentEnabled')} 
+          <Form.Item
+            name="min_score"
+            label={t('projects.minScore', 'Min Score')}
+            extra={i18n.language?.startsWith('zh') ? 'CI 流水线阻塞阈值（0 表示使用系统默认值）' : 'CI blocking threshold (0 means use system default)'}
+          >
+            <InputNumber min={0} max={100} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item
+            name="comment_enabled"
+            label={t('projects.commentEnabled')}
             valuePropName="checked"
             extra={i18n.language?.startsWith('zh') ? '审查完成后自动评论到 MR/PR' : 'Auto-comment review result to MR/PR'}
           >
@@ -433,8 +449,8 @@ const Projects: React.FC = () => {
         }
       >
         <Form form={promptForm} layout="vertical">
-          <Form.Item 
-            name="prompt_mode" 
+          <Form.Item
+            name="prompt_mode"
             label={t('projects.promptMode', 'Prompt Mode')}
           >
             <Radio.Group>
@@ -450,44 +466,44 @@ const Projects: React.FC = () => {
           >
             {({ getFieldValue }) => {
               const mode = getFieldValue('prompt_mode');
-              
+
               const scoringHint = (
                 <div style={{ padding: 12, background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 4, marginBottom: 16 }}>
                   <p style={{ margin: 0, fontSize: 12, color: '#ad8b00' }}>
-                    {i18n.language?.startsWith('zh') 
+                    {i18n.language?.startsWith('zh')
                       ? '💡 提示：如果您的提示词没有包含打分指令（如"总分"、"评分"、"score"等），系统将自动追加打分要求。'
                       : '💡 Hint: If your prompt doesn\'t include scoring instructions (like "total score", "rating", etc.), the system will auto-append scoring requirements.'}
                   </p>
                 </div>
               );
-              
+
               if (mode === 'template') {
                 return (
                   <>
                     {scoringHint}
-                    <Form.Item 
-                      name="ai_prompt_id" 
+                    <Form.Item
+                      name="ai_prompt_id"
                       label={t('projects.selectTemplate', 'Select Template')}
                       rules={[{ required: true, message: t('projects.pleaseSelectTemplate', 'Please select a template') }]}
                     >
                       <Select
                         placeholder={t('projects.selectTemplate', 'Select Template')}
-                        options={promptTemplates.map(p => ({ 
-                          value: p.id, 
-                          label: `${p.name}${p.is_default ? ' ★' : ''}${p.is_system ? ` (${t('prompts.system')})` : ''}` 
+                        options={promptTemplates.map(p => ({
+                          value: p.id,
+                          label: `${p.name}${p.is_default ? ' ★' : ''}${p.is_system ? ` (${t('prompts.system')})` : ''}`
                         }))}
                       />
                     </Form.Item>
                   </>
                 );
               }
-              
+
               if (mode === 'custom') {
                 return (
                   <>
                     {scoringHint}
-                    <Form.Item 
-                      name="ai_prompt" 
+                    <Form.Item
+                      name="ai_prompt"
                       label={t('projects.customPrompt', 'Custom Prompt')}
                       rules={[{ required: true, message: t('projects.pleaseInputPrompt', 'Please input prompt') }]}
                       extra={i18n.language?.startsWith('zh') ? '使用 {{diffs}} 和 {{commits}} 作为占位符' : 'Use {{diffs}} and {{commits}} as placeholders'}
@@ -504,7 +520,7 @@ const Projects: React.FC = () => {
               return (
                 <div style={{ padding: 16, background: '#f5f5f5', borderRadius: 4 }}>
                   <p style={{ margin: 0, color: '#666' }}>
-                    {i18n.language?.startsWith('zh') 
+                    {i18n.language?.startsWith('zh')
                       ? '使用系统默认提示词。您可以在「提示词模板」页面中修改默认提示词。'
                       : 'Using system default prompt. You can modify the default prompt in the "Prompt Templates" page.'}
                   </p>
@@ -514,7 +530,7 @@ const Projects: React.FC = () => {
           </Form.Item>
 
           <Divider />
-          
+
           <div style={{ fontSize: 12, color: '#999' }}>
             <p><strong>{t('projects.promptPriority', 'Prompt Priority')}:</strong></p>
             <ol style={{ paddingLeft: 20, margin: 0 }}>

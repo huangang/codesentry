@@ -283,6 +283,7 @@
     "updateSuccess": "Prompt updated successfully",
     "deleteSuccess": "Prompt deleted successfully",
     "cannotEditSystem": "System prompts cannot be edited",
+    "duplicate": "Duplicate",
     "pleaseInputName": "Please input prompt name",
     "pleaseInputContent": "Please input prompt content"
   }

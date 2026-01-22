@@ -283,6 +283,7 @@
     "updateSuccess": "提示词更新成功",
     "deleteSuccess": "提示词删除成功",
     "cannotEditSystem": "系统提示词不可编辑",
+    "duplicate": "复制为新模板",
     "pleaseInputName": "请输入提示词名称",
     "pleaseInputContent": "请输入提示词内容"
   }

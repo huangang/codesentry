@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -284,6 +285,9 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 		"commit":     commitSHA,
 	})
 
+	// Set pending status
+	s.setCommitStatus(project, commitSHA, "pending", "AI Review in progress...", event.ProjectID)
+
 	var allDiffs strings.Builder
 	for _, c := range event.Commits {
 		diff, err := s.getGitLabDiff(project, c.ID)
@@ -368,6 +372,14 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 			ReviewResult:  result.Content,
 			EventType:     "push",
 		})
+
+		// Set final status
+		minScore := s.getEffectiveMinScore(project)
+		if result.Score >= minScore {
+			s.setCommitStatus(project, commitSHA, "success", fmt.Sprintf("AI Review Passed: %.0f/%.0f", result.Score, minScore), event.ProjectID)
+		} else {
+			s.setCommitStatus(project, commitSHA, "failed", fmt.Sprintf("AI Review Failed: %.0f (Min: %.0f)", result.Score, minScore), event.ProjectID)
+		}
 	}
 
 	return s.reviewService.Update(reviewLog)
@@ -393,6 +405,24 @@ func (s *WebhookService) processGitLabMR(ctx context.Context, project *models.Pr
 		ReviewStatus:  "pending",
 	}
 	s.reviewService.Create(reviewLog)
+
+	// Get latest commit SHA for the MR to set status
+	// We might need to fetch the MR details to get the SHA if not provided in the event accurately
+	// For now, assuming we can get it from the event or just rely on the diff context
+	// But CommitStatus requires a SHA.
+	// GitLab MR Hook usually provides `last_commit` in `object_attributes`.
+	// Let's defer status for MR if we can't find SHA easily, but usually `last_commit.id` is available.
+	// We'll update models later if needed, but for now let's try to proceed.
+	// NOTE: The current GitLabMREvent struct might need `LastCommit` field.
+	// Assuming we can proceed without status for MR if SHA is missing, or we should fetch it.
+
+	// Actually for MR, the "pipeline" is often attached to the HEAD of the source branch.
+	// So we can use the source branch HEAD SHA if available.
+	// Let's assume we can fetch the MR version to get the SHA.
+	mrSHA, _ := s.getGitLabRequestSHA(project, mrNumber)
+	if mrSHA != "" {
+		s.setCommitStatus(project, mrSHA, "pending", "AI Review in progress...", event.Project.ID)
+	}
 
 	// Get MR diff
 	diff, err := s.getGitLabMRDiff(project, mrNumber)
@@ -434,7 +464,22 @@ func (s *WebhookService) processGitLabMR(ctx context.Context, project *models.Pr
 		}
 	}
 
-	return s.reviewService.Update(reviewLog)
+	s.reviewService.Update(reviewLog)
+
+	if mrSHA != "" {
+		minScore := s.getEffectiveMinScore(project)
+		if reviewLog.ReviewStatus == "completed" && reviewLog.Score != nil {
+			if *reviewLog.Score >= minScore {
+				s.setCommitStatus(project, mrSHA, "success", fmt.Sprintf("AI Review Passed: %.0f/%.0f", *reviewLog.Score, minScore), event.Project.ID)
+			} else {
+				s.setCommitStatus(project, mrSHA, "failed", fmt.Sprintf("AI Review Failed: %.0f (Min: %.0f)", *reviewLog.Score, minScore), event.Project.ID)
+			}
+		} else {
+			s.setCommitStatus(project, mrSHA, "failed", "AI Review Failed/Error", event.Project.ID)
+		}
+	}
+
+	return nil
 }
 
 func (s *WebhookService) processGitHubPush(ctx context.Context, project *models.Project, event *GitHubPushEvent) error {
@@ -797,8 +842,129 @@ func VerifyGitHubSignature(secret string, body []byte, signature string) bool {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write(body)
 	expectedMAC := hex.EncodeToString(mac.Sum(nil))
+	return hmac.Equal([]byte(signature), []byte("sha256="+expectedMAC))
+}
 
-	return hmac.Equal([]byte(signature[7:]), []byte(expectedMAC))
+// Helper for sending commit status to GitLab
+func (s *WebhookService) setCommitStatus(project *models.Project, sha string, state string, description string, gitlabProjectID int) {
+	if project.Platform != "gitlab" {
+		return
+	}
+
+	// If gitlabProjectID is 0, we might need to rely on parsing project.URL or existing info
+	// But usually the webhook event contains the ID.
+
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		log.Printf("[Webhook] Failed to parse repo info for status update: %v", err)
+		return
+	}
+
+	// Use project ID from event if available, otherwise try to derive or use path
+	// API: POST /projects/:id/statuses/:sha
+	// :id can be the project ID or URL-encoded path
+
+	projectIdentifier := strings.ReplaceAll(info.projectPath, "/", "%2F")
+	if gitlabProjectID != 0 {
+		projectIdentifier = fmt.Sprintf("%d", gitlabProjectID)
+	}
+
+	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/statuses/%s",
+		info.baseURL, projectIdentifier, sha)
+
+	data := map[string]string{
+		"state":       state,
+		"context":     "codesentry/ai-review",
+		"description": description,
+		// "target_url": ... logic to link to review detail ...
+	}
+
+	payload, _ := json.Marshal(data)
+	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(payload))
+	if err != nil {
+		log.Printf("[Webhook] Failed to create request: %v", err)
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if project.AccessToken != "" {
+		req.Header.Set("PRIVATE-TOKEN", project.AccessToken)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		log.Printf("[Webhook] Failed to send commit status: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("[Webhook] Failed to set commit status (code %d): %s", resp.StatusCode, string(body))
+	} else {
+		log.Printf("[Webhook] Set commit status for %s to %s", sha[:8], state)
+	}
+}
+
+// getEffectiveMinScore determines the passing score
+func (s *WebhookService) getEffectiveMinScore(project *models.Project) float64 {
+	// 1. Check Project level
+	if project.MinScore > 0 {
+		return project.MinScore
+	}
+
+	// 2. Check System level
+	var sysConfig models.SystemConfig
+	if err := s.db.Where("`key` = ?", "system.min_score").First(&sysConfig).Error; err == nil {
+		// Parse value
+		var score float64
+		// Assuming value is simple string like "60"
+		if _, err := fmt.Sscanf(sysConfig.Value, "%f", &score); err == nil {
+			return score
+		}
+	}
+
+	// 3. Default fallback
+	return 60.0
+}
+
+func (s *WebhookService) getGitLabRequestSHA(project *models.Project, mrIID int) (string, error) {
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		return "", err
+	}
+
+	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/merge_requests/%d",
+		info.baseURL, strings.ReplaceAll(info.projectPath, "/", "%2F"), mrIID)
+
+	req, _ := http.NewRequest("GET", apiURL, nil)
+	if project.AccessToken != "" {
+		req.Header.Set("PRIVATE-TOKEN", project.AccessToken)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("status %d", resp.StatusCode)
+	}
+
+	// Note: GitLab MR API returns "sha" field in the root as the HEAD sha of the MR
+	// Or sometimes "diff_refs.head_sha" is safer.
+	// Let's decode to a generic map to be safe
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+
+	if sha, ok := result["sha"].(string); ok {
+		return sha, nil
+	}
+
+	return "", fmt.Errorf("sha not found")
 }
 
 func (s *WebhookService) postGitLabMRComment(project *models.Project, mrIID int, comment string) error {

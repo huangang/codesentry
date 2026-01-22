@@ -31,31 +31,33 @@ type ProjectListResponse struct {
 }
 
 type CreateProjectRequest struct {
-	Name           string `json:"name" binding:"required"`
-	URL            string `json:"url" binding:"required"`
-	Platform       string `json:"platform" binding:"required,oneof=github gitlab"`
-	AccessToken    string `json:"access_token"`
-	WebhookSecret  string `json:"webhook_secret"`
-	FileExtensions string `json:"file_extensions"`
-	ReviewEvents   string `json:"review_events"`
-	AIEnabled      bool   `json:"ai_enabled"`
-	AIPrompt       string `json:"ai_prompt"`
-	IMEnabled      bool   `json:"im_enabled"`
-	IMBotID        *uint  `json:"im_bot_id"`
+	Name           string  `json:"name" binding:"required"`
+	URL            string  `json:"url" binding:"required"`
+	Platform       string  `json:"platform" binding:"required,oneof=github gitlab"`
+	AccessToken    string  `json:"access_token"`
+	WebhookSecret  string  `json:"webhook_secret"`
+	FileExtensions string  `json:"file_extensions"`
+	ReviewEvents   string  `json:"review_events"`
+	AIEnabled      bool    `json:"ai_enabled"`
+	AIPrompt       string  `json:"ai_prompt"`
+	IMEnabled      bool    `json:"im_enabled"`
+	IMBotID        *uint   `json:"im_bot_id"`
+	MinScore       float64 `json:"min_score"`
 }
 
 type UpdateProjectRequest struct {
-	Name           string `json:"name"`
-	URL            string `json:"url"`
-	Platform       string `json:"platform" binding:"omitempty,oneof=github gitlab"`
-	AccessToken    string `json:"access_token"`
-	WebhookSecret  string `json:"webhook_secret"`
-	FileExtensions string `json:"file_extensions"`
-	ReviewEvents   string `json:"review_events"`
-	AIEnabled      *bool  `json:"ai_enabled"`
-	AIPrompt       string `json:"ai_prompt"`
-	IMEnabled      *bool  `json:"im_enabled"`
-	IMBotID        *uint  `json:"im_bot_id"`
+	Name           string   `json:"name"`
+	URL            string   `json:"url"`
+	Platform       string   `json:"platform" binding:"omitempty,oneof=github gitlab"`
+	AccessToken    string   `json:"access_token"`
+	WebhookSecret  string   `json:"webhook_secret"`
+	FileExtensions string   `json:"file_extensions"`
+	ReviewEvents   string   `json:"review_events"`
+	AIEnabled      *bool    `json:"ai_enabled"`
+	AIPrompt       string   `json:"ai_prompt"`
+	IMEnabled      *bool    `json:"im_enabled"`
+	IMBotID        *uint    `json:"im_bot_id"`
+	MinScore       *float64 `json:"min_score"`
 }
 
 // List returns paginated projects
@@ -125,6 +127,7 @@ func (s *ProjectService) Create(req *CreateProjectRequest, userID uint) (*models
 		AIPrompt:       req.AIPrompt,
 		IMEnabled:      req.IMEnabled,
 		IMBotID:        req.IMBotID,
+		MinScore:       req.MinScore,
 		CreatedBy:      userID,
 	}
 
@@ -176,6 +179,9 @@ func (s *ProjectService) Update(id uint, req *UpdateProjectRequest) (*models.Pro
 	}
 	if req.IMBotID != nil {
 		updates["im_bot_id"] = req.IMBotID
+	}
+	if req.MinScore != nil {
+		updates["min_score"] = *req.MinScore
 	}
 
 	if err := s.db.Model(&project).Updates(updates).Error; err != nil {

@@ -25,6 +25,7 @@ import {
   EyeOutlined,
   StarOutlined,
   StarFilled,
+  CopyOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
@@ -107,6 +108,16 @@ const Prompts: React.FC = () => {
   const showViewDrawer = (record: PromptTemplate) => {
     setViewingPrompt(record);
     setDrawerVisible(true);
+  };
+
+  const handleDuplicate = (record: PromptTemplate) => {
+    modal.open();
+    form.setFieldsValue({
+      name: `${record.name} (Copy)`,
+      description: record.description,
+      content: record.content,
+      is_default: false,
+    });
   };
 
   const handleSubmit = async () => {
@@ -204,6 +215,14 @@ const Prompts: React.FC = () => {
               size="small"
               icon={<EyeOutlined />}
               onClick={() => showViewDrawer(record)}
+            />
+          </Tooltip>
+          <Tooltip title={t('prompts.duplicate')}>
+            <Button
+              type="link"
+              size="small"
+              icon={<CopyOutlined />}
+              onClick={() => handleDuplicate(record)}
             />
           </Tooltip>
           {!record.is_system && (
