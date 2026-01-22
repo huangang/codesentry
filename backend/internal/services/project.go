@@ -174,10 +174,10 @@ func (s *ProjectService) Update(id uint, req *UpdateProjectRequest) (*models.Pro
 		updates["ai_enabled"] = *req.AIEnabled
 	}
 	if req.AIPromptID != nil {
-		updates["ai_prompt_id"] = req.AIPromptID
+		updates["a_iprompt_id"] = req.AIPromptID
 	}
 	if req.AIPrompt != nil {
-		updates["ai_prompt"] = *req.AIPrompt
+		updates["a_iprompt"] = *req.AIPrompt
 	}
 	if req.LLMConfigID != nil {
 		updates["llm_config_id"] = req.LLMConfigID

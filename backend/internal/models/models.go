@@ -33,11 +33,11 @@ type Project struct {
 	WebhookSecret  string         `gorm:"size:255" json:"-"`
 	FileExtensions string         `gorm:"size:1000" json:"file_extensions"` // .js,.ts,.go,...
 	ReviewEvents   string         `gorm:"size:200" json:"review_events"`    // push,merge_request
-	AIEnabled      bool           `gorm:"default:true" json:"ai_enabled"`
-	AIPromptID     *uint          `json:"ai_prompt_id"`                     // Reference to PromptTemplate
-	AIPrompt       string         `gorm:"type:text" json:"ai_prompt"`       // Custom prompt override
-	LLMConfigID    *uint          `json:"llm_config_id"`                    // Reference to LLMConfig
-	IgnorePatterns string         `gorm:"size:2000" json:"ignore_patterns"` // Patterns to ignore: vendor/,node_modules/,*.min.js
+	AIEnabled      bool           `gorm:"column:ai_enabled;default:true" json:"ai_enabled"`
+	AIPromptID     *uint          `gorm:"column:a_iprompt_id" json:"ai_prompt_id"`     // Reference to PromptTemplate
+	AIPrompt       string         `gorm:"column:a_iprompt;type:text" json:"ai_prompt"` // Custom prompt override
+	LLMConfigID    *uint          `gorm:"column:llm_config_id" json:"llm_config_id"`   // Reference to LLMConfig
+	IgnorePatterns string         `gorm:"size:2000" json:"ignore_patterns"`            // Patterns to ignore: vendor/,node_modules/,*.min.js
 	CommentEnabled bool           `gorm:"default:false" json:"comment_enabled"`
 	IMEnabled      bool           `gorm:"default:false" json:"im_enabled"`
 	IMBotID        *uint          `json:"im_bot_id"`
