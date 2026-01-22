@@ -4,7 +4,6 @@ import (
 	"embed"
 	"io/fs"
 	"log"
-	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -172,24 +171,53 @@ func main() {
 	}
 
 	// Serve static files (embedded frontend)
-	staticFS, err := fs.Sub(staticFiles, "static")
-	if err == nil {
-		r.NoRoute(func(c *gin.Context) {
-			// Try to serve static file
-			path := c.Request.URL.Path
-			if path == "/" {
-				path = "/index.html"
-			}
-
-			file, err := staticFS.Open(path[1:]) // Remove leading /
-			if err != nil {
-				// Fallback to index.html for SPA routing
-				c.FileFromFS("index.html", http.FS(staticFS))
+	staticFS, staticErr := fs.Sub(staticFiles, "static")
+	if staticErr == nil {
+		// Helper function to serve index.html
+		serveIndex := func(c *gin.Context) {
+			data, readErr := fs.ReadFile(staticFS, "index.html")
+			if readErr != nil {
+				c.String(404, "index.html not found")
 				return
 			}
-			file.Close()
+			c.Data(200, "text/html; charset=utf-8", data)
+		}
 
-			c.FileFromFS(path[1:], http.FS(staticFS))
+		// Serve index.html for root path
+		r.GET("/", serveIndex)
+
+		r.NoRoute(func(c *gin.Context) {
+			// Try to serve static file
+			path := c.Request.URL.Path[1:] // Remove leading /
+
+			data, readErr := fs.ReadFile(staticFS, path)
+			if readErr != nil {
+				// Fallback to index.html for SPA routing
+				serveIndex(c)
+				return
+			}
+
+			// Determine content type
+			contentType := "application/octet-stream"
+			if len(path) > 3 {
+				switch path[len(path)-3:] {
+				case ".js":
+					contentType = "application/javascript"
+				case "css":
+					contentType = "text/css"
+				case "tml":
+					contentType = "text/html"
+				case "son":
+					contentType = "application/json"
+				case "svg":
+					contentType = "image/svg+xml"
+				case "png":
+					contentType = "image/png"
+				case "ico":
+					contentType = "image/x-icon"
+				}
+			}
+			c.Data(200, contentType, data)
 		})
 	}
 
