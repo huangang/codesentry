@@ -598,6 +598,13 @@ func (s *WebhookService) processGitHubPush(ctx context.Context, project *models.
 				reviewLog.CommentPosted = true
 			}
 		}
+
+		minScore := s.getEffectiveMinScore(project)
+		if result.Score >= minScore {
+			s.setCommitStatus(project, event.After, "success", fmt.Sprintf("AI Review Passed: %.0f/%.0f", result.Score, minScore), 0)
+		} else {
+			s.setCommitStatus(project, event.After, "failed", fmt.Sprintf("AI Review Failed: %.0f (Min: %.0f)", result.Score, minScore), 0)
+		}
 	}
 
 	return s.reviewService.Update(reviewLog)
@@ -668,6 +675,13 @@ func (s *WebhookService) processGitHubPR(ctx context.Context, project *models.Pr
 			} else {
 				reviewLog.CommentPosted = true
 			}
+		}
+
+		minScore := s.getEffectiveMinScore(project)
+		if result.Score >= minScore {
+			s.setCommitStatus(project, event.PullRequest.Head.SHA, "success", fmt.Sprintf("AI Review Passed: %.0f/%.0f", result.Score, minScore), 0)
+		} else {
+			s.setCommitStatus(project, event.PullRequest.Head.SHA, "failed", fmt.Sprintf("AI Review Failed: %.0f (Min: %.0f)", result.Score, minScore), 0)
 		}
 	}
 
@@ -910,24 +924,21 @@ func VerifyGitHubSignature(secret string, body []byte, signature string) bool {
 	return hmac.Equal([]byte(signature), []byte("sha256="+expectedMAC))
 }
 
-// Helper for sending commit status to GitLab
 func (s *WebhookService) setCommitStatus(project *models.Project, sha string, state string, description string, gitlabProjectID int) {
-	if project.Platform != "gitlab" {
-		return
+	switch project.Platform {
+	case "gitlab":
+		s.setGitLabCommitStatus(project, sha, state, description, gitlabProjectID)
+	case "github":
+		s.setGitHubCommitStatus(project, sha, state, description)
 	}
+}
 
-	// If gitlabProjectID is 0, we might need to rely on parsing project.URL or existing info
-	// But usually the webhook event contains the ID.
-
+func (s *WebhookService) setGitLabCommitStatus(project *models.Project, sha string, state string, description string, gitlabProjectID int) {
 	info, err := parseRepoInfo(project.URL)
 	if err != nil {
 		log.Printf("[Webhook] Failed to parse repo info for status update: %v", err)
 		return
 	}
-
-	// Use project ID from event if available, otherwise try to derive or use path
-	// API: POST /projects/:id/statuses/:sha
-	// :id can be the project ID or URL-encoded path
 
 	projectIdentifier := strings.ReplaceAll(info.projectPath, "/", "%2F")
 	if gitlabProjectID != 0 {
@@ -971,7 +982,61 @@ func (s *WebhookService) setCommitStatus(project *models.Project, sha string, st
 	}
 }
 
-// getEffectiveMinScore determines the passing score
+func (s *WebhookService) setGitHubCommitStatus(project *models.Project, sha string, state string, description string) {
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		log.Printf("[Webhook] Failed to parse repo info for GitHub status update: %v", err)
+		return
+	}
+
+	githubState := state
+	switch state {
+	case "pending":
+		githubState = "pending"
+	case "success":
+		githubState = "success"
+	case "failed":
+		githubState = "failure"
+	default:
+		githubState = "error"
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/statuses/%s", info.owner, info.repo, sha)
+
+	data := map[string]string{
+		"state":       githubState,
+		"context":     "codesentry/ai-review",
+		"description": description,
+	}
+
+	payload, _ := json.Marshal(data)
+	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(payload))
+	if err != nil {
+		log.Printf("[Webhook] Failed to create GitHub status request: %v", err)
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	if project.AccessToken != "" {
+		req.Header.Set("Authorization", "token "+project.AccessToken)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		log.Printf("[Webhook] Failed to send GitHub commit status: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("[Webhook] Failed to set GitHub commit status (code %d): %s", resp.StatusCode, string(body))
+	} else {
+		log.Printf("[Webhook] Set GitHub commit status for %s to %s", sha[:8], githubState)
+	}
+}
+
 func (s *WebhookService) getEffectiveMinScore(project *models.Project) float64 {
 	// 1. Check Project level
 	if project.MinScore > 0 {
