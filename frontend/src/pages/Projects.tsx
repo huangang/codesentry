@@ -14,6 +14,8 @@ import {
   Popconfirm,
   Drawer,
   Tooltip,
+  Radio,
+  Divider,
 } from 'antd';
 import {
   PlusOutlined,
@@ -26,8 +28,8 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useTranslation } from 'react-i18next';
-import { projectApi, imBotApi } from '../services';
-import type { Project, IMBot } from '../types';
+import { projectApi, imBotApi, promptApi, llmConfigApi } from '../services';
+import type { Project, IMBot, PromptTemplate, LLMConfig } from '../types';
 import { usePaginatedList, useModal } from '../hooks';
 import { PLATFORMS } from '../constants';
 
@@ -37,12 +39,16 @@ interface ProjectFilters {
   name?: string;
 }
 
+type PromptMode = 'default' | 'template' | 'custom';
+
 const Projects: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [form] = Form.useForm();
   const [promptForm] = Form.useForm();
 
   const [imBots, setImBots] = useState<IMBot[]>([]);
+  const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>([]);
+  const [llmConfigs, setLLMConfigs] = useState<LLMConfig[]>([]);
   const [defaultPrompt, setDefaultPrompt] = useState('');
   const [searchName, setSearchName] = useState('');
 
@@ -78,6 +84,24 @@ const Projects: React.FC = () => {
     }
   }, []);
 
+  const fetchPromptTemplates = useCallback(async () => {
+    try {
+      const res = await promptApi.getActive();
+      setPromptTemplates(res.data);
+    } catch (error) {
+      console.error('Failed to fetch prompt templates:', error);
+    }
+  }, []);
+
+  const fetchLLMConfigs = useCallback(async () => {
+    try {
+      const res = await llmConfigApi.list({ page_size: 100 });
+      setLLMConfigs(res.data.items.filter(c => c.is_active));
+    } catch (error) {
+      console.error('Failed to fetch LLM configs:', error);
+    }
+  }, []);
+
   const fetchDefaultPrompt = useCallback(async () => {
     try {
       const res = await projectApi.getDefaultPrompt();
@@ -93,8 +117,10 @@ const Projects: React.FC = () => {
 
   useEffect(() => {
     fetchImBots();
+    fetchPromptTemplates();
+    fetchLLMConfigs();
     fetchDefaultPrompt();
-  }, [fetchImBots, fetchDefaultPrompt]);
+  }, [fetchImBots, fetchPromptTemplates, fetchLLMConfigs, fetchDefaultPrompt]);
 
   const handleSearch = () => {
     setPage(1);
@@ -124,11 +150,19 @@ const Projects: React.FC = () => {
     form.setFieldsValue(record);
   };
 
+  const getPromptMode = (project: Project): PromptMode => {
+    if (project.ai_prompt) return 'custom';
+    if (project.ai_prompt_id) return 'template';
+    return 'default';
+  };
+
   const showPromptDrawer = (record: Project) => {
     setCurrentProjectForPrompt(record);
+    const mode = getPromptMode(record);
     promptForm.setFieldsValue({
+      prompt_mode: mode,
+      ai_prompt_id: record.ai_prompt_id,
       ai_prompt: record.ai_prompt || defaultPrompt,
-      use_default: !record.ai_prompt,
     });
     setPromptDrawerVisible(true);
   };
@@ -154,9 +188,24 @@ const Projects: React.FC = () => {
     try {
       const values = await promptForm.validateFields();
       if (currentProjectForPrompt) {
-        await projectApi.update(currentProjectForPrompt.id, {
-          ai_prompt: values.use_default ? '' : values.ai_prompt,
-        });
+        const updateData: Partial<Project> = {};
+        
+        switch (values.prompt_mode) {
+          case 'default':
+            updateData.ai_prompt = '';
+            updateData.ai_prompt_id = null;
+            break;
+          case 'template':
+            updateData.ai_prompt = '';
+            updateData.ai_prompt_id = values.ai_prompt_id;
+            break;
+          case 'custom':
+            updateData.ai_prompt = values.ai_prompt;
+            updateData.ai_prompt_id = null;
+            break;
+        }
+        
+        await projectApi.update(currentProjectForPrompt.id, updateData);
         message.success(t('common.success'));
         setPromptDrawerVisible(false);
         fetchData({ name: searchName || undefined });
@@ -340,6 +389,20 @@ const Projects: React.FC = () => {
             <Switch />
           </Form.Item>
           <Form.Item 
+            name="llm_config_id" 
+            label={t('projects.llmConfig', 'LLM Model')}
+            extra={i18n.language?.startsWith('zh') ? '选择用于此项目的 AI 模型（不选则使用默认模型）' : 'Select AI model for this project (uses default if not set)'}
+          >
+            <Select
+              allowClear
+              placeholder={t('projects.selectLLM', 'Select LLM Model')}
+              options={llmConfigs.map(c => ({ 
+                value: c.id, 
+                label: `${c.name} (${c.model})${c.is_default ? ' ★' : ''}` 
+              }))}
+            />
+          </Form.Item>
+          <Form.Item 
             name="comment_enabled" 
             label={t('projects.commentEnabled')} 
             valuePropName="checked"
@@ -370,23 +433,96 @@ const Projects: React.FC = () => {
         }
       >
         <Form form={promptForm} layout="vertical">
-          <Form.Item name="use_default" label={t('projects.useDefaultPrompt', 'Use Default Prompt')} valuePropName="checked">
-            <Switch />
+          <Form.Item 
+            name="prompt_mode" 
+            label={t('projects.promptMode', 'Prompt Mode')}
+          >
+            <Radio.Group>
+              <Radio.Button value="default">{t('projects.useSystemDefault', 'System Default')}</Radio.Button>
+              <Radio.Button value="template">{t('projects.useTemplate', 'Use Template')}</Radio.Button>
+              <Radio.Button value="custom">{t('projects.customPrompt', 'Custom')}</Radio.Button>
+            </Radio.Group>
           </Form.Item>
+
           <Form.Item
             noStyle
-            shouldUpdate={(prev, cur) => prev.use_default !== cur.use_default}
+            shouldUpdate={(prev, cur) => prev.prompt_mode !== cur.prompt_mode}
           >
-            {({ getFieldValue }) => (
-              <Form.Item name="ai_prompt" label={t('projects.customPrompt', 'Custom Prompt')}>
-                <TextArea
-                  rows={20}
-                  disabled={getFieldValue('use_default')}
-                  placeholder="{{diffs}}, {{commits}}"
-                />
-              </Form.Item>
-            )}
+            {({ getFieldValue }) => {
+              const mode = getFieldValue('prompt_mode');
+              
+              const scoringHint = (
+                <div style={{ padding: 12, background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 4, marginBottom: 16 }}>
+                  <p style={{ margin: 0, fontSize: 12, color: '#ad8b00' }}>
+                    {i18n.language?.startsWith('zh') 
+                      ? '💡 提示：如果您的提示词没有包含打分指令（如"总分"、"评分"、"score"等），系统将自动追加打分要求。'
+                      : '💡 Hint: If your prompt doesn\'t include scoring instructions (like "total score", "rating", etc.), the system will auto-append scoring requirements.'}
+                  </p>
+                </div>
+              );
+              
+              if (mode === 'template') {
+                return (
+                  <>
+                    {scoringHint}
+                    <Form.Item 
+                      name="ai_prompt_id" 
+                      label={t('projects.selectTemplate', 'Select Template')}
+                      rules={[{ required: true, message: t('projects.pleaseSelectTemplate', 'Please select a template') }]}
+                    >
+                      <Select
+                        placeholder={t('projects.selectTemplate', 'Select Template')}
+                        options={promptTemplates.map(p => ({ 
+                          value: p.id, 
+                          label: `${p.name}${p.is_default ? ' ★' : ''}${p.is_system ? ` (${t('prompts.system')})` : ''}` 
+                        }))}
+                      />
+                    </Form.Item>
+                  </>
+                );
+              }
+              
+              if (mode === 'custom') {
+                return (
+                  <>
+                    {scoringHint}
+                    <Form.Item 
+                      name="ai_prompt" 
+                      label={t('projects.customPrompt', 'Custom Prompt')}
+                      rules={[{ required: true, message: t('projects.pleaseInputPrompt', 'Please input prompt') }]}
+                      extra={i18n.language?.startsWith('zh') ? '使用 {{diffs}} 和 {{commits}} 作为占位符' : 'Use {{diffs}} and {{commits}} as placeholders'}
+                    >
+                      <TextArea
+                        rows={20}
+                        placeholder="{{diffs}}, {{commits}}"
+                      />
+                    </Form.Item>
+                  </>
+                );
+              }
+
+              return (
+                <div style={{ padding: 16, background: '#f5f5f5', borderRadius: 4 }}>
+                  <p style={{ margin: 0, color: '#666' }}>
+                    {i18n.language?.startsWith('zh') 
+                      ? '使用系统默认提示词。您可以在「提示词模板」页面中修改默认提示词。'
+                      : 'Using system default prompt. You can modify the default prompt in the "Prompt Templates" page.'}
+                  </p>
+                </div>
+              );
+            }}
           </Form.Item>
+
+          <Divider />
+          
+          <div style={{ fontSize: 12, color: '#999' }}>
+            <p><strong>{t('projects.promptPriority', 'Prompt Priority')}:</strong></p>
+            <ol style={{ paddingLeft: 20, margin: 0 }}>
+              <li>{i18n.language?.startsWith('zh') ? '项目自定义提示词' : 'Project custom prompt'}</li>
+              <li>{i18n.language?.startsWith('zh') ? '项目关联的模板' : 'Project linked template'}</li>
+              <li>{i18n.language?.startsWith('zh') ? '系统默认提示词' : 'System default prompt'}</li>
+            </ol>
+          </div>
         </Form>
       </Drawer>
     </>

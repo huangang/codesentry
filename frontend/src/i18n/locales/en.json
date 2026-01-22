@@ -121,7 +121,8 @@
     "aiEnabled": "AI Review Enabled",
     "commentEnabled": "MR/PR Comment",
     "aiPrompt": "AI Prompt",
-    "llmConfig": "LLM Configuration",
+    "llmConfig": "LLM Model",
+    "selectLLM": "Select LLM Model",
     "imEnabled": "IM Notification Enabled",
     "imBot": "IM Bot",
     "createSuccess": "Project created successfully",
@@ -134,7 +135,15 @@
     "pleaseInputUrl": "Please input project URL",
     "pleaseSelectPlatform": "Please select platform",
     "github": "GitHub",
-    "gitlab": "GitLab"
+    "gitlab": "GitLab",
+    "promptMode": "Prompt Mode",
+    "useSystemDefault": "System Default",
+    "useTemplate": "Use Template",
+    "customPrompt": "Custom",
+    "selectTemplate": "Select Template",
+    "pleaseSelectTemplate": "Please select a template",
+    "pleaseInputPrompt": "Please input prompt",
+    "promptPriority": "Prompt Priority"
   },
   "reviewLogs": {
     "title": "Review Logs",

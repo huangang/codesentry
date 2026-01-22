@@ -167,32 +167,73 @@ func (s *AIService) callLLM(ctx context.Context, llmConfig *models.LLMConfig, pr
 }
 
 func (s *AIService) getPromptForProject(project *models.Project, customPrompt string) string {
+	var prompt string
+	var isSystemDefault bool
+
 	if customPrompt != "" {
 		log.Printf("[AI] Using custom prompt from request")
-		return customPrompt
-	}
-
-	if project.AIPrompt != "" {
+		prompt = customPrompt
+	} else if project.AIPrompt != "" {
 		log.Printf("[AI] Using project custom prompt")
-		return project.AIPrompt
-	}
-
-	if project.AIPromptID != nil {
+		prompt = project.AIPrompt
+	} else if project.AIPromptID != nil {
 		var promptTemplate models.PromptTemplate
 		if err := s.db.First(&promptTemplate, *project.AIPromptID).Error; err == nil {
 			log.Printf("[AI] Using linked prompt template: %s (ID: %d)", promptTemplate.Name, promptTemplate.ID)
-			return promptTemplate.Content
+			prompt = promptTemplate.Content
 		}
 	}
 
-	var defaultPrompt models.PromptTemplate
-	if err := s.db.Where("is_default = ?", true).First(&defaultPrompt).Error; err == nil {
-		log.Printf("[AI] Using system default prompt: %s (ID: %d)", defaultPrompt.Name, defaultPrompt.ID)
-		return defaultPrompt.Content
+	if prompt == "" {
+		var defaultPrompt models.PromptTemplate
+		if err := s.db.Where("is_default = ?", true).First(&defaultPrompt).Error; err == nil {
+			log.Printf("[AI] Using system default prompt: %s (ID: %d)", defaultPrompt.Name, defaultPrompt.ID)
+			prompt = defaultPrompt.Content
+		} else {
+			log.Printf("[AI] Using hardcoded default prompt")
+			prompt = NewProjectService(s.db).GetDefaultPrompt()
+		}
+		isSystemDefault = true
 	}
 
-	log.Printf("[AI] Using hardcoded default prompt")
-	return NewProjectService(s.db).GetDefaultPrompt()
+	if !isSystemDefault && !containsScoringInstruction(prompt) {
+		log.Printf("[AI] Prompt missing scoring instructions, auto-appending")
+		prompt = appendScoringInstruction(prompt)
+	}
+
+	return prompt
+}
+
+func containsScoringInstruction(prompt string) bool {
+	lowerPrompt := strings.ToLower(prompt)
+	chineseKeywords := []string{"总分", "评分", "分数", "打分", "得分", "x/100", "/100分"}
+	englishKeywords := []string{"total score", "score:", "scoring", "points", "x/100", "/100 points", "rate the", "rating"}
+	scoringKeywords := append(chineseKeywords, englishKeywords...)
+
+	for _, keyword := range scoringKeywords {
+		if strings.Contains(lowerPrompt, keyword) {
+			return true
+		}
+	}
+	return false
+}
+
+func appendScoringInstruction(prompt string) string {
+	scoringInstruction := `
+
+---
+## Scoring Requirement (Auto-appended)
+Please provide a score for the code review. Use the following format at the end of your review:
+
+### Total Score: X/100
+
+Score breakdown (adjust based on your review focus):
+- Code Quality: X/40
+- Security: X/30  
+- Best Practices: X/20
+- Other: X/10
+`
+	return prompt + scoringInstruction
 }
 
 // extractScore extracts the score from review content

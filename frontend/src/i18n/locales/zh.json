@@ -121,7 +121,8 @@
     "aiEnabled": "启用 AI 审查",
     "commentEnabled": "MR/PR 评论",
     "aiPrompt": "AI 提示词",
-    "llmConfig": "大模型配置",
+    "llmConfig": "AI 模型",
+    "selectLLM": "选择 AI 模型",
     "imEnabled": "启用 IM 通知",
     "imBot": "通知机器人",
     "createSuccess": "项目创建成功",
@@ -134,7 +135,15 @@
     "pleaseInputUrl": "请输入项目地址",
     "pleaseSelectPlatform": "请选择平台",
     "github": "GitHub",
-    "gitlab": "GitLab"
+    "gitlab": "GitLab",
+    "promptMode": "提示词模式",
+    "useSystemDefault": "系统默认",
+    "useTemplate": "使用模板",
+    "customPrompt": "自定义",
+    "selectTemplate": "选择模板",
+    "pleaseSelectTemplate": "请选择一个模板",
+    "pleaseInputPrompt": "请输入提示词",
+    "promptPriority": "提示词优先级"
   },
   "reviewLogs": {
     "title": "审查记录",

@@ -7,6 +7,7 @@ AI-powered Code Review Platform for GitHub and GitLab.
 ## Features
 
 - **AI Code Review**: Automatically review code changes using OpenAI-compatible models
+- **Auto-Scoring**: Automatically appends scoring instructions if custom prompts lack them
 - **Multi-Platform Support**: GitHub and GitLab webhook integration
 - **Dashboard**: Visual statistics and metrics for code review activities
 - **Review History**: Track all code reviews with detailed logs
