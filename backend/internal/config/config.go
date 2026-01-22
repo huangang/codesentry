@@ -55,29 +55,26 @@ func Load(configPath string) (*Config, error) {
 		configPath = "config.yaml"
 	}
 
-	// Check if config file exists
+	var cfg *Config
+
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		// Create default config
-		cfg := DefaultConfig()
-		GlobalConfig = cfg
-		return cfg, nil
+		cfg = DefaultConfig()
+	} else {
+		data, err := os.ReadFile(configPath)
+		if err != nil {
+			return nil, err
+		}
+
+		var fileCfg Config
+		if err := yaml.Unmarshal(data, &fileCfg); err != nil {
+			return nil, err
+		}
+		cfg = &fileCfg
 	}
 
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, err
-	}
-
-	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, err
-	}
-
-	// Override with environment variables
 	cfg.overrideFromEnv()
-
-	GlobalConfig = &cfg
-	return &cfg, nil
+	GlobalConfig = cfg
+	return cfg, nil
 }
 
 func DefaultConfig() *Config {
