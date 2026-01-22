@@ -80,6 +80,7 @@ func main() {
 	webhookHandler := handlers.NewWebhookHandler(models.GetDB(), &cfg.OpenAI)
 	r.POST("/webhook", webhookHandler.HandleUnifiedWebhook)
 	r.POST("/review/webhook", webhookHandler.HandleUnifiedWebhook)
+	r.POST("/review/sync", webhookHandler.HandleSyncReview)
 
 	// API routes
 	api := r.Group("/api")
@@ -169,6 +170,7 @@ func main() {
 		api.POST("/webhook/github", webhookHandler.HandleGitHubWebhookGeneric)
 		api.POST("/webhook", webhookHandler.HandleUnifiedWebhook)
 		api.POST("/review/webhook", webhookHandler.HandleUnifiedWebhook)
+		api.POST("/review/sync", webhookHandler.HandleSyncReview)
 	}
 
 	// Serve static files (embedded frontend)

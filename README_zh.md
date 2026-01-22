@@ -9,6 +9,8 @@
 - **AI 代码审查**: 使用 OpenAI 兼容模型自动审查代码变更
 - **自动打分**: 自定义提示词缺少打分指令时，系统自动追加评分要求
 - **Commit 评论**: 将 AI 审查结果作为评论发布到 commit（支持 GitLab/GitHub）
+- **Commit 状态**: 设置 commit 状态，分数低于阈值时阻止合并（支持 GitLab/GitHub）
+- **同步审查 API**: 为 Git pre-receive hook 提供同步审查接口，可阻止不合格的 push
 - **防重复审查**: 跳过已审查的 commit，避免重复处理
 - **多平台支持**: GitHub 和 GitLab Webhook 集成，支持多级项目路径
 - **可视化看板**: 代码审查活动的统计指标和图表
@@ -207,6 +209,35 @@ https://你的域名/review/webhook
 - `POST /api/webhook/github` - GitHub Webhook（自动匹配项目）
 - `POST /api/webhook/gitlab/:project_id` - GitLab Webhook（指定项目ID）
 - `POST /api/webhook/github/:project_id` - GitHub Webhook（指定项目ID）
+
+### 同步审查（用于 Git Hooks）
+- `POST /review/sync` - 同步代码审查，用于 pre-receive hook
+- `POST /api/review/sync` - /api 前缀下的同步审查
+
+请求体:
+```json
+{
+  "project_url": "https://gitlab.example.com/group/project",
+  "commit_sha": "abc123...",
+  "ref": "refs/heads/main",
+  "author": "John Doe",
+  "message": "feat: add new feature",
+  "diffs": "diff --git a/file.go..."
+}
+```
+
+响应:
+```json
+{
+  "passed": true,
+  "score": 85,
+  "min_score": 60,
+  "message": "Score: 85/100 (min: 60)",
+  "review_id": 123
+}
+```
+
+参考 `scripts/pre-receive-hook.sh` 获取 GitLab pre-receive hook 示例脚本。
 
 ### 系统日志
 - `GET /api/system-logs` - 日志列表

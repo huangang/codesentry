@@ -1270,3 +1270,90 @@ func (s *WebhookService) isCommitAlreadyReviewed(projectID uint, commitSHA strin
 		Count(&count)
 	return count > 0
 }
+
+type SyncReviewRequest struct {
+	ProjectURL string
+	CommitSHA  string
+	Ref        string
+	Author     string
+	Message    string
+	Diffs      string
+}
+
+type SyncReviewResponse struct {
+	Passed      bool    `json:"passed"`
+	Score       float64 `json:"score"`
+	MinScore    float64 `json:"min_score"`
+	Message     string  `json:"message"`
+	ReviewID    uint    `json:"review_id,omitempty"`
+	FullContent string  `json:"full_content,omitempty"`
+}
+
+func (s *WebhookService) SyncReview(ctx context.Context, project *models.Project, req *SyncReviewRequest) (*SyncReviewResponse, error) {
+	minScore := s.getEffectiveMinScore(project)
+
+	if s.isCommitAlreadyReviewed(project.ID, req.CommitSHA) {
+		return &SyncReviewResponse{
+			Passed:   true,
+			Score:    100,
+			MinScore: minScore,
+			Message:  "Commit already reviewed and passed",
+		}, nil
+	}
+
+	branch := strings.TrimPrefix(req.Ref, "refs/heads/")
+	additions, deletions, filesChanged := parseDiffStats(req.Diffs)
+
+	reviewLog := &models.ReviewLog{
+		ProjectID:     project.ID,
+		EventType:     "push",
+		Branch:        branch,
+		CommitHash:    req.CommitSHA,
+		Author:        req.Author,
+		CommitMessage: req.Message,
+		ReviewStatus:  "pending",
+		Additions:     additions,
+		Deletions:     deletions,
+		FilesChanged:  filesChanged,
+	}
+
+	if err := s.reviewService.Create(reviewLog); err != nil {
+		return nil, fmt.Errorf("failed to create review log: %w", err)
+	}
+
+	reviewLog.ReviewStatus = "processing"
+	s.reviewService.Update(reviewLog)
+
+	result, err := s.aiService.Review(ctx, &ReviewRequest{
+		ProjectID: project.ID,
+		Diffs:     req.Diffs,
+		Commits:   req.Message,
+	})
+
+	if err != nil {
+		reviewLog.ReviewStatus = "failed"
+		reviewLog.ErrorMessage = err.Error()
+		s.reviewService.Update(reviewLog)
+		return nil, fmt.Errorf("AI review failed: %w", err)
+	}
+
+	reviewLog.ReviewStatus = "completed"
+	reviewLog.ReviewResult = result.Content
+	reviewLog.Score = &result.Score
+	s.reviewService.Update(reviewLog)
+
+	passed := result.Score >= minScore
+	message := fmt.Sprintf("Score: %.0f/100 (min: %.0f)", result.Score, minScore)
+	if !passed {
+		message = fmt.Sprintf("Review failed: %.0f/100 (min: %.0f required)", result.Score, minScore)
+	}
+
+	return &SyncReviewResponse{
+		Passed:      passed,
+		Score:       result.Score,
+		MinScore:    minScore,
+		Message:     message,
+		ReviewID:    reviewLog.ID,
+		FullContent: result.Content,
+	}, nil
+}

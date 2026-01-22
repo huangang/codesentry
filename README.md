@@ -9,6 +9,8 @@ AI-powered Code Review Platform for GitHub and GitLab.
 - **AI Code Review**: Automatically review code changes using OpenAI-compatible models
 - **Auto-Scoring**: Automatically appends scoring instructions if custom prompts lack them
 - **Commit Comments**: Post AI review results as comments on commits (GitLab/GitHub)
+- **Commit Status**: Set commit status to block merges when score is below threshold (GitLab/GitHub)
+- **Sync Review API**: Synchronous review endpoint for Git pre-receive hooks to block pushes
 - **Duplicate Prevention**: Skip already reviewed commits to avoid redundant processing
 - **Multi-Platform Support**: GitHub and GitLab webhook integration with multi-level project path support
 - **Dashboard**: Visual statistics and metrics for code review activities
@@ -207,6 +209,35 @@ The system automatically detects the platform via request headers.
 - `POST /api/webhook/github` - GitHub webhook (auto-detect project by URL)
 - `POST /api/webhook/gitlab/:project_id` - GitLab webhook (with project ID)
 - `POST /api/webhook/github/:project_id` - GitHub webhook (with project ID)
+
+### Sync Review (for Git Hooks)
+- `POST /review/sync` - Synchronous code review for pre-receive hooks
+- `POST /api/review/sync` - Same endpoint under /api prefix
+
+Request body:
+```json
+{
+  "project_url": "https://gitlab.example.com/group/project",
+  "commit_sha": "abc123...",
+  "ref": "refs/heads/main",
+  "author": "John Doe",
+  "message": "feat: add new feature",
+  "diffs": "diff --git a/file.go..."
+}
+```
+
+Response:
+```json
+{
+  "passed": true,
+  "score": 85,
+  "min_score": 60,
+  "message": "Score: 85/100 (min: 60)",
+  "review_id": 123
+}
+```
+
+See `scripts/pre-receive-hook.sh` for GitLab pre-receive hook example.
 
 ### System Logs
 - `GET /api/system-logs` - List system logs

@@ -195,6 +195,71 @@ func (h *WebhookHandler) HandleUnifiedWebhook(c *gin.Context) {
 	}
 }
 
+func (h *WebhookHandler) HandleSyncReview(c *gin.Context) {
+	var req struct {
+		ProjectURL string `json:"project_url" binding:"required"`
+		CommitSHA  string `json:"commit_sha" binding:"required"`
+		Ref        string `json:"ref"`
+		Author     string `json:"author"`
+		Message    string `json:"message"`
+		Diffs      string `json:"diffs" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
+		return
+	}
+
+	projectURL := strings.TrimSuffix(req.ProjectURL, ".git")
+	project, err := h.projectService.GetByURL(projectURL)
+	if err != nil {
+		services.LogError("SyncReview", "ProjectNotFound", "Project not registered: "+projectURL, nil, c.ClientIP(), c.GetHeader("User-Agent"), map[string]interface{}{
+			"project_url": projectURL,
+			"commit_sha":  req.CommitSHA,
+		})
+		c.JSON(http.StatusNotFound, gin.H{"error": "project not found for URL: " + projectURL})
+		return
+	}
+
+	apiKey := c.GetHeader("X-API-Key")
+	if project.WebhookSecret != "" && apiKey != project.WebhookSecret {
+		services.LogWarning("SyncReview", "InvalidAPIKey", "Invalid API key", nil, c.ClientIP(), c.GetHeader("User-Agent"), map[string]interface{}{
+			"project_id":  project.ID,
+			"project_url": projectURL,
+		})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid API key"})
+		return
+	}
+
+	services.LogInfo("SyncReview", "Received", "Sync review request received", nil, c.ClientIP(), c.GetHeader("User-Agent"), map[string]interface{}{
+		"project_id":   project.ID,
+		"project_name": project.Name,
+		"commit_sha":   req.CommitSHA,
+		"ref":          req.Ref,
+	})
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Minute)
+	defer cancel()
+
+	result, err := h.webhookService.SyncReview(ctx, project, &services.SyncReviewRequest{
+		ProjectURL: req.ProjectURL,
+		CommitSHA:  req.CommitSHA,
+		Ref:        req.Ref,
+		Author:     req.Author,
+		Message:    req.Message,
+		Diffs:      req.Diffs,
+	})
+	if err != nil {
+		services.LogError("SyncReview", "ReviewFailed", err.Error(), nil, c.ClientIP(), c.GetHeader("User-Agent"), map[string]interface{}{
+			"project_id": project.ID,
+			"commit_sha": req.CommitSHA,
+		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "review failed: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
 func (h *WebhookHandler) HandleGitHubWebhookGeneric(c *gin.Context) {
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
