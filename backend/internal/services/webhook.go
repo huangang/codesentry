@@ -210,35 +210,45 @@ type GitHubPREvent struct {
 
 // HandleGitLabWebhook processes GitLab webhook events
 func (s *WebhookService) HandleGitLabWebhook(ctx context.Context, projectID uint, eventType string, body []byte) error {
+	log.Printf("[Webhook] Received GitLab webhook: projectID=%d, eventType=%s", projectID, eventType)
+
 	project, err := s.projectService.GetByID(projectID)
 	if err != nil {
+		log.Printf("[Webhook] Project not found: %d, error: %v", projectID, err)
 		return fmt.Errorf("project not found: %w", err)
 	}
 
 	if !project.AIEnabled {
-		return nil // AI review is disabled
+		log.Printf("[Webhook] AI disabled for project %d, skipping", projectID)
+		return nil
 	}
 
 	switch eventType {
 	case "Push Hook":
 		if !strings.Contains(project.ReviewEvents, "push") {
+			log.Printf("[Webhook] Push events not enabled for project %d, skipping", projectID)
 			return nil
 		}
 		var event GitLabPushEvent
 		if err := json.Unmarshal(body, &event); err != nil {
+			log.Printf("[Webhook] Failed to parse GitLab push event: %v", err)
 			return err
 		}
 		return s.processGitLabPush(ctx, project, &event)
 
 	case "Merge Request Hook":
 		if !strings.Contains(project.ReviewEvents, "merge_request") {
+			log.Printf("[Webhook] MR events not enabled for project %d, skipping", projectID)
 			return nil
 		}
 		var event GitLabMREvent
 		if err := json.Unmarshal(body, &event); err != nil {
+			log.Printf("[Webhook] Failed to parse GitLab MR event: %v", err)
 			return err
 		}
 		return s.processGitLabMR(ctx, project, &event)
+	default:
+		log.Printf("[Webhook] Unknown event type: %s, skipping", eventType)
 	}
 
 	return nil
