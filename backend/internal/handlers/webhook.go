@@ -260,6 +260,22 @@ func (h *WebhookHandler) HandleSyncReview(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+func (h *WebhookHandler) GetReviewScore(c *gin.Context) {
+	commitSHA := c.Query("commit_sha")
+	if commitSHA == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "commit_sha is required"})
+		return
+	}
+
+	result, err := h.webhookService.GetReviewScore(commitSHA)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
 func (h *WebhookHandler) HandleGitHubWebhookGeneric(c *gin.Context) {
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {

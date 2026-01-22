@@ -1271,6 +1271,47 @@ func (s *WebhookService) isCommitAlreadyReviewed(projectID uint, commitSHA strin
 	return count > 0
 }
 
+type ReviewScoreResponse struct {
+	CommitSHA string   `json:"commit_sha"`
+	Status    string   `json:"status"`
+	Score     *float64 `json:"score,omitempty"`
+	MinScore  float64  `json:"min_score,omitempty"`
+	Passed    *bool    `json:"passed,omitempty"`
+	ReviewID  uint     `json:"review_id"`
+	Message   string   `json:"message"`
+}
+
+func (s *WebhookService) GetReviewScore(commitSHA string) (*ReviewScoreResponse, error) {
+	var reviewLog models.ReviewLog
+	if err := s.db.Where("commit_hash = ?", commitSHA).Order("created_at DESC").First(&reviewLog).Error; err != nil {
+		return nil, fmt.Errorf("review not found for commit: %s", commitSHA)
+	}
+
+	resp := &ReviewScoreResponse{
+		CommitSHA: commitSHA,
+		Status:    reviewLog.ReviewStatus,
+		ReviewID:  reviewLog.ID,
+	}
+
+	switch reviewLog.ReviewStatus {
+	case "pending", "processing":
+		resp.Message = "Review in progress"
+	case "completed":
+		var project models.Project
+		s.db.First(&project, reviewLog.ProjectID)
+		minScore := s.getEffectiveMinScore(&project)
+		passed := reviewLog.Score != nil && *reviewLog.Score >= minScore
+		resp.Score = reviewLog.Score
+		resp.MinScore = minScore
+		resp.Passed = &passed
+		resp.Message = "Review completed"
+	case "failed":
+		resp.Message = "Review failed: " + reviewLog.ErrorMessage
+	}
+
+	return resp, nil
+}
+
 type SyncReviewRequest struct {
 	ProjectURL string
 	CommitSHA  string

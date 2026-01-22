@@ -81,6 +81,7 @@ func main() {
 	r.POST("/webhook", webhookHandler.HandleUnifiedWebhook)
 	r.POST("/review/webhook", webhookHandler.HandleUnifiedWebhook)
 	r.POST("/review/sync", webhookHandler.HandleSyncReview)
+	r.GET("/review/score", webhookHandler.GetReviewScore)
 
 	// API routes
 	api := r.Group("/api")
@@ -171,6 +172,7 @@ func main() {
 		api.POST("/webhook", webhookHandler.HandleUnifiedWebhook)
 		api.POST("/review/webhook", webhookHandler.HandleUnifiedWebhook)
 		api.POST("/review/sync", webhookHandler.HandleSyncReview)
+		api.GET("/review/score", webhookHandler.GetReviewScore)
 	}
 
 	// Serve static files (embedded frontend)
