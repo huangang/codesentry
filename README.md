@@ -213,6 +213,8 @@ The system automatically detects the platform via request headers.
 ### Sync Review (for Git Hooks)
 - `POST /review/sync` - Synchronous code review for pre-receive hooks
 - `POST /api/review/sync` - Same endpoint under /api prefix
+- `GET /review/score?commit_sha=xxx` - Query review status/score by commit SHA
+- `GET /api/review/score?commit_sha=xxx` - Same endpoint under /api prefix
 
 Request body:
 ```json

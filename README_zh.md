@@ -213,6 +213,8 @@ https://你的域名/review/webhook
 ### 同步审查（用于 Git Hooks）
 - `POST /review/sync` - 同步代码审查，用于 pre-receive hook
 - `POST /api/review/sync` - /api 前缀下的同步审查
+- `GET /review/score?commit_sha=xxx` - 通过 commit SHA 查询审查状态/分数
+- `GET /api/review/score?commit_sha=xxx` - /api 前缀下的查询接口
 
 请求体:
 ```json
