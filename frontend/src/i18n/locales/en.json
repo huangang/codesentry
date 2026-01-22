@@ -171,7 +171,9 @@
     "pullRequest": "Pull Request",
     "retry": "Retry",
     "retryCount": "Retries",
-    "retryInitiated": "Retry initiated"
+    "retryInitiated": "Retry initiated",
+    "viewCommit": "View Commit",
+    "viewMR": "View MR"
   },
   "llmModels": {
     "title": "LLM Models",

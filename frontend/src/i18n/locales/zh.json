@@ -171,7 +171,9 @@
     "pullRequest": "拉取请求",
     "retry": "重试",
     "retryCount": "重试次数",
-    "retryInitiated": "已发起重试"
+    "retryInitiated": "已发起重试",
+    "viewCommit": "查看 Commit",
+    "viewMR": "查看 MR"
   },
   "llmModels": {
     "title": "大模型管理",

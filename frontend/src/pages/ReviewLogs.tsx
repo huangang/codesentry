@@ -13,7 +13,7 @@ import {
   message,
   Typography,
 } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, EyeOutlined, LinkOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
@@ -317,7 +317,20 @@ const ReviewLogs: React.FC = () => {
                 <span style={{ color: '#ff4d4f' }}>-{selectedLog.deletions}</span>
               </Descriptions.Item>
               <Descriptions.Item label="Commit Hash" span={2}>
-                <code>{selectedLog.commit_hash}</code>
+                <Space>
+                  <code>{selectedLog.commit_hash}</code>
+                  {(selectedLog.commit_url || selectedLog.mr_url) && (
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<LinkOutlined />}
+                      href={selectedLog.mr_url || selectedLog.commit_url}
+                      target="_blank"
+                    >
+                      {selectedLog.mr_url ? t('reviewLogs.viewMR', '查看 MR') : t('reviewLogs.viewCommit', '查看 Commit')}
+                    </Button>
+                  )}
+                </Space>
               </Descriptions.Item>
               <Descriptions.Item label={t('reviewLogs.commitMessage')} span={2}>
                 {selectedLog.commit_message}

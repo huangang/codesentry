@@ -1,6 +1,8 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
+import dayjs from 'dayjs';
+import 'dayjs/locale/zh-cn';
 
 import en from './locales/en.json';
 import zh from './locales/zh.json';
@@ -26,5 +28,11 @@ i18n
       lookupLocalStorage: 'i18nextLng',
     },
   });
+
+i18n.on('languageChanged', (lng) => {
+  dayjs.locale(lng === 'zh' ? 'zh-cn' : 'en');
+});
+
+dayjs.locale(i18n.language === 'zh' ? 'zh-cn' : 'en');
 
 export default i18n;
