@@ -264,11 +264,8 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 	}
 
 	var commits []string
-	var additions, deletions int
 	for _, c := range event.Commits {
 		commits = append(commits, fmt.Sprintf("%s: %s", c.ID[:8], c.Message))
-		additions += len(c.Added) + len(c.Modified)
-		deletions += len(c.Removed)
 	}
 
 	commitSHA := event.CheckoutSHA
@@ -306,6 +303,8 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 		log.Printf("[Webhook] Got combined diffs, total length: %d bytes", len(diff))
 	}
 
+	additions, deletions, filesChanged := parseDiffStats(diff)
+
 	branch := strings.TrimPrefix(event.Ref, "refs/heads/")
 
 	var commitURL string
@@ -323,7 +322,7 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 		AuthorEmail:   event.UserEmail,
 		AuthorAvatar:  event.UserAvatar,
 		CommitMessage: strings.Join(commits, "\n"),
-		FilesChanged:  additions + deletions,
+		FilesChanged:  filesChanged,
 		Additions:     additions,
 		Deletions:     deletions,
 		ReviewStatus:  "pending",
@@ -392,6 +391,18 @@ func (s *WebhookService) processGitLabMR(ctx context.Context, project *models.Pr
 
 	mrNumber := event.ObjectAttributes.IID
 
+	mrSHA, _ := s.getGitLabRequestSHA(project, mrNumber)
+	if mrSHA != "" {
+		s.setCommitStatus(project, mrSHA, "pending", "AI Review in progress...", event.Project.ID)
+	}
+
+	diff, err := s.getGitLabMRDiff(project, mrNumber)
+	if err != nil {
+		diff = "Failed to get diff: " + err.Error()
+	}
+
+	additions, deletions, filesChanged := parseDiffStats(diff)
+
 	reviewLog := &models.ReviewLog{
 		ProjectID:     project.ID,
 		EventType:     "merge_request",
@@ -400,35 +411,14 @@ func (s *WebhookService) processGitLabMR(ctx context.Context, project *models.Pr
 		AuthorEmail:   event.User.Email,
 		AuthorAvatar:  event.User.AvatarURL,
 		CommitMessage: event.ObjectAttributes.Title,
+		FilesChanged:  filesChanged,
+		Additions:     additions,
+		Deletions:     deletions,
 		MRNumber:      &mrNumber,
 		MRURL:         event.ObjectAttributes.URL,
 		ReviewStatus:  "pending",
 	}
 	s.reviewService.Create(reviewLog)
-
-	// Get latest commit SHA for the MR to set status
-	// We might need to fetch the MR details to get the SHA if not provided in the event accurately
-	// For now, assuming we can get it from the event or just rely on the diff context
-	// But CommitStatus requires a SHA.
-	// GitLab MR Hook usually provides `last_commit` in `object_attributes`.
-	// Let's defer status for MR if we can't find SHA easily, but usually `last_commit.id` is available.
-	// We'll update models later if needed, but for now let's try to proceed.
-	// NOTE: The current GitLabMREvent struct might need `LastCommit` field.
-	// Assuming we can proceed without status for MR if SHA is missing, or we should fetch it.
-
-	// Actually for MR, the "pipeline" is often attached to the HEAD of the source branch.
-	// So we can use the source branch HEAD SHA if available.
-	// Let's assume we can fetch the MR version to get the SHA.
-	mrSHA, _ := s.getGitLabRequestSHA(project, mrNumber)
-	if mrSHA != "" {
-		s.setCommitStatus(project, mrSHA, "pending", "AI Review in progress...", event.Project.ID)
-	}
-
-	// Get MR diff
-	diff, err := s.getGitLabMRDiff(project, mrNumber)
-	if err != nil {
-		diff = "Failed to get diff: " + err.Error()
-	}
 
 	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
 	result, err := s.aiService.Review(ctx, &ReviewRequest{
@@ -488,16 +478,20 @@ func (s *WebhookService) processGitHubPush(ctx context.Context, project *models.
 	}
 
 	var commits []string
-	var additions, deletions int
 	var commitURL string
 	for _, c := range event.Commits {
 		commits = append(commits, fmt.Sprintf("%s: %s", c.ID[:8], c.Message))
-		additions += len(c.Added) + len(c.Modified)
-		deletions += len(c.Removed)
 		if commitURL == "" && c.URL != "" {
 			commitURL = c.URL
 		}
 	}
+
+	diff, err := s.getGitHubDiff(project, event.After)
+	if err != nil {
+		diff = "Failed to get diff: " + err.Error()
+	}
+
+	additions, deletions, filesChanged := parseDiffStats(diff)
 
 	branch := strings.TrimPrefix(event.Ref, "refs/heads/")
 	reviewLog := &models.ReviewLog{
@@ -511,18 +505,12 @@ func (s *WebhookService) processGitHubPush(ctx context.Context, project *models.
 		AuthorAvatar:  event.Sender.AvatarURL,
 		AuthorURL:     event.Sender.HTMLURL,
 		CommitMessage: strings.Join(commits, "\n"),
-		FilesChanged:  additions + deletions,
+		FilesChanged:  filesChanged,
 		Additions:     additions,
 		Deletions:     deletions,
 		ReviewStatus:  "pending",
 	}
 	s.reviewService.Create(reviewLog)
-
-	// Get diff from GitHub API
-	diff, err := s.getGitHubDiff(project, event.After)
-	if err != nil {
-		diff = "Failed to get diff: " + err.Error()
-	}
 
 	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
 	result, err := s.aiService.Review(ctx, &ReviewRequest{
@@ -560,6 +548,13 @@ func (s *WebhookService) processGitHubPR(ctx context.Context, project *models.Pr
 
 	mrNumber := event.Number
 
+	diff, err := s.getGitHubPRDiff(project, mrNumber)
+	if err != nil {
+		diff = "Failed to get diff: " + err.Error()
+	}
+
+	additions, deletions, filesChanged := parseDiffStats(diff)
+
 	reviewLog := &models.ReviewLog{
 		ProjectID:     project.ID,
 		EventType:     "merge_request",
@@ -569,16 +564,14 @@ func (s *WebhookService) processGitHubPR(ctx context.Context, project *models.Pr
 		AuthorAvatar:  event.PullRequest.User.AvatarURL,
 		AuthorURL:     event.PullRequest.User.HTMLURL,
 		CommitMessage: event.PullRequest.Title,
+		FilesChanged:  filesChanged,
+		Additions:     additions,
+		Deletions:     deletions,
 		MRNumber:      &mrNumber,
 		MRURL:         event.PullRequest.HTMLURL,
 		ReviewStatus:  "pending",
 	}
 	s.reviewService.Create(reviewLog)
-
-	diff, err := s.getGitHubPRDiff(project, mrNumber)
-	if err != nil {
-		diff = "Failed to get diff: " + err.Error()
-	}
 
 	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
 	result, err := s.aiService.Review(ctx, &ReviewRequest{
@@ -1037,4 +1030,30 @@ func (s *WebhookService) postGitHubPRComment(project *models.Project, prNumber i
 
 func (s *WebhookService) formatReviewComment(score float64, reviewResult string) string {
 	return fmt.Sprintf("## 🤖 AI Code Review\n\n**Score: %.0f/100**\n\n%s\n\n---\n*Powered by CodeSentry*", score, reviewResult)
+}
+
+func parseDiffStats(diff string) (additions, deletions, filesChanged int) {
+	lines := strings.Split(diff, "\n")
+	fileSet := make(map[string]bool)
+
+	for _, line := range lines {
+		if strings.HasPrefix(line, "+++ ") || strings.HasPrefix(line, "--- ") {
+			continue
+		}
+		if strings.HasPrefix(line, "diff --git") {
+			parts := strings.Split(line, " ")
+			if len(parts) >= 4 {
+				fileSet[parts[len(parts)-1]] = true
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
+			additions++
+		} else if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---") {
+			deletions++
+		}
+	}
+
+	filesChanged = len(fileSet)
+	return
 }
