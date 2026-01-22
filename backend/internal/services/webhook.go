@@ -48,16 +48,38 @@ type repoInfo struct {
 }
 
 func parseRepoInfo(projectURL string) (*repoInfo, error) {
-	url := strings.TrimSuffix(projectURL, ".git")
-	parts := strings.Split(url, "/")
-	if len(parts) < 2 {
-		return nil, fmt.Errorf("invalid project URL: %s", projectURL)
+	urlStr := strings.TrimSuffix(projectURL, ".git")
+
+	protocolIdx := strings.Index(urlStr, "://")
+	if protocolIdx == -1 {
+		return nil, fmt.Errorf("invalid project URL (no protocol): %s", projectURL)
 	}
+
+	protocol := urlStr[:protocolIdx+3]
+	rest := urlStr[protocolIdx+3:]
+
+	slashIdx := strings.Index(rest, "/")
+	if slashIdx == -1 {
+		return nil, fmt.Errorf("invalid project URL (no path): %s", projectURL)
+	}
+
+	host := rest[:slashIdx]
+	projectPath := rest[slashIdx+1:]
+
+	if projectPath == "" {
+		return nil, fmt.Errorf("invalid project URL (empty project path): %s", projectURL)
+	}
+
+	pathParts := strings.Split(projectPath, "/")
+	if len(pathParts) < 2 {
+		return nil, fmt.Errorf("invalid project URL (need at least owner/repo): %s", projectURL)
+	}
+
 	return &repoInfo{
-		owner:       parts[len(parts)-2],
-		repo:        parts[len(parts)-1],
-		projectPath: parts[len(parts)-2] + "/" + parts[len(parts)-1],
-		baseURL:     strings.TrimSuffix(url, "/"+parts[len(parts)-2]+"/"+parts[len(parts)-1]),
+		owner:       pathParts[len(pathParts)-2],
+		repo:        pathParts[len(pathParts)-1],
+		projectPath: projectPath,
+		baseURL:     protocol + host,
 	}, nil
 }
 
@@ -709,9 +731,12 @@ func (s *WebhookService) fetchDiff(apiURL, token, tokenHeader string) (string, e
 	}
 
 	var diffs []struct {
-		Diff    string `json:"diff"`
-		OldPath string `json:"old_path"`
-		NewPath string `json:"new_path"`
+		Diff        string `json:"diff"`
+		OldPath     string `json:"old_path"`
+		NewPath     string `json:"new_path"`
+		NewFile     bool   `json:"new_file"`
+		RenamedFile bool   `json:"renamed_file"`
+		DeletedFile bool   `json:"deleted_file"`
 	}
 	if err := json.Unmarshal(body, &diffs); err != nil {
 		return string(body), nil
@@ -719,7 +744,12 @@ func (s *WebhookService) fetchDiff(apiURL, token, tokenHeader string) (string, e
 
 	var result strings.Builder
 	for _, d := range diffs {
-		result.WriteString(fmt.Sprintf("--- %s\n+++ %s\n%s\n", d.OldPath, d.NewPath, d.Diff))
+		result.WriteString(fmt.Sprintf("diff --git a/%s b/%s\n", d.OldPath, d.NewPath))
+		result.WriteString(fmt.Sprintf("--- a/%s\n+++ b/%s\n", d.OldPath, d.NewPath))
+		result.WriteString(d.Diff)
+		if !strings.HasSuffix(d.Diff, "\n") {
+			result.WriteString("\n")
+		}
 	}
 
 	return result.String(), nil
@@ -908,7 +938,7 @@ func (s *WebhookService) getEffectiveMinScore(project *models.Project) float64 {
 
 	// 2. Check System level
 	var sysConfig models.SystemConfig
-	if err := s.db.Where("`key` = ?", "system.min_score").First(&sysConfig).Error; err == nil {
+	if err := s.db.Where("config_key = ?", "system.min_score").First(&sysConfig).Error; err == nil {
 		// Parse value
 		var score float64
 		// Assuming value is simple string like "60"

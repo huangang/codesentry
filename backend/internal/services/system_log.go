@@ -158,7 +158,7 @@ func (s *SystemLogService) CleanupOldLogs(retentionDays int) (int64, error) {
 // GetRetentionDays gets the log retention days from system config
 func (s *SystemLogService) GetRetentionDays() int {
 	var cfg models.SystemConfig
-	if err := s.db.Where("key = ?", "log_retention_days").First(&cfg).Error; err != nil {
+	if err := s.db.Where("config_key = ?", "log_retention_days").First(&cfg).Error; err != nil {
 		return 30 // default 30 days
 	}
 
@@ -172,7 +172,7 @@ func (s *SystemLogService) GetRetentionDays() int {
 // SetRetentionDays sets the log retention days in system config
 func (s *SystemLogService) SetRetentionDays(days int) error {
 	return s.db.Model(&models.SystemConfig{}).
-		Where("key = ?", "log_retention_days").
+		Where("config_key = ?", "log_retention_days").
 		Update("value", strconv.Itoa(days)).Error
 }
 

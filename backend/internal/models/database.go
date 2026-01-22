@@ -167,7 +167,7 @@ Please strictly follow this structure:
 
 	for _, cfg := range defaultConfigs {
 		var count int64
-		DB.Model(&SystemConfig{}).Where("key = ?", cfg.Key).Count(&count)
+		DB.Model(&SystemConfig{}).Where("config_key = ?", cfg.Key).Count(&count)
 		if count == 0 {
 			if err := DB.Create(&cfg).Error; err != nil {
 				return err
