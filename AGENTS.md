@@ -176,8 +176,14 @@ Git 凭证功能支持：
 - Prompts
 - IM Bots
 - Git Credentials
+- Users
 - System Logs
 - Settings
+
+**Admin-only 操作**:
+- 项目的创建、编辑、删除
+- 审查记录的删除和重试
+- 用户的编辑和删除
 
 ## 待完成功能
 

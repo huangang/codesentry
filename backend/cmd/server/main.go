@@ -143,6 +143,13 @@ func main() {
 			// Review Logs (write operations)
 			reviewLogHandler := handlers.NewReviewLogHandler(models.GetDB(), &cfg.OpenAI)
 			admin.POST("/review-logs/:id/retry", reviewLogHandler.Retry)
+			admin.DELETE("/review-logs/:id", reviewLogHandler.Delete)
+
+			// Users
+			userHandler := handlers.NewUserHandler(models.GetDB())
+			admin.GET("/users", userHandler.List)
+			admin.PUT("/users/:id", userHandler.Update)
+			admin.DELETE("/users/:id", userHandler.Delete)
 
 			// LLM Configs
 			llmConfigHandler := handlers.NewLLMConfigHandler(models.GetDB())

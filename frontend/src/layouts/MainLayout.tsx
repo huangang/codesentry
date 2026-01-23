@@ -39,6 +39,7 @@ const MainLayout: React.FC = () => {
     { key: '/admin/prompts', icon: <BookOutlined />, label: t('menu.prompts') },
     { key: '/admin/im-bots', icon: <NotificationOutlined />, label: t('menu.imBots') },
     { key: '/admin/git-credentials', icon: <KeyOutlined />, label: t('menu.gitCredentials') },
+    { key: '/admin/users', icon: <UserOutlined />, label: t('menu.users') },
     { key: '/admin/sys-logs', icon: <FileTextOutlined />, label: t('menu.systemLogs') },
     { key: '/admin/settings', icon: <SettingOutlined />, label: t('menu.settings') },
   ];

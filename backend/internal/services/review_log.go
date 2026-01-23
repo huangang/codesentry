@@ -99,3 +99,8 @@ func (s *ReviewLogService) Create(log *models.ReviewLog) error {
 func (s *ReviewLogService) Update(log *models.ReviewLog) error {
 	return s.db.Save(log).Error
 }
+
+// Delete deletes a review log by ID
+func (s *ReviewLogService) Delete(id uint) error {
+	return s.db.Delete(&models.ReviewLog{}, id).Error
+}

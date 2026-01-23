@@ -194,7 +194,14 @@ https://你的域名/review/webhook
 
 - `GET /api/review-logs` - 审查记录列表
 - `GET /api/review-logs/:id` - 审查详情
-- `POST /api/review-logs/:id/retry` - 重试失败的审查
+- `POST /api/review-logs/:id/retry` - 重试失败的审查（仅管理员）
+- `DELETE /api/review-logs/:id` - 删除审查记录（仅管理员）
+
+### 用户管理
+
+- `GET /api/users` - 用户列表（仅管理员）
+- `PUT /api/users/:id` - 更新用户（仅管理员）
+- `DELETE /api/users/:id` - 删除用户（仅管理员）
 
 ### 看板
 

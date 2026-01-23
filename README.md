@@ -193,7 +193,14 @@ The system automatically detects the platform via request headers.
 
 - `GET /api/review-logs` - List review logs
 - `GET /api/review-logs/:id` - Get review detail
-- `POST /api/review-logs/:id/retry` - Retry failed review
+- `POST /api/review-logs/:id/retry` - Retry failed review (admin only)
+- `DELETE /api/review-logs/:id` - Delete review log (admin only)
+
+### Users
+
+- `GET /api/users` - List users (admin only)
+- `PUT /api/users/:id` - Update user (admin only)
+- `DELETE /api/users/:id` - Delete user (admin only)
 
 ### Dashboard
 

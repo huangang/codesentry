@@ -201,3 +201,17 @@ export const systemConfigApi = {
   updateLDAPConfig: (data: Partial<LDAPConfig>) =>
     api.put<LDAPConfig>('/system-config/ldap', data),
 };
+
+export const userApi = {
+  list: (params?: { page?: number; page_size?: number; username?: string; role?: string; auth_type?: string }) =>
+    api.get<{ items: User[]; total: number; page: number; page_size: number }>('/users', { params }),
+  
+  update: (id: number, data: { role?: string; is_active?: boolean; nickname?: string }) =>
+    api.put<User>(`/users/${id}`, data),
+  
+  delete: (id: number) => api.delete(`/users/${id}`),
+};
+
+export const reviewLogApiExtra = {
+  delete: (id: number) => api.delete(`/review-logs/${id}`),
+};

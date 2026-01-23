@@ -74,3 +74,18 @@ func (h *ReviewLogHandler) Retry(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "retry initiated"})
 }
+
+func (h *ReviewLogHandler) Delete(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid review log id"})
+		return
+	}
+
+	if err := h.reviewLogService.Delete(uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "review log deleted"})
+}

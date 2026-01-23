@@ -12,14 +12,15 @@ import {
   Descriptions,
   message,
   Typography,
+  Popconfirm,
 } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined, LinkOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, EyeOutlined, LinkOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
-import { reviewLogApi, projectApi } from '../services';
+import { reviewLogApi, projectApi, reviewLogApiExtra } from '../services';
 import type { ReviewLog, Project } from '../types';
-import { usePaginatedList } from '../hooks';
+import { usePaginatedList, usePermission } from '../hooks';
 import { MarkdownContent } from '../components';
 import { REVIEW_STATUS, EVENT_TYPES, getScoreColor, getStatusColor } from '../constants';
 
@@ -37,6 +38,7 @@ interface ReviewLogFilters {
 
 const ReviewLogs: React.FC = () => {
   const { t } = useTranslation();
+  const { isAdmin } = usePermission();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedLog, setSelectedLog] = useState<ReviewLog | null>(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
@@ -122,6 +124,17 @@ const ReviewLogs: React.FC = () => {
     }
   };
 
+  const handleDelete = async (id: number) => {
+    try {
+      await reviewLogApiExtra.delete(id);
+      message.success(t('reviewLogs.deleteSuccess', 'Review log deleted successfully'));
+      fetchData(buildFilters());
+      setDrawerVisible(false);
+    } catch (error) {
+      message.error(t('common.error'));
+    }
+  };
+
   const getStatusText = (status: string) => {
     switch (status) {
       case REVIEW_STATUS.PENDING: return t('reviewLogs.pending');
@@ -192,15 +205,31 @@ const ReviewLogs: React.FC = () => {
     {
       title: t('common.actions'),
       key: 'action',
-      width: 100,
+      width: 150,
       render: (_, record) => (
-        <Button
-          type="link"
-          icon={<EyeOutlined />}
-          onClick={() => showDetail(record)}
-        >
-          {t('common.details')}
-        </Button>
+        <Space>
+          <Button
+            type="link"
+            icon={<EyeOutlined />}
+            onClick={() => showDetail(record)}
+          >
+            {t('common.details')}
+          </Button>
+          {isAdmin && (
+            <Popconfirm
+              title={t('reviewLogs.deleteConfirm', 'Are you sure you want to delete this review log?')}
+              onConfirm={() => handleDelete(record.id)}
+              okText={t('common.yes')}
+              cancelText={t('common.no')}
+            >
+              <Button
+                type="link"
+                danger
+                icon={<DeleteOutlined />}
+              />
+            </Popconfirm>
+          )}
+        </Space>
       ),
     },
   ];
@@ -275,6 +304,20 @@ const ReviewLogs: React.FC = () => {
         width={720}
         open={drawerVisible}
         onClose={() => setDrawerVisible(false)}
+        extra={
+          isAdmin && selectedLog && (
+            <Popconfirm
+              title={t('reviewLogs.deleteConfirm', 'Are you sure you want to delete this review log?')}
+              onConfirm={() => handleDelete(selectedLog.id)}
+              okText={t('common.yes')}
+              cancelText={t('common.no')}
+            >
+              <Button danger icon={<DeleteOutlined />}>
+                {t('common.delete')}
+              </Button>
+            </Popconfirm>
+          )
+        }
       >
         {selectedLog && (
           <>

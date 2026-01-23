@@ -10,6 +10,7 @@ export const ADMIN_ONLY_ROUTES = [
   '/admin/prompts',
   '/admin/im-bots',
   '/admin/git-credentials',
+  '/admin/users',
   '/admin/sys-logs',
   '/admin/settings',
 ] as const;

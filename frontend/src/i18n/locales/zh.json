@@ -73,6 +73,7 @@
     "imBots": "通知机器人",
     "prompts": "提示词管理",
     "gitCredentials": "Git 凭证",
+    "users": "用户管理",
     "systemLogs": "系统日志",
     "settings": "系统设置"
   },
@@ -174,7 +175,9 @@
     "retryCount": "重试次数",
     "retryInitiated": "已发起重试",
     "viewCommit": "查看 Commit",
-    "viewMR": "查看 MR"
+    "viewMR": "查看 MR",
+    "deleteConfirm": "确定要删除此审查记录吗？",
+    "deleteSuccess": "审查记录删除成功"
   },
   "llmModels": {
     "title": "大模型管理",
@@ -341,5 +344,23 @@
       "pleaseInputUserFilter": "请输入用户过滤器",
       "passwordHint": "留空则保留原密码"
     }
+  },
+  "users": {
+    "title": "用户管理",
+    "username": "用户名",
+    "nickname": "昵称",
+    "email": "邮箱",
+    "role": "角色",
+    "authType": "认证类型",
+    "isActive": "启用",
+    "lastLogin": "最后登录",
+    "admin": "管理员",
+    "user": "普通用户",
+    "local": "本地认证",
+    "ldap": "LDAP",
+    "editUser": "编辑用户",
+    "updateSuccess": "用户更新成功",
+    "deleteSuccess": "用户删除成功",
+    "deleteConfirm": "确定要删除此用户吗？"
   }
 }
