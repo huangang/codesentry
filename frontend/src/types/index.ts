@@ -80,8 +80,9 @@ export interface LLMConfig {
 export interface IMBot {
   id: number;
   name: string;
-  type: 'wechat_work' | 'dingtalk' | 'feishu' | 'slack';
+  type: 'wechat_work' | 'dingtalk' | 'feishu' | 'slack' | 'discord' | 'teams' | 'telegram';
   webhook: string;
+  extra: string;
   is_active: boolean;
   error_notify: boolean;
   created_at: string;

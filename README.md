@@ -27,7 +27,9 @@ AI-powered Code Review Platform for GitHub and GitLab.
 
 - **LLM Configuration**: Configure multiple AI models with custom endpoints
 - **Prompt Templates**: System and custom prompt templates with copy functionality
-- **IM Notifications**: Send review results to DingTalk, Feishu, WeCom, Slack, or custom webhooks
+- **IM Notifications**: Send review results to DingTalk, Feishu, WeCom, Slack, Discord, Microsoft Teams, Telegram
+- **Error Notifications**: Real-time error alerts via IM bots
+- **Git Credentials**: Auto-create projects from webhooks with credential management
 - **System Logging**: Comprehensive logging for webhook events, errors, and system operations
 - **Authentication**: Local authentication and LDAP support
 - **Multi-Database**: SQLite for development, MySQL/PostgreSQL for production

@@ -32,18 +32,20 @@ type IMBotListResponse struct {
 
 type CreateIMBotRequest struct {
 	Name        string `json:"name" binding:"required"`
-	Type        string `json:"type" binding:"required,oneof=wechat_work dingtalk feishu slack"`
+	Type        string `json:"type" binding:"required,oneof=wechat_work dingtalk feishu slack discord teams telegram"`
 	Webhook     string `json:"webhook" binding:"required"`
 	Secret      string `json:"secret"`
+	Extra       string `json:"extra"`
 	IsActive    bool   `json:"is_active"`
 	ErrorNotify bool   `json:"error_notify"`
 }
 
 type UpdateIMBotRequest struct {
 	Name        string `json:"name"`
-	Type        string `json:"type" binding:"omitempty,oneof=wechat_work dingtalk feishu slack"`
+	Type        string `json:"type" binding:"omitempty,oneof=wechat_work dingtalk feishu slack discord teams telegram"`
 	Webhook     string `json:"webhook"`
 	Secret      string `json:"secret"`
+	Extra       string `json:"extra"`
 	IsActive    *bool  `json:"is_active"`
 	ErrorNotify *bool  `json:"error_notify"`
 }
@@ -103,6 +105,7 @@ func (s *IMBotService) Create(req *CreateIMBotRequest) (*models.IMBot, error) {
 		Type:        req.Type,
 		Webhook:     req.Webhook,
 		Secret:      req.Secret,
+		Extra:       req.Extra,
 		IsActive:    req.IsActive,
 		ErrorNotify: req.ErrorNotify,
 	}
@@ -134,6 +137,9 @@ func (s *IMBotService) Update(id uint, req *UpdateIMBotRequest) (*models.IMBot, 
 	}
 	if req.Secret != "" {
 		updates["secret"] = req.Secret
+	}
+	if req.Extra != "" {
+		updates["extra"] = req.Extra
 	}
 	if req.IsActive != nil {
 		updates["is_active"] = *req.IsActive

@@ -62,12 +62,19 @@ const IMBots: React.FC = () => {
       case IM_BOT_TYPES.DINGTALK: return t('imBots.dingtalk');
       case IM_BOT_TYPES.FEISHU: return t('imBots.feishu');
       case IM_BOT_TYPES.SLACK: return t('imBots.slack');
+      case IM_BOT_TYPES.DISCORD: return t('imBots.discord');
+      case IM_BOT_TYPES.TEAMS: return t('imBots.teams');
+      case IM_BOT_TYPES.TELEGRAM: return t('imBots.telegram');
       default: return type;
     }
   };
 
   const needsSecret = (type: string) => {
     return type === IM_BOT_TYPES.DINGTALK || type === IM_BOT_TYPES.FEISHU;
+  };
+
+  const needsExtra = (type: string) => {
+    return type === IM_BOT_TYPES.TELEGRAM;
   };
 
   const getSecretHelpText = (type: string) => {
@@ -92,6 +99,12 @@ const IMBots: React.FC = () => {
         return 'https://open.feishu.cn/open-apis/bot/v2/hook/xxx';
       case IM_BOT_TYPES.SLACK:
         return 'https://hooks.slack.com/services/xxx/xxx/xxx';
+      case IM_BOT_TYPES.DISCORD:
+        return 'https://discord.com/api/webhooks/xxx/xxx';
+      case IM_BOT_TYPES.TEAMS:
+        return 'https://xxx.webhook.office.com/webhookb2/xxx';
+      case IM_BOT_TYPES.TELEGRAM:
+        return 'https://api.telegram.org/botXXX:YYY/sendMessage';
       default:
         return 'https://...';
     }
@@ -102,6 +115,9 @@ const IMBots: React.FC = () => {
     { value: IM_BOT_TYPES.DINGTALK, label: t('imBots.dingtalk') },
     { value: IM_BOT_TYPES.FEISHU, label: t('imBots.feishu') },
     { value: IM_BOT_TYPES.SLACK, label: t('imBots.slack') },
+    { value: IM_BOT_TYPES.DISCORD, label: t('imBots.discord') },
+    { value: IM_BOT_TYPES.TEAMS, label: t('imBots.teams') },
+    { value: IM_BOT_TYPES.TELEGRAM, label: t('imBots.telegram') },
   ];
 
   useEffect(() => {
@@ -312,6 +328,25 @@ const IMBots: React.FC = () => {
                   extra={getSecretHelpText(type)}
                 >
                   <Input.Password placeholder={t('imBots.secretPlaceholder', 'SEC...')} />
+                </Form.Item>
+              );
+            }}
+          </Form.Item>
+          <Form.Item
+            noStyle
+            shouldUpdate={(prev, cur) => prev.type !== cur.type}
+          >
+            {({ getFieldValue }) => {
+              const type = getFieldValue('type');
+              if (!needsExtra(type)) return null;
+              return (
+                <Form.Item 
+                  name="extra" 
+                  label={t('imBots.extra')}
+                  rules={[{ required: true, message: t('imBots.pleaseInputExtra') }]}
+                  extra={t('imBots.extraHelp')}
+                >
+                  <Input placeholder="-123456789" />
                 </Form.Item>
               );
             }}

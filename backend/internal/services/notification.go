@@ -61,6 +61,12 @@ func (s *NotificationService) SendReviewNotification(project *models.Project, no
 				imErr = s.sendFeishuNotification(&bot, notification)
 			case "slack":
 				imErr = s.sendSlackNotification(&bot, notification)
+			case "discord":
+				imErr = s.sendDiscordNotification(&bot, notification)
+			case "teams":
+				imErr = s.sendTeamsNotification(&bot, notification)
+			case "telegram":
+				imErr = s.sendTelegramNotification(&bot, notification)
 			default:
 				imErr = s.sendGenericWebhook(&bot, notification)
 			}
@@ -348,6 +354,53 @@ func (s *NotificationService) sendGenericWebhook(bot *models.IMBot, n *ReviewNot
 	return s.postJSON(bot.Webhook, payload)
 }
 
+func (s *NotificationService) sendDiscordNotification(bot *models.IMBot, n *ReviewNotification) error {
+	msg := s.buildMessage(n)
+	payload := map[string]interface{}{
+		"content": msg,
+	}
+	return s.postJSON(bot.Webhook, payload)
+}
+
+func (s *NotificationService) sendTeamsNotification(bot *models.IMBot, n *ReviewNotification) error {
+	msg := s.buildMessage(n)
+	payload := map[string]interface{}{
+		"type": "message",
+		"attachments": []map[string]interface{}{
+			{
+				"contentType": "application/vnd.microsoft.card.adaptive",
+				"content": map[string]interface{}{
+					"type":    "AdaptiveCard",
+					"$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+					"version": "1.5",
+					"body": []map[string]interface{}{
+						{
+							"type": "TextBlock",
+							"text": msg,
+							"wrap": true,
+						},
+					},
+				},
+			},
+		},
+	}
+	return s.postJSON(bot.Webhook, payload)
+}
+
+func (s *NotificationService) sendTelegramNotification(bot *models.IMBot, n *ReviewNotification) error {
+	msg := s.buildMessage(n)
+	chatID := bot.Extra
+	if chatID == "" {
+		return fmt.Errorf("telegram chat_id is required in extra field")
+	}
+	payload := map[string]interface{}{
+		"chat_id":    chatID,
+		"text":       msg,
+		"parse_mode": "Markdown",
+	}
+	return s.postJSON(bot.Webhook, payload)
+}
+
 // splitMessage splits a long message into chunks, trying to break at newlines
 func (s *NotificationService) splitMessage(msg string, maxLen int) []string {
 	if len(msg) <= maxLen {
@@ -420,6 +473,12 @@ func (s *NotificationService) SendErrorNotification(bot *models.IMBot, message s
 		return s.sendFeishuText(bot, message)
 	case "slack":
 		return s.sendSlackText(bot, message)
+	case "discord":
+		return s.sendDiscordText(bot, message)
+	case "teams":
+		return s.sendTeamsText(bot, message)
+	case "telegram":
+		return s.sendTelegramText(bot, message)
 	default:
 		return s.sendGenericText(bot, message)
 	}
@@ -488,6 +547,50 @@ func (s *NotificationService) sendGenericText(bot *models.IMBot, message string)
 	payload := map[string]interface{}{
 		"type":    "error",
 		"message": message,
+	}
+	return s.postJSON(bot.Webhook, payload)
+}
+
+func (s *NotificationService) sendDiscordText(bot *models.IMBot, message string) error {
+	payload := map[string]interface{}{
+		"content": message,
+	}
+	return s.postJSON(bot.Webhook, payload)
+}
+
+func (s *NotificationService) sendTeamsText(bot *models.IMBot, message string) error {
+	payload := map[string]interface{}{
+		"type": "message",
+		"attachments": []map[string]interface{}{
+			{
+				"contentType": "application/vnd.microsoft.card.adaptive",
+				"content": map[string]interface{}{
+					"type":    "AdaptiveCard",
+					"$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+					"version": "1.5",
+					"body": []map[string]interface{}{
+						{
+							"type": "TextBlock",
+							"text": message,
+							"wrap": true,
+						},
+					},
+				},
+			},
+		},
+	}
+	return s.postJSON(bot.Webhook, payload)
+}
+
+func (s *NotificationService) sendTelegramText(bot *models.IMBot, message string) error {
+	chatID := bot.Extra
+	if chatID == "" {
+		return fmt.Errorf("telegram chat_id is required in extra field")
+	}
+	payload := map[string]interface{}{
+		"chat_id":    chatID,
+		"text":       message,
+		"parse_mode": "Markdown",
 	}
 	return s.postJSON(bot.Webhook, payload)
 }

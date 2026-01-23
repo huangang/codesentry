@@ -212,6 +212,9 @@
     "botType": "机器人类型",
     "webhook": "Webhook 地址",
     "secret": "密钥",
+    "extra": "Chat ID",
+    "extraHelp": "Telegram 聊天 ID（Telegram 必填）",
+    "pleaseInputExtra": "请输入 Chat ID",
     "isActive": "激活",
     "errorNotify": "错误通知",
     "errorNotifyHelp": "接收系统错误通知",
@@ -228,6 +231,9 @@
     "feishu": "飞书",
     "wecom": "企业微信",
     "slack": "Slack",
+    "discord": "Discord",
+    "teams": "Microsoft Teams",
+    "telegram": "Telegram",
     "custom": "自定义 Webhook"
   },
   "memberAnalysis": {

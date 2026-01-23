@@ -142,10 +142,6 @@ const Login: React.FC = () => {
           centered
           items={tabItems}
         />
-
-        <div style={{ textAlign: 'center', marginTop: 16, color: '#999', fontSize: 12 }}>
-          {t('auth.defaultCredentials')}
-        </div>
       </Card>
     </div>
   );

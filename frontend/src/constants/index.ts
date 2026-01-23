@@ -26,7 +26,9 @@ export const IM_BOT_TYPES = {
   DINGTALK: 'dingtalk',
   FEISHU: 'feishu',
   SLACK: 'slack',
-  CUSTOM: 'custom',
+  DISCORD: 'discord',
+  TEAMS: 'teams',
+  TELEGRAM: 'telegram',
 } as const;
 
 export type IMBotType = typeof IM_BOT_TYPES[keyof typeof IM_BOT_TYPES];

@@ -212,6 +212,9 @@
     "botType": "Bot Type",
     "webhook": "Webhook URL",
     "secret": "Secret",
+    "extra": "Chat ID",
+    "extraHelp": "Telegram chat ID (required for Telegram)",
+    "pleaseInputExtra": "Please input chat ID",
     "isActive": "Active",
     "errorNotify": "Error Notify",
     "errorNotifyHelp": "Receive system error notifications",
@@ -228,6 +231,9 @@
     "feishu": "Feishu",
     "wecom": "WeCom",
     "slack": "Slack",
+    "discord": "Discord",
+    "teams": "Microsoft Teams",
+    "telegram": "Telegram",
     "custom": "Custom Webhook"
   },
   "memberAnalysis": {

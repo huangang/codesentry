@@ -114,12 +114,15 @@ cd frontend && npm run build
 4. 在 `frontend/src/services/index.ts` 添加 API 调用
 
 ### IM 机器人限制
-| 平台 | 字符限制 |
-|------|----------|
-| 企业微信 | 4096 |
-| 钉钉 | 20000 |
-| 飞书 | 4096 |
-| Slack | 40000 |
+| 平台 | 字符限制 | 说明 |
+|------|----------|------|
+| 企业微信 | 4096 | 使用 markdown_v2 格式 |
+| 钉钉 | 20000 | 支持加签密钥 |
+| 飞书 | 4096 | 支持签名密钥 |
+| Slack | 40000 | |
+| Discord | 2000 | 直接 Webhook |
+| Microsoft Teams | - | 使用 Adaptive Card |
+| Telegram | - | 需要配置 chat_id |
 
 ### Git 凭证自动创建项目
 Git 凭证功能支持：
