@@ -490,6 +490,14 @@ func (s *DailyReportService) buildDefaultSummary(stats ReportStats, topProjects 
 		sb.WriteString("\n")
 	}
 
+	if len(topAuthors) > 0 {
+		sb.WriteString("### 👤 Top 贡献者\n")
+		for i, a := range topAuthors {
+			sb.WriteString(fmt.Sprintf("%d. %s - %d 次提交，均分 %.0f\n", i+1, a.Name, a.CommitCount, a.AvgScore))
+		}
+		sb.WriteString("\n")
+	}
+
 	if len(lowScores) > 0 {
 		sb.WriteString("### ⚠️ 需关注\n")
 		for _, l := range lowScores {
