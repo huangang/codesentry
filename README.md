@@ -143,19 +143,9 @@ database:
 jwt:
   secret: your-secret-key-change-in-production
   expire_hours: 24
-
-ldap:
-  enabled: false
-  host: ldap.example.com
-  port: 389
-  use_ssl: false
-  bind_dn: cn=admin,dc=example,dc=com
-  bind_password: password
-  base_dn: dc=example,dc=com
-  user_filter: (uid=%s)
 ```
 
-> **Note**: LDAP configuration can also be managed via the Settings page in the web UI. Web UI settings take precedence over config file settings.
+> **Note**: All business configurations (LLM models, LDAP, prompts, IM bots, Git credentials) are managed via the web UI and stored in the database.
 
 ## Webhook Setup
 

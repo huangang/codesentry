@@ -12,18 +12,3 @@ database:
 jwt:
   secret: "codesentry-secret-key-change-in-production"
   expire_hour: 24
-
-ldap:
-  enabled: false
-  host: "ldap.example.com"
-  port: 389
-  base_dn: "dc=example,dc=com"
-  bind_dn: "cn=admin,dc=example,dc=com"
-  bind_password: ""
-  user_filter: "(uid=%s)"
-  use_ssl: false
-
-openai:
-  base_url: "https://api.openai.com/v1"
-  api_key: ""
-  model: "gpt-4"

@@ -52,6 +52,7 @@ func AutoMigrate() error {
 		&SystemLog{},
 		&GitCredential{},
 		&DailyReport{},
+		&SchedulerLock{},
 	)
 }
 

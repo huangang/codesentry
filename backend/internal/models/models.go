@@ -203,6 +203,16 @@ type GitCredential struct {
 	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
+// SchedulerLock represents a distributed lock for scheduled tasks
+type SchedulerLock struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	LockName  string    `gorm:"uniqueIndex:idx_lock_name_key;size:100;not null" json:"lock_name"`
+	LockKey   string    `gorm:"uniqueIndex:idx_lock_name_key;size:100;not null" json:"lock_key"`
+	LockedBy  string    `gorm:"size:100" json:"locked_by"`
+	LockedAt  time.Time `json:"locked_at"`
+	ExpiresAt time.Time `gorm:"index" json:"expires_at"`
+}
+
 // TableName overrides
 func (User) TableName() string           { return "users" }
 func (Project) TableName() string        { return "projects" }
@@ -214,6 +224,7 @@ func (IMBot) TableName() string          { return "im_bots" }
 func (SystemLog) TableName() string      { return "system_logs" }
 func (GitCredential) TableName() string  { return "git_credentials" }
 func (DailyReport) TableName() string    { return "daily_reports" }
+func (SchedulerLock) TableName() string  { return "scheduler_locks" }
 
 // MaskAPIKey returns masked API key for display
 func (l *LLMConfig) MaskAPIKey() string {

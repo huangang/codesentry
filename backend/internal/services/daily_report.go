@@ -144,7 +144,42 @@ func (s *DailyReportService) getLLMConfigID() uint {
 	return uint(id)
 }
 
+func (s *DailyReportService) acquireLock(lockName, lockKey string, ttl time.Duration) bool {
+	now := time.Now()
+
+	s.db.Where("lock_name = ? AND lock_key = ? AND expires_at < ?", lockName, lockKey, now).Delete(&models.SchedulerLock{})
+
+	lock := models.SchedulerLock{
+		LockName:  lockName,
+		LockKey:   lockKey,
+		LockedBy:  fmt.Sprintf("pod-%d", now.UnixNano()),
+		LockedAt:  now,
+		ExpiresAt: now.Add(ttl),
+	}
+
+	return s.db.Create(&lock).Error == nil
+}
+
+func (s *DailyReportService) releaseLock(lockName, lockKey string) {
+	s.db.Where("lock_name = ? AND lock_key = ?", lockName, lockKey).Delete(&models.SchedulerLock{})
+}
+
 func (s *DailyReportService) GenerateAndSendReport() error {
+	if !s.isEnabled() {
+		log.Println("[DailyReport] Daily report is disabled, skipping")
+		return nil
+	}
+
+	today := time.Now().Format("2006-01-02")
+	lockName := "daily_report"
+	lockKey := today
+
+	if !s.acquireLock(lockName, lockKey, 10*time.Minute) {
+		log.Printf("[DailyReport] Failed to acquire lock for %s, another pod is processing", today)
+		return nil
+	}
+	defer s.releaseLock(lockName, lockKey)
+
 	report, err := s.GenerateReport()
 	if err != nil {
 		return err

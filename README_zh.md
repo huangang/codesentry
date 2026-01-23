@@ -144,19 +144,9 @@ database:
 jwt:
   secret: your-secret-key-change-in-production
   expire_hours: 24
-
-ldap:
-  enabled: false
-  host: ldap.example.com
-  port: 389
-  use_ssl: false
-  bind_dn: cn=admin,dc=example,dc=com
-  bind_password: password
-  base_dn: dc=example,dc=com
-  user_filter: (uid=%s)
 ```
 
-> **注意**: LDAP 配置也可以通过 Web 界面的「系统设置」页面进行管理。Web 界面的设置优先于配置文件。
+> **注意**: 所有业务配置(大模型、LDAP、提示词、IM 机器人、Git 凭证)均通过 Web 界面管理,存储在数据库中。
 
 ## Webhook 配置
 
