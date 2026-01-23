@@ -190,13 +190,12 @@ Git 凭证功能支持：
 | 角色 | 权限 |
 |------|------|
 | admin | 完全权限，可访问所有页面和所有操作 |
-| user | 只读权限，只能访问 Dashboard、Review Logs、Projects（只读）、Member Analysis |
+| user | 只读权限，只能访问 Dashboard、Review Logs、Projects（只读）、Member Analysis、Prompts（只读） |
 
 **LDAP 用户默认角色**: user（只读）
 
 **Admin-only 页面**:
 - LLM Models
-- Prompts
 - IM Bots
 - Git Credentials
 - Users
@@ -208,6 +207,7 @@ Git 凭证功能支持：
 - 项目的创建、编辑、删除
 - 审查记录的删除和重试
 - 用户的编辑和删除
+- 提示词模板的创建、编辑、删除、设为默认
 - 日报的生成和发送
 
 ### 日报功能

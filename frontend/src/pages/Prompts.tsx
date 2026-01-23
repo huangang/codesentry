@@ -35,7 +35,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { promptApi } from '../services';
 import type { PromptTemplate } from '../types';
-import { usePaginatedList, useModal } from '../hooks';
+import { usePaginatedList, useModal, usePermission } from '../hooks';
 
 const { TextArea } = Input;
 const { Paragraph } = Typography;
@@ -53,6 +53,7 @@ const Prompts: React.FC = () => {
   const [drawerVisible, setDrawerVisible] = React.useState(false);
   const [viewingPrompt, setViewingPrompt] = React.useState<PromptTemplate | null>(null);
   const [viewMode, setViewMode] = React.useState<'rendered' | 'source'>('rendered');
+  const { canWrite } = usePermission();
 
   const modal = useModal<PromptTemplate>();
 
@@ -221,51 +222,55 @@ const Prompts: React.FC = () => {
               onClick={() => showViewDrawer(record)}
             />
           </Tooltip>
-          <Tooltip title={t('prompts.duplicate')}>
-            <Button
-              type="link"
-              size="small"
-              icon={<CopyOutlined />}
-              onClick={() => handleDuplicate(record)}
-            />
-          </Tooltip>
-          {!record.is_system && (
+          {canWrite && (
             <>
-              <Tooltip title={t('common.edit')}>
+              <Tooltip title={t('prompts.duplicate')}>
                 <Button
                   type="link"
                   size="small"
-                  icon={<EditOutlined />}
-                  onClick={() => showEditModal(record)}
+                  icon={<CopyOutlined />}
+                  onClick={() => handleDuplicate(record)}
                 />
               </Tooltip>
-              <Tooltip title={t('prompts.setAsDefault')}>
-                <Button
-                  type="link"
-                  size="small"
-                  icon={<StarOutlined />}
-                  onClick={() => handleSetDefault(record.id)}
-                  disabled={record.is_default}
-                />
-              </Tooltip>
-              <Popconfirm
-                title={t('prompts.deleteConfirm')}
-                onConfirm={() => handleDelete(record.id)}
-              >
-                <Button type="link" size="small" danger icon={<DeleteOutlined />} />
-              </Popconfirm>
+              {!record.is_system && (
+                <>
+                  <Tooltip title={t('common.edit')}>
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<EditOutlined />}
+                      onClick={() => showEditModal(record)}
+                    />
+                  </Tooltip>
+                  <Tooltip title={t('prompts.setAsDefault')}>
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<StarOutlined />}
+                      onClick={() => handleSetDefault(record.id)}
+                      disabled={record.is_default}
+                    />
+                  </Tooltip>
+                  <Popconfirm
+                    title={t('prompts.deleteConfirm')}
+                    onConfirm={() => handleDelete(record.id)}
+                  >
+                    <Button type="link" size="small" danger icon={<DeleteOutlined />} />
+                  </Popconfirm>
+                </>
+              )}
+              {record.is_system && (
+                <Tooltip title={t('prompts.setAsDefault')}>
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<StarOutlined />}
+                    onClick={() => handleSetDefault(record.id)}
+                    disabled={record.is_default}
+                  />
+                </Tooltip>
+              )}
             </>
-          )}
-          {record.is_system && (
-            <Tooltip title={t('prompts.setAsDefault')}>
-              <Button
-                type="link"
-                size="small"
-                icon={<StarOutlined />}
-                onClick={() => handleSetDefault(record.id)}
-                disabled={record.is_default}
-              />
-            </Tooltip>
           )}
         </Space>
       ),
@@ -300,9 +305,11 @@ const Prompts: React.FC = () => {
           <Button icon={<ReloadOutlined />} onClick={handleReset}>
             {t('common.reset')}
           </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={showCreateModal}>
-            {t('prompts.createPrompt')}
-          </Button>
+          {canWrite && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={showCreateModal}>
+              {t('prompts.createPrompt')}
+            </Button>
+          )}
         </Space>
 
         <Table
@@ -359,13 +366,14 @@ const Prompts: React.FC = () => {
 
       <Drawer
         title={t('prompts.viewPrompt')}
-        width={720}
+        width="min(960px, 92vw)"
         open={drawerVisible}
         onClose={() => setDrawerVisible(false)}
+        styles={{ body: { padding: 24, display: 'flex', flexDirection: 'column', height: '100%' } }}
       >
         {viewingPrompt && (
-          <div>
-            <div style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minHeight: 0 }}>
+            <div>
               <strong>{t('prompts.name')}:</strong> {viewingPrompt.name}
               {viewingPrompt.is_system && (
                 <Tag color="blue" style={{ marginLeft: 8 }}>
@@ -379,12 +387,12 @@ const Prompts: React.FC = () => {
               )}
             </div>
             {viewingPrompt.description && (
-              <div style={{ marginBottom: 16 }}>
+              <div>
                 <strong>{t('prompts.description')}:</strong> {viewingPrompt.description}
               </div>
             )}
-            <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong>{t('prompts.content')}:</strong>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong style={{ fontSize: 14 }}>{t('prompts.content')}:</strong>
               <Segmented
                 size="small"
                 value={viewMode}
@@ -395,39 +403,50 @@ const Prompts: React.FC = () => {
                 ]}
               />
             </div>
-            {viewMode === 'rendered' ? (
-              <div
-                style={{
-                  backgroundColor: '#fafafa',
-                  padding: 16,
-                  borderRadius: 8,
-                  maxHeight: 500,
-                  overflow: 'auto',
-                  border: '1px solid #f0f0f0',
-                }}
-                className="markdown-body"
-              >
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {viewingPrompt.content}
-                </ReactMarkdown>
-              </div>
-            ) : (
-              <Paragraph
-                copyable
-                style={{
-                  whiteSpace: 'pre-wrap',
-                  backgroundColor: '#f5f5f5',
-                  padding: 16,
-                  borderRadius: 8,
-                  maxHeight: 500,
-                  overflow: 'auto',
-                  fontFamily: 'monospace',
-                  fontSize: 13,
-                }}
-              >
-                {viewingPrompt.content}
-              </Paragraph>
-            )}
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                backgroundColor: '#fafafa',
+                borderRadius: 8,
+                border: '1px solid #f0f0f0',
+              }}
+            >
+              {viewMode === 'rendered' ? (
+                <div
+                  style={{
+                    padding: 18,
+                    height: '100%',
+                    overflow: 'auto',
+                  }}
+                  className="markdown-body"
+                >
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {viewingPrompt.content}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    padding: 18,
+                    height: '100%',
+                    overflow: 'auto',
+                  }}
+                >
+                  <Paragraph
+                    copyable
+                    style={{
+                      whiteSpace: 'pre-wrap',
+                      margin: 0,
+                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                      fontSize: 13,
+                    }}
+                  >
+                    {viewingPrompt.content}
+                  </Paragraph>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </Drawer>

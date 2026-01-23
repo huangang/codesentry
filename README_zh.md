@@ -223,10 +223,13 @@ https://你的域名/review/webhook
 ### 提示词模板
 
 - `GET /api/prompts` - 提示词列表
-- `POST /api/prompts` - 创建提示词
-- `PUT /api/prompts/:id` - 更新提示词
-- `DELETE /api/prompts/:id` - 删除提示词
-- `PUT /api/prompts/:id/default` - 设为默认模板
+- `GET /api/prompts/:id` - 提示词详情
+- `GET /api/prompts/default` - 获取默认提示词
+- `GET /api/prompts/active` - 获取激活的提示词列表
+- `POST /api/prompts` - 创建提示词（仅管理员）
+- `PUT /api/prompts/:id` - 更新提示词（仅管理员）
+- `DELETE /api/prompts/:id` - 删除提示词（仅管理员）
+- `POST /api/prompts/:id/set-default` - 设为默认模板（仅管理员）
 
 ### IM 机器人
 

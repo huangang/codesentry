@@ -140,6 +140,13 @@ func main() {
 			memberHandler := handlers.NewMemberHandler(models.GetDB())
 			protected.GET("/members", memberHandler.List)
 			protected.GET("/members/detail", memberHandler.GetDetail)
+
+			// Prompts (read for all users)
+			promptHandler := handlers.NewPromptHandler(models.GetDB())
+			protected.GET("/prompts", promptHandler.List)
+			protected.GET("/prompts/default", promptHandler.GetDefault)
+			protected.GET("/prompts/active", promptHandler.GetAllActive)
+			protected.GET("/prompts/:id", promptHandler.GetByID)
 		}
 
 		// Admin only routes
@@ -183,10 +190,6 @@ func main() {
 
 			// Prompts
 			promptHandler := handlers.NewPromptHandler(models.GetDB())
-			admin.GET("/prompts", promptHandler.List)
-			admin.GET("/prompts/default", promptHandler.GetDefault)
-			admin.GET("/prompts/active", promptHandler.GetAllActive)
-			admin.GET("/prompts/:id", promptHandler.GetByID)
 			admin.POST("/prompts", promptHandler.Create)
 			admin.PUT("/prompts/:id", promptHandler.Update)
 			admin.DELETE("/prompts/:id", promptHandler.Delete)

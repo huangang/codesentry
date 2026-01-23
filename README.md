@@ -222,10 +222,13 @@ The system automatically detects the platform via request headers.
 ### Prompt Templates
 
 - `GET /api/prompts` - List prompt templates
-- `POST /api/prompts` - Create prompt template
-- `PUT /api/prompts/:id` - Update prompt template
-- `DELETE /api/prompts/:id` - Delete prompt template
-- `PUT /api/prompts/:id/default` - Set as default template
+- `GET /api/prompts/:id` - Get prompt template detail
+- `GET /api/prompts/default` - Get default prompt template
+- `GET /api/prompts/active` - List active prompt templates
+- `POST /api/prompts` - Create prompt template (admin only)
+- `PUT /api/prompts/:id` - Update prompt template (admin only)
+- `DELETE /api/prompts/:id` - Delete prompt template (admin only)
+- `POST /api/prompts/:id/set-default` - Set as default template (admin only)
 
 ### IM Bots
 
