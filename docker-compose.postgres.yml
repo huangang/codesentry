@@ -1,6 +1,5 @@
 version: '3.8'
 
-# Default: MySQL storage
 services:
   codesentry:
     image: huangangzhang/codesentry:latest
@@ -12,33 +11,32 @@ services:
     environment:
       - SERVER_PORT=8080
       - SERVER_MODE=release
-      - DB_DRIVER=mysql
-      - DB_DSN=codesentry:${DB_PASSWORD:-codesentry}@tcp(mysql:3306)/codesentry?charset=utf8mb4&parseTime=True&loc=Local
+      - DB_DRIVER=postgres
+      - DB_DSN=host=postgres user=codesentry password=${DB_PASSWORD:-codesentry} dbname=codesentry port=5432 sslmode=disable
       - JWT_SECRET=${JWT_SECRET:-codesentry-secret-key-change-in-production}
       - JWT_EXPIRE_HOUR=${JWT_EXPIRE_HOUR:-24}
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
     restart: unless-stopped
 
-  mysql:
-    image: mysql:8.0
-    container_name: codesentry-mysql
+  postgres:
+    image: postgres:16-alpine
+    container_name: codesentry-postgres
     environment:
-      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-rootpassword}
-      - MYSQL_DATABASE=codesentry
-      - MYSQL_USER=codesentry
-      - MYSQL_PASSWORD=${DB_PASSWORD:-codesentry}
+      - POSTGRES_DB=codesentry
+      - POSTGRES_USER=codesentry
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-codesentry}
     volumes:
-      - mysql-data:/var/lib/mysql
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-rootpassword}"]
+      test: ["CMD-SHELL", "pg_isready -U codesentry -d codesentry"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 10s
     restart: unless-stopped
 
 volumes:
   codesentry-data:
-  mysql-data:
+  postgres-data:

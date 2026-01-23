@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/huangang/codesentry/backend/internal/config"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -20,10 +21,12 @@ func (Project) TableName() string {
 }
 
 func main() {
-	// 数据库连接
-	dsn := "downtown:downtown#2013@tcp(10.11.15.44:3306)/codesentry?charset=utf8mb4&parseTime=True&loc=Local"
+	cfg, err := config.Load("")
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
 
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(mysql.Open(cfg.Database.DSN), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -31,7 +34,6 @@ func main() {
 	fmt.Println("Connected to database successfully!")
 	fmt.Println("")
 
-	// 查询更新前的数据
 	var projects []Project
 	if err := db.Where("deleted_at IS NULL").Find(&projects).Error; err != nil {
 		log.Fatalf("Failed to query projects: %v", err)
@@ -45,16 +47,14 @@ func main() {
 	}
 	fmt.Println("")
 
-	// 执行更新
 	result := db.Model(&Project{}).Where("deleted_at IS NULL").Update("min_score", 75)
 	if result.Error != nil {
 		log.Fatalf("Failed to update projects: %v", result.Error)
 	}
 
-	fmt.Printf("✅ Successfully updated %d projects!\n", result.RowsAffected)
+	fmt.Printf("Successfully updated %d projects!\n", result.RowsAffected)
 	fmt.Println("")
 
-	// 查询更新后的数据
 	var updatedProjects []Project
 	if err := db.Where("deleted_at IS NULL").Find(&updatedProjects).Error; err != nil {
 		log.Fatalf("Failed to query updated projects: %v", err)
@@ -68,5 +68,5 @@ func main() {
 	}
 
 	fmt.Println("")
-	fmt.Printf("✅ All projects now have MinScore = 75\n")
+	fmt.Printf("All projects now have MinScore = 75\n")
 }

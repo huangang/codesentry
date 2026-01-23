@@ -83,11 +83,24 @@ docker pull huangangzhang/codesentry:latest
 
 # Or pull from GitHub Container Registry
 docker pull ghcr.io/huangang/codesentry:latest
+```
 
-# Run with docker-compose (uses pre-built image)
+**Choose your database:**
+
+```bash
+# MySQL (default, recommended for production)
 docker-compose up -d
 
-# Or run directly
+# SQLite (simple, single file)
+docker-compose -f docker-compose.sqlite.yml up -d
+
+# PostgreSQL
+docker-compose -f docker-compose.postgres.yml up -d
+```
+
+**Or run directly (SQLite):**
+
+```bash
 docker run -d -p 8080:8080 -v codesentry-data:/app/data huangangzhang/codesentry:latest
 ```
 

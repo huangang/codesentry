@@ -111,7 +111,10 @@
     "authorCodeChanges": "作者代码变更",
     "commits": "提交数",
     "additions": "新增行",
-    "deletions": "删除行"
+    "deletions": "删除行",
+    "expand": "展开",
+    "showMore": "展开更多",
+    "showLess": "收起"
   },
   "projects": {
     "title": "项目管理",
@@ -155,7 +158,8 @@
     "selectTemplate": "选择模板",
     "pleaseSelectTemplate": "请选择一个模板",
     "pleaseInputPrompt": "请输入提示词",
-    "promptPriority": "提示词优先级"
+    "promptPriority": "提示词优先级",
+    "minScore": "最低分"
   },
   "reviewLogs": {
     "title": "审查记录",

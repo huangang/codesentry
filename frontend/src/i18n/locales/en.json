@@ -111,7 +111,10 @@
     "authorCodeChanges": "Author Code Changes",
     "commits": "Commits",
     "additions": "Additions",
-    "deletions": "Deletions"
+    "deletions": "Deletions",
+    "expand": "Expand",
+    "showMore": "Show More",
+    "showLess": "Show Less"
   },
   "projects": {
     "title": "Projects",
@@ -155,7 +158,8 @@
     "selectTemplate": "Select Template",
     "pleaseSelectTemplate": "Please select a template",
     "pleaseInputPrompt": "Please input prompt",
-    "promptPriority": "Prompt Priority"
+    "promptPriority": "Prompt Priority",
+    "minScore": "Min Score"
   },
   "reviewLogs": {
     "title": "Review Logs",

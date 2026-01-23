@@ -16,8 +16,10 @@ func NewDashboardService(db *gorm.DB) *DashboardService {
 }
 
 type DashboardStatsRequest struct {
-	StartDate string `form:"start_date"`
-	EndDate   string `form:"end_date"`
+	StartDate    string `form:"start_date"`
+	EndDate      string `form:"end_date"`
+	ProjectLimit int    `form:"project_limit"`
+	AuthorLimit  int    `form:"author_limit"`
 }
 
 type DashboardStats struct {
@@ -73,6 +75,22 @@ func (s *DashboardService) GetStats(req *DashboardStatsRequest) (*DashboardRespo
 		endDate = time.Now()
 	}
 
+	projectLimit := req.ProjectLimit
+	if projectLimit <= 0 {
+		projectLimit = 10
+	}
+	if projectLimit > 100 {
+		projectLimit = 100
+	}
+
+	authorLimit := req.AuthorLimit
+	if authorLimit <= 0 {
+		authorLimit = 10
+	}
+	if authorLimit > 100 {
+		authorLimit = 100
+	}
+
 	var stats DashboardStats
 
 	s.db.Model(&models.ReviewLog{}).
@@ -100,7 +118,7 @@ func (s *DashboardService) GetStats(req *DashboardStatsRequest) (*DashboardRespo
 		Where("created_at BETWEEN ? AND ?", startDate, endDate).
 		Group("project_id").
 		Order("commit_count DESC").
-		Limit(10).
+		Limit(projectLimit).
 		Scan(&projectStats)
 
 	for i := range projectStats {
@@ -116,7 +134,7 @@ func (s *DashboardService) GetStats(req *DashboardStatsRequest) (*DashboardRespo
 		Where("created_at BETWEEN ? AND ?", startDate, endDate).
 		Group("author").
 		Order("commit_count DESC").
-		Limit(10).
+		Limit(authorLimit).
 		Scan(&authorStats)
 
 	return &DashboardResponse{

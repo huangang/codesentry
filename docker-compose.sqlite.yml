@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  codesentry:
+    image: huangangzhang/codesentry:latest
+    container_name: codesentry
+    ports:
+      - "8080:8080"
+    volumes:
+      - codesentry-data:/app/data
+    environment:
+      - SERVER_PORT=8080
+      - SERVER_MODE=release
+      - DB_DRIVER=sqlite
+      - DB_DSN=/app/data/codesentry.db
+      - JWT_SECRET=${JWT_SECRET:-codesentry-secret-key-change-in-production}
+      - JWT_EXPIRE_HOUR=${JWT_EXPIRE_HOUR:-24}
+    restart: unless-stopped
+
+volumes:
+  codesentry-data:

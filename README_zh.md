@@ -84,11 +84,24 @@ docker pull huangangzhang/codesentry:latest
 
 # 或从 GitHub Container Registry 拉取
 docker pull ghcr.io/huangang/codesentry:latest
+```
 
-# 使用 docker-compose 运行（使用预构建镜像）
+**选择数据库：**
+
+```bash
+# MySQL（默认，推荐生产环境使用）
 docker-compose up -d
 
-# 或直接运行
+# SQLite（简单，单文件存储）
+docker-compose -f docker-compose.sqlite.yml up -d
+
+# PostgreSQL
+docker-compose -f docker-compose.postgres.yml up -d
+```
+
+**或直接运行（SQLite）：**
+
+```bash
 docker run -d -p 8080:8080 -v codesentry-data:/app/data huangangzhang/codesentry:latest
 ```
 

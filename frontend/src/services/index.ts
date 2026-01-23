@@ -31,8 +31,8 @@ export const authApi = {
 
 // Dashboard
 export const dashboardApi = {
-  getStats: (startDate?: string, endDate?: string) =>
-    api.get<DashboardResponse>('/dashboard/stats', { params: { start_date: startDate, end_date: endDate } }),
+  getStats: (params?: { start_date?: string; end_date?: string; project_limit?: number; author_limit?: number }) =>
+    api.get<DashboardResponse>('/dashboard/stats', { params }),
 };
 
 // Projects

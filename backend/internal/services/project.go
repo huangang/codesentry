@@ -57,6 +57,8 @@ type UpdateProjectRequest struct {
 	AIPromptID     *uint    `json:"ai_prompt_id"`
 	AIPrompt       *string  `json:"ai_prompt"`
 	LLMConfigID    *uint    `json:"llm_config_id"`
+	IgnorePatterns *string  `json:"ignore_patterns"`
+	CommentEnabled *bool    `json:"comment_enabled"`
 	IMEnabled      *bool    `json:"im_enabled"`
 	IMBotID        *uint    `json:"im_bot_id"`
 	MinScore       *float64 `json:"min_score"`
@@ -181,6 +183,12 @@ func (s *ProjectService) Update(id uint, req *UpdateProjectRequest) (*models.Pro
 	}
 	if req.LLMConfigID != nil {
 		updates["llm_config_id"] = req.LLMConfigID
+	}
+	if req.IgnorePatterns != nil {
+		updates["ignore_patterns"] = *req.IgnorePatterns
+	}
+	if req.CommentEnabled != nil {
+		updates["comment_enabled"] = *req.CommentEnabled
 	}
 	if req.IMEnabled != nil {
 		updates["im_enabled"] = *req.IMEnabled
