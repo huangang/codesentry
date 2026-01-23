@@ -17,6 +17,7 @@ const IMBots = React.lazy(() => import('./pages/IMBots'));
 const Prompts = React.lazy(() => import('./pages/Prompts'));
 const SystemLogs = React.lazy(() => import('./pages/SystemLogs'));
 const GitCredentials = React.lazy(() => import('./pages/GitCredentials'));
+const Settings = React.lazy(() => import('./pages/Settings'));
 
 const PageLoader: React.FC = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', minHeight: 300 }}>
@@ -63,6 +64,7 @@ const App: React.FC = () => {
             <Route path="prompts" element={<Suspense fallback={<PageLoader />}><Prompts /></Suspense>} />
             <Route path="sys-logs" element={<Suspense fallback={<PageLoader />}><SystemLogs /></Suspense>} />
             <Route path="git-credentials" element={<Suspense fallback={<PageLoader />}><GitCredentials /></Suspense>} />
+            <Route path="settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
           </Route>
           <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />

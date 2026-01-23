@@ -3,3 +3,6 @@ export type { UsePaginatedListOptions, UsePaginatedListReturn } from './usePagin
 
 export { useModal } from './useModal';
 export type { UseModalReturn } from './useModal';
+
+export { usePermission } from './usePermission';
+export type { UsePermissionReturn } from './usePermission';

@@ -109,75 +109,91 @@ func main() {
 			protected.GET("/auth/me", authHandler.GetCurrentUser)
 			protected.POST("/auth/logout", authHandler.Logout)
 
-			// Dashboard
+			// Dashboard (all users)
 			dashboardHandler := handlers.NewDashboardHandler(models.GetDB())
 			protected.GET("/dashboard/stats", dashboardHandler.GetStats)
 
-			// Projects
+			// Projects (read for all users)
 			projectHandler := handlers.NewProjectHandler(models.GetDB())
 			protected.GET("/projects", projectHandler.List)
 			protected.GET("/projects/default-prompt", projectHandler.GetDefaultPrompt)
 			protected.GET("/projects/:id", projectHandler.GetByID)
-			protected.POST("/projects", projectHandler.Create)
-			protected.PUT("/projects/:id", projectHandler.Update)
-			protected.DELETE("/projects/:id", projectHandler.Delete)
 
-			// Review Logs
+			// Review Logs (read for all users)
 			reviewLogHandler := handlers.NewReviewLogHandler(models.GetDB(), &cfg.OpenAI)
 			protected.GET("/review-logs", reviewLogHandler.List)
 			protected.GET("/review-logs/:id", reviewLogHandler.GetByID)
-			protected.POST("/review-logs/:id/retry", reviewLogHandler.Retry)
 
-			// LLM Configs
-			llmConfigHandler := handlers.NewLLMConfigHandler(models.GetDB())
-			protected.GET("/llm-configs", llmConfigHandler.List)
-			protected.GET("/llm-configs/active", llmConfigHandler.GetActive)
-			protected.GET("/llm-configs/:id", llmConfigHandler.GetByID)
-			protected.POST("/llm-configs", llmConfigHandler.Create)
-			protected.PUT("/llm-configs/:id", llmConfigHandler.Update)
-			protected.DELETE("/llm-configs/:id", llmConfigHandler.Delete)
-
-			// IM Bots
-			imBotHandler := handlers.NewIMBotHandler(models.GetDB())
-			protected.GET("/im-bots", imBotHandler.List)
-			protected.GET("/im-bots/active", imBotHandler.GetAllActive)
-			protected.GET("/im-bots/:id", imBotHandler.GetByID)
-			protected.POST("/im-bots", imBotHandler.Create)
-			protected.PUT("/im-bots/:id", imBotHandler.Update)
-			protected.DELETE("/im-bots/:id", imBotHandler.Delete)
-
-			// Prompts
-			promptHandler := handlers.NewPromptHandler(models.GetDB())
-			protected.GET("/prompts", promptHandler.List)
-			protected.GET("/prompts/default", promptHandler.GetDefault)
-			protected.GET("/prompts/active", promptHandler.GetAllActive)
-			protected.GET("/prompts/:id", promptHandler.GetByID)
-			protected.POST("/prompts", promptHandler.Create)
-			protected.PUT("/prompts/:id", promptHandler.Update)
-			protected.DELETE("/prompts/:id", promptHandler.Delete)
-			protected.POST("/prompts/:id/set-default", promptHandler.SetDefault)
-
-			// Members
+			// Members (all users)
 			memberHandler := handlers.NewMemberHandler(models.GetDB())
 			protected.GET("/members", memberHandler.List)
 			protected.GET("/members/detail", memberHandler.GetDetail)
+		}
+
+		// Admin only routes
+		admin := api.Group("")
+		admin.Use(middleware.AuthRequired(), middleware.AdminRequired())
+		{
+			// Projects (write operations)
+			projectHandler := handlers.NewProjectHandler(models.GetDB())
+			admin.POST("/projects", projectHandler.Create)
+			admin.PUT("/projects/:id", projectHandler.Update)
+			admin.DELETE("/projects/:id", projectHandler.Delete)
+
+			// Review Logs (write operations)
+			reviewLogHandler := handlers.NewReviewLogHandler(models.GetDB(), &cfg.OpenAI)
+			admin.POST("/review-logs/:id/retry", reviewLogHandler.Retry)
+
+			// LLM Configs
+			llmConfigHandler := handlers.NewLLMConfigHandler(models.GetDB())
+			admin.GET("/llm-configs", llmConfigHandler.List)
+			admin.GET("/llm-configs/active", llmConfigHandler.GetActive)
+			admin.GET("/llm-configs/:id", llmConfigHandler.GetByID)
+			admin.POST("/llm-configs", llmConfigHandler.Create)
+			admin.PUT("/llm-configs/:id", llmConfigHandler.Update)
+			admin.DELETE("/llm-configs/:id", llmConfigHandler.Delete)
+
+			// IM Bots
+			imBotHandler := handlers.NewIMBotHandler(models.GetDB())
+			admin.GET("/im-bots", imBotHandler.List)
+			admin.GET("/im-bots/active", imBotHandler.GetAllActive)
+			admin.GET("/im-bots/:id", imBotHandler.GetByID)
+			admin.POST("/im-bots", imBotHandler.Create)
+			admin.PUT("/im-bots/:id", imBotHandler.Update)
+			admin.DELETE("/im-bots/:id", imBotHandler.Delete)
+
+			// Prompts
+			promptHandler := handlers.NewPromptHandler(models.GetDB())
+			admin.GET("/prompts", promptHandler.List)
+			admin.GET("/prompts/default", promptHandler.GetDefault)
+			admin.GET("/prompts/active", promptHandler.GetAllActive)
+			admin.GET("/prompts/:id", promptHandler.GetByID)
+			admin.POST("/prompts", promptHandler.Create)
+			admin.PUT("/prompts/:id", promptHandler.Update)
+			admin.DELETE("/prompts/:id", promptHandler.Delete)
+			admin.POST("/prompts/:id/set-default", promptHandler.SetDefault)
 
 			// System Logs
 			systemLogHandler := handlers.NewSystemLogHandler(models.GetDB())
-			protected.GET("/system-logs", systemLogHandler.List)
-			protected.GET("/system-logs/modules", systemLogHandler.GetModules)
-			protected.GET("/system-logs/retention", systemLogHandler.GetRetentionDays)
-			protected.PUT("/system-logs/retention", systemLogHandler.SetRetentionDays)
-			protected.POST("/system-logs/cleanup", systemLogHandler.Cleanup)
+			admin.GET("/system-logs", systemLogHandler.List)
+			admin.GET("/system-logs/modules", systemLogHandler.GetModules)
+			admin.GET("/system-logs/retention", systemLogHandler.GetRetentionDays)
+			admin.PUT("/system-logs/retention", systemLogHandler.SetRetentionDays)
+			admin.POST("/system-logs/cleanup", systemLogHandler.Cleanup)
 
 			// Git Credentials
 			gitCredentialHandler := handlers.NewGitCredentialHandler(models.GetDB())
-			protected.GET("/git-credentials", gitCredentialHandler.List)
-			protected.GET("/git-credentials/active", gitCredentialHandler.GetActive)
-			protected.GET("/git-credentials/:id", gitCredentialHandler.GetByID)
-			protected.POST("/git-credentials", gitCredentialHandler.Create)
-			protected.PUT("/git-credentials/:id", gitCredentialHandler.Update)
-			protected.DELETE("/git-credentials/:id", gitCredentialHandler.Delete)
+			admin.GET("/git-credentials", gitCredentialHandler.List)
+			admin.GET("/git-credentials/active", gitCredentialHandler.GetActive)
+			admin.GET("/git-credentials/:id", gitCredentialHandler.GetByID)
+			admin.POST("/git-credentials", gitCredentialHandler.Create)
+			admin.PUT("/git-credentials/:id", gitCredentialHandler.Update)
+			admin.DELETE("/git-credentials/:id", gitCredentialHandler.Delete)
+
+			// System Config
+			systemConfigHandler := handlers.NewSystemConfigHandler(models.GetDB())
+			admin.GET("/system-config/ldap", systemConfigHandler.GetLDAPConfig)
+			admin.PUT("/system-config/ldap", systemConfigHandler.UpdateLDAPConfig)
 		}
 
 		// Webhook routes (public with signature verification)

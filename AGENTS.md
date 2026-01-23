@@ -148,6 +148,37 @@ Git 凭证功能支持：
 - 支持多个机器人同时接收错误通知
 - 通知内容包含：模块、操作、错误信息、时间、额外数据
 
+### LDAP 配置
+系统设置页面支持在线配置 LDAP 认证，无需修改配置文件。
+
+配置项：
+- **启用 LDAP**: 开启/关闭 LDAP 认证
+- **LDAP 服务器**: 服务器地址
+- **端口**: 默认 389 (SSL: 636)
+- **Base DN**: 例如 `dc=example,dc=com`
+- **Bind DN**: 绑定账号，例如 `cn=admin,dc=example,dc=com`
+- **Bind 密码**: 绑定密码
+- **用户过滤器**: 例如 `(uid=%s)` 或 `(sAMAccountName=%s)`
+- **使用 SSL**: 是否使用 LDAPS
+
+### 权限管理
+系统支持两种角色：
+
+| 角色 | 权限 |
+|------|------|
+| admin | 完全权限，可访问所有页面和所有操作 |
+| user | 只读权限，只能访问 Dashboard、Review Logs、Projects（只读）、Member Analysis |
+
+**LDAP 用户默认角色**: user（只读）
+
+**Admin-only 页面**:
+- LLM Models
+- Prompts
+- IM Bots
+- Git Credentials
+- System Logs
+- Settings
+
 ## 待完成功能
 
 （暂无）

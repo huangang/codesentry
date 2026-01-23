@@ -10,7 +10,8 @@ import type {
   PromptTemplate,
   PaginatedResponse,
   DashboardResponse,
-  GitCredential
+  GitCredential,
+  LDAPConfig
 } from '../types';
 
 // Auth
@@ -192,4 +193,11 @@ export const gitCredentialApi = {
     api.put<GitCredential>(`/git-credentials/${id}`, data),
   
   delete: (id: number) => api.delete(`/git-credentials/${id}`),
+};
+
+export const systemConfigApi = {
+  getLDAPConfig: () => api.get<LDAPConfig>('/system-config/ldap'),
+  
+  updateLDAPConfig: (data: Partial<LDAPConfig>) =>
+    api.put<LDAPConfig>('/system-config/ldap', data),
 };

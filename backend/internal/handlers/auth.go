@@ -11,14 +11,12 @@ import (
 
 type AuthHandler struct {
 	authService *services.AuthService
-	ldapEnabled bool
 }
 
 func NewAuthHandler(db *gorm.DB, cfg *config.Config) *AuthHandler {
-	authService := services.NewAuthService(db, &cfg.LDAP, &cfg.JWT)
+	authService := services.NewAuthService(db, &cfg.JWT)
 	return &AuthHandler{
 		authService: authService,
-		ldapEnabled: cfg.LDAP.Enabled,
 	}
 }
 
@@ -53,7 +51,7 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 
 func (h *AuthHandler) GetAuthConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"ldap_enabled": h.ldapEnabled,
+		"ldap_enabled": h.authService.IsLDAPEnabled(),
 	})
 }
 

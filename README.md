@@ -31,7 +31,8 @@ AI-powered Code Review Platform for GitHub and GitLab.
 - **Error Notifications**: Real-time error alerts via IM bots
 - **Git Credentials**: Auto-create projects from webhooks with credential management
 - **System Logging**: Comprehensive logging for webhook events, errors, and system operations
-- **Authentication**: Local authentication and LDAP support
+- **Authentication**: Local authentication and LDAP support (configurable via web UI)
+- **Role-based Access Control**: Admin and User roles with different permission levels
 - **Multi-Database**: SQLite for development, MySQL/PostgreSQL for production
 - **Internationalization**: Support for English and Chinese (including DatePicker localization)
 
@@ -139,6 +140,8 @@ ldap:
   base_dn: dc=example,dc=com
   user_filter: (uid=%s)
 ```
+
+> **Note**: LDAP configuration can also be managed via the Settings page in the web UI. Web UI settings take precedence over config file settings.
 
 ## Webhook Setup
 

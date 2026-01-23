@@ -31,7 +31,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { useTranslation } from 'react-i18next';
 import { projectApi, imBotApi, promptApi, llmConfigApi } from '../services';
 import type { Project, IMBot, PromptTemplate, LLMConfig } from '../types';
-import { usePaginatedList, useModal } from '../hooks';
+import { usePaginatedList, useModal, usePermission } from '../hooks';
 import { PLATFORMS } from '../constants';
 
 const { TextArea } = Input;
@@ -46,6 +46,7 @@ const Projects: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [form] = Form.useForm();
   const [promptForm] = Form.useForm();
+  const { isAdmin } = usePermission();
 
   const [imBots, setImBots] = useState<IMBot[]>([]);
   const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>([]);
@@ -291,18 +292,24 @@ const Projects: React.FC = () => {
       width: 160,
       render: (_, record) => (
         <Space>
-          <Tooltip title={t('common.edit')}>
-            <Button type="link" size="small" icon={<EditOutlined />} onClick={() => showEditModal(record)} />
-          </Tooltip>
-          <Tooltip title={t('projects.aiPrompt')}>
-            <Button type="link" size="small" icon={<SettingOutlined />} onClick={() => showPromptDrawer(record)} />
-          </Tooltip>
+          {isAdmin && (
+            <Tooltip title={t('common.edit')}>
+              <Button type="link" size="small" icon={<EditOutlined />} onClick={() => showEditModal(record)} />
+            </Tooltip>
+          )}
+          {isAdmin && (
+            <Tooltip title={t('projects.aiPrompt')}>
+              <Button type="link" size="small" icon={<SettingOutlined />} onClick={() => showPromptDrawer(record)} />
+            </Tooltip>
+          )}
           <Tooltip title={t('projects.copyWebhookUrl')}>
             <Button type="link" size="small" icon={<CopyOutlined />} onClick={() => copyWebhookUrl(record)} />
           </Tooltip>
-          <Popconfirm title={t('projects.deleteConfirm')} onConfirm={() => handleDelete(record.id)}>
-            <Button type="link" size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
+          {isAdmin && (
+            <Popconfirm title={t('projects.deleteConfirm')} onConfirm={() => handleDelete(record.id)}>
+              <Button type="link" size="small" danger icon={<DeleteOutlined />} />
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -325,9 +332,11 @@ const Projects: React.FC = () => {
           <Button icon={<ReloadOutlined />} onClick={handleReset}>
             {t('common.reset')}
           </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={showCreateModal}>
-            {t('projects.createProject')}
-          </Button>
+          {isAdmin && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={showCreateModal}>
+              {t('projects.createProject')}
+            </Button>
+          )}
         </Space>
 
         <Table

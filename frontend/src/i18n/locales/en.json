@@ -319,5 +319,27 @@
     "deleteSuccess": "Credential deleted successfully",
     "pleaseInputName": "Please input credential name",
     "pleaseSelectPlatform": "Please select platform"
+  },
+  "settings": {
+    "title": "Settings",
+    "ldap": {
+      "title": "LDAP Configuration",
+      "enabled": "Enable LDAP",
+      "host": "LDAP Host",
+      "port": "Port",
+      "baseDn": "Base DN",
+      "bindDn": "Bind DN",
+      "bindPassword": "Bind Password",
+      "userFilter": "User Filter",
+      "useSsl": "Use SSL",
+      "saveSuccess": "LDAP configuration saved successfully",
+      "saveFailed": "Failed to save LDAP configuration",
+      "pleaseInputHost": "Please input LDAP host",
+      "pleaseInputPort": "Please input port",
+      "pleaseInputBaseDn": "Please input Base DN",
+      "pleaseInputBindDn": "Please input Bind DN",
+      "pleaseInputUserFilter": "Please input user filter",
+      "passwordHint": "Leave empty to keep existing password"
+    }
   }
 }

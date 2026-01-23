@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Layout, Menu, Dropdown, Avatar, Space, Typography, Select } from 'antd';
 import {
   DashboardOutlined,
@@ -18,6 +18,7 @@ import {
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../stores/authStore';
+import { usePermission } from '../hooks';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -27,8 +28,9 @@ const MainLayout: React.FC = () => {
   const location = useLocation();
   const { user, logout } = useAuthStore();
   const { t, i18n } = useTranslation();
+  const { canAccess } = usePermission();
 
-  const menuItems = [
+  const allMenuItems = [
     { key: '/admin/dashboard', icon: <DashboardOutlined />, label: t('menu.dashboard') },
     { key: '/admin/review-logs', icon: <FileSearchOutlined />, label: t('menu.reviewLogs') },
     { key: '/admin/projects', icon: <ProjectOutlined />, label: t('menu.projects') },
@@ -38,7 +40,13 @@ const MainLayout: React.FC = () => {
     { key: '/admin/im-bots', icon: <NotificationOutlined />, label: t('menu.imBots') },
     { key: '/admin/git-credentials', icon: <KeyOutlined />, label: t('menu.gitCredentials') },
     { key: '/admin/sys-logs', icon: <FileTextOutlined />, label: t('menu.systemLogs') },
+    { key: '/admin/settings', icon: <SettingOutlined />, label: t('menu.settings') },
   ];
+
+  const menuItems = useMemo(
+    () => allMenuItems.filter((item) => canAccess(item.key)),
+    [canAccess, t]
+  );
 
   const handleMenuClick = (info: { key: string }) => {
     navigate(info.key);

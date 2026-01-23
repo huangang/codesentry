@@ -180,3 +180,14 @@ export interface DashboardResponse {
   project_stats: ProjectStats[];
   author_stats: AuthorStats[];
 }
+
+export interface LDAPConfig {
+  enabled: boolean;
+  host: string;
+  port: number;
+  base_dn: string;
+  bind_dn: string;
+  bind_password: string;
+  user_filter: string;
+  use_ssl: boolean;
+}

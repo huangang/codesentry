@@ -16,10 +16,10 @@ type AuthService struct {
 	jwtConfig   *config.JWTConfig
 }
 
-func NewAuthService(db *gorm.DB, ldapCfg *config.LDAPConfig, jwtCfg *config.JWTConfig) *AuthService {
+func NewAuthService(db *gorm.DB, jwtCfg *config.JWTConfig) *AuthService {
 	return &AuthService{
 		db:          db,
-		ldapService: NewLDAPService(ldapCfg),
+		ldapService: NewLDAPService(db),
 		jwtConfig:   jwtCfg,
 	}
 }
@@ -170,4 +170,8 @@ func (s *AuthService) CreateAdminIfNotExists() error {
 	}
 
 	return nil
+}
+
+func (s *AuthService) IsLDAPEnabled() bool {
+	return s.ldapService.IsEnabled()
 }

@@ -67,3 +67,5 @@ export function getStatusColor(status: string): 'success' | 'error' | 'processin
       return 'default';
   }
 }
+
+export * from './permissions';

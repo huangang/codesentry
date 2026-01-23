@@ -319,5 +319,27 @@
     "deleteSuccess": "凭证删除成功",
     "pleaseInputName": "请输入凭证名称",
     "pleaseSelectPlatform": "请选择平台"
+  },
+  "settings": {
+    "title": "系统设置",
+    "ldap": {
+      "title": "LDAP 配置",
+      "enabled": "启用 LDAP",
+      "host": "LDAP 服务器",
+      "port": "端口",
+      "baseDn": "Base DN",
+      "bindDn": "Bind DN",
+      "bindPassword": "Bind 密码",
+      "userFilter": "用户过滤器",
+      "useSsl": "使用 SSL",
+      "saveSuccess": "LDAP 配置保存成功",
+      "saveFailed": "LDAP 配置保存失败",
+      "pleaseInputHost": "请输入 LDAP 服务器地址",
+      "pleaseInputPort": "请输入端口",
+      "pleaseInputBaseDn": "请输入 Base DN",
+      "pleaseInputBindDn": "请输入 Bind DN",
+      "pleaseInputUserFilter": "请输入用户过滤器",
+      "passwordHint": "留空则保留原密码"
+    }
   }
 }
