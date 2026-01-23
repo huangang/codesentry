@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"strconv"
 	"time"
@@ -26,6 +27,53 @@ func LogWarning(module, action, message string, userID *uint, ip, userAgent stri
 
 func LogError(module, action, message string, userID *uint, ip, userAgent string, extra interface{}) {
 	writeLog("error", module, action, message, userID, ip, userAgent, extra)
+	go sendErrorNotification(module, action, message, extra)
+}
+
+func sendErrorNotification(module, action, message string, extra interface{}) {
+	if globalDB == nil {
+		return
+	}
+
+	var bots []models.IMBot
+	if err := globalDB.Where("is_active = ? AND error_notify = ?", true, true).Find(&bots).Error; err != nil {
+		log.Printf("[SystemLog] Failed to get error notify bots: %v", err)
+		return
+	}
+
+	if len(bots) == 0 {
+		return
+	}
+
+	notificationService := NewNotificationService(globalDB)
+	errorMsg := buildErrorMessage(module, action, message, extra)
+
+	for _, bot := range bots {
+		if err := notificationService.SendErrorNotification(&bot, errorMsg); err != nil {
+			log.Printf("[SystemLog] Failed to send error notification to bot %s: %v", bot.Name, err)
+		}
+	}
+}
+
+func buildErrorMessage(module, action, message string, extra interface{}) string {
+	msg := fmt.Sprintf(`🚨 **System Error Alert**
+
+**Module**: %s
+**Action**: %s
+**Message**: %s
+**Time**: %s`, module, action, message, time.Now().Format("2006-01-02 15:04:05"))
+
+	if extra != nil {
+		if b, err := json.Marshal(extra); err == nil && len(b) > 2 {
+			extraStr := string(b)
+			if len(extraStr) > 500 {
+				extraStr = extraStr[:500] + "..."
+			}
+			msg += fmt.Sprintf("\n\n**Extra**: ```%s```", extraStr)
+		}
+	}
+
+	return msg
 }
 
 func writeLog(level, module, action, message string, userID *uint, ip, userAgent string, extra interface{}) {

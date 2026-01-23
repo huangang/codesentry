@@ -20,6 +20,11 @@ AI-powered Code Review Platform for GitHub and GitLab.
 - **Dashboard**: Visual statistics and metrics for code review activities
 - **Review History**: Track all code reviews with detailed logs and direct links to commits/MRs
 - **Project Management**: Manage multiple repositories
+
+## Preview
+
+![CodeSentry Dashboard](frontend/public/dashboard-preview.png)
+
 - **LLM Configuration**: Configure multiple AI models with custom endpoints
 - **Prompt Templates**: System and custom prompt templates with copy functionality
 - **IM Notifications**: Send review results to DingTalk, Feishu, WeCom, Slack, or custom webhooks

@@ -31,19 +31,21 @@ type IMBotListResponse struct {
 }
 
 type CreateIMBotRequest struct {
-	Name     string `json:"name" binding:"required"`
-	Type     string `json:"type" binding:"required,oneof=wechat_work dingtalk feishu slack"`
-	Webhook  string `json:"webhook" binding:"required"`
-	Secret   string `json:"secret"`
-	IsActive bool   `json:"is_active"`
+	Name        string `json:"name" binding:"required"`
+	Type        string `json:"type" binding:"required,oneof=wechat_work dingtalk feishu slack"`
+	Webhook     string `json:"webhook" binding:"required"`
+	Secret      string `json:"secret"`
+	IsActive    bool   `json:"is_active"`
+	ErrorNotify bool   `json:"error_notify"`
 }
 
 type UpdateIMBotRequest struct {
-	Name     string `json:"name"`
-	Type     string `json:"type" binding:"omitempty,oneof=wechat_work dingtalk feishu slack"`
-	Webhook  string `json:"webhook"`
-	Secret   string `json:"secret"`
-	IsActive *bool  `json:"is_active"`
+	Name        string `json:"name"`
+	Type        string `json:"type" binding:"omitempty,oneof=wechat_work dingtalk feishu slack"`
+	Webhook     string `json:"webhook"`
+	Secret      string `json:"secret"`
+	IsActive    *bool  `json:"is_active"`
+	ErrorNotify *bool  `json:"error_notify"`
 }
 
 // List returns paginated IM bots
@@ -97,11 +99,12 @@ func (s *IMBotService) GetByID(id uint) (*models.IMBot, error) {
 // Create creates a new IM bot
 func (s *IMBotService) Create(req *CreateIMBotRequest) (*models.IMBot, error) {
 	bot := models.IMBot{
-		Name:     req.Name,
-		Type:     req.Type,
-		Webhook:  req.Webhook,
-		Secret:   req.Secret,
-		IsActive: req.IsActive,
+		Name:        req.Name,
+		Type:        req.Type,
+		Webhook:     req.Webhook,
+		Secret:      req.Secret,
+		IsActive:    req.IsActive,
+		ErrorNotify: req.ErrorNotify,
 	}
 
 	if err := s.db.Create(&bot).Error; err != nil {
@@ -135,6 +138,9 @@ func (s *IMBotService) Update(id uint, req *UpdateIMBotRequest) (*models.IMBot, 
 	if req.IsActive != nil {
 		updates["is_active"] = *req.IsActive
 	}
+	if req.ErrorNotify != nil {
+		updates["error_notify"] = *req.ErrorNotify
+	}
 
 	if err := s.db.Model(&bot).Updates(updates).Error; err != nil {
 		return nil, err
@@ -161,6 +167,15 @@ func (s *IMBotService) Delete(id uint) error {
 func (s *IMBotService) GetAllActive() ([]models.IMBot, error) {
 	var bots []models.IMBot
 	if err := s.db.Where("is_active = ?", true).Find(&bots).Error; err != nil {
+		return nil, err
+	}
+	return bots, nil
+}
+
+// GetErrorNotifyBots returns all active bots with error notification enabled
+func (s *IMBotService) GetErrorNotifyBots() ([]models.IMBot, error) {
+	var bots []models.IMBot
+	if err := s.db.Where("is_active = ? AND error_notify = ?", true, true).Find(&bots).Error; err != nil {
 		return nil, err
 	}
 	return bots, nil

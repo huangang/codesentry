@@ -126,6 +126,7 @@ const IMBots: React.FC = () => {
     form.setFieldsValue({
       type: IM_BOT_TYPES.WECHAT_WORK,
       is_active: true,
+      error_notify: false,
     });
   };
 
@@ -188,6 +189,16 @@ const IMBots: React.FC = () => {
       render: (_, record) => (
         <Tag color={record.is_active ? 'success' : 'default'}>
           {record.is_active ? t('common.enabled') : t('common.disabled')}
+        </Tag>
+      ),
+    },
+    {
+      title: t('imBots.errorNotify'),
+      key: 'error_notify',
+      width: 120,
+      render: (_, record) => (
+        <Tag color={record.error_notify ? 'warning' : 'default'}>
+          {record.error_notify ? t('common.enabled') : t('common.disabled')}
         </Tag>
       ),
     },
@@ -306,6 +317,9 @@ const IMBots: React.FC = () => {
             }}
           </Form.Item>
           <Form.Item name="is_active" label={t('imBots.isActive')} valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item name="error_notify" label={t('imBots.errorNotify')} valuePropName="checked" extra={t('imBots.errorNotifyHelp')}>
             <Switch />
           </Form.Item>
         </Form>

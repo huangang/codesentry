@@ -139,8 +139,8 @@ func (s *NotificationService) sendWeComNotification(bot *models.IMBot, n *Review
 
 	if len(msg) <= maxLen {
 		payload := map[string]interface{}{
-			"msgtype": "markdown",
-			"markdown": map[string]string{
+			"msgtype": "markdown_v2",
+			"markdown_v2": map[string]string{
 				"content": msg,
 			},
 		}
@@ -154,8 +154,8 @@ func (s *NotificationService) sendWeComNotification(bot *models.IMBot, n *Review
 			content = fmt.Sprintf("**[%d/%d]**\n\n%s", i+1, len(parts), part)
 		}
 		payload := map[string]interface{}{
-			"msgtype": "markdown",
-			"markdown": map[string]string{
+			"msgtype": "markdown_v2",
+			"markdown_v2": map[string]string{
 				"content": content,
 			},
 		}
@@ -404,4 +404,90 @@ func (s *NotificationService) postJSON(webhookURL string, payload interface{}) e
 	}
 
 	return nil
+}
+
+func (s *NotificationService) SendErrorNotification(bot *models.IMBot, message string) error {
+	if !bot.IsActive {
+		return nil
+	}
+
+	switch bot.Type {
+	case "wechat_work":
+		return s.sendWeComText(bot, message)
+	case "dingtalk":
+		return s.sendDingTalkText(bot, message)
+	case "feishu":
+		return s.sendFeishuText(bot, message)
+	case "slack":
+		return s.sendSlackText(bot, message)
+	default:
+		return s.sendGenericText(bot, message)
+	}
+}
+
+func (s *NotificationService) sendWeComText(bot *models.IMBot, message string) error {
+	payload := map[string]interface{}{
+		"msgtype": "markdown_v2",
+		"markdown_v2": map[string]string{
+			"content": message,
+		},
+	}
+	return s.postJSON(bot.Webhook, payload)
+}
+
+func (s *NotificationService) sendDingTalkText(bot *models.IMBot, message string) error {
+	webhookURL := bot.Webhook
+	if bot.Secret != "" {
+		timestamp := time.Now().UnixMilli()
+		sign := s.dingTalkSign(timestamp, bot.Secret)
+		webhookURL = fmt.Sprintf("%s&timestamp=%d&sign=%s", bot.Webhook, timestamp, url.QueryEscape(sign))
+	}
+
+	payload := map[string]interface{}{
+		"msgtype": "markdown",
+		"markdown": map[string]string{
+			"title": "System Error Alert",
+			"text":  message,
+		},
+	}
+	return s.postJSON(webhookURL, payload)
+}
+
+func (s *NotificationService) sendFeishuText(bot *models.IMBot, message string) error {
+	webhookURL := bot.Webhook
+	if bot.Secret != "" {
+		timestamp := time.Now().Unix()
+		sign := s.feishuSign(timestamp, bot.Secret)
+		payload := map[string]interface{}{
+			"timestamp": fmt.Sprintf("%d", timestamp),
+			"sign":      sign,
+			"msg_type":  "text",
+			"content": map[string]string{
+				"text": message,
+			},
+		}
+		return s.postJSON(webhookURL, payload)
+	}
+	payload := map[string]interface{}{
+		"msg_type": "text",
+		"content": map[string]string{
+			"text": message,
+		},
+	}
+	return s.postJSON(webhookURL, payload)
+}
+
+func (s *NotificationService) sendSlackText(bot *models.IMBot, message string) error {
+	payload := map[string]interface{}{
+		"text": message,
+	}
+	return s.postJSON(bot.Webhook, payload)
+}
+
+func (s *NotificationService) sendGenericText(bot *models.IMBot, message string) error {
+	payload := map[string]interface{}{
+		"type":    "error",
+		"message": message,
+	}
+	return s.postJSON(bot.Webhook, payload)
 }

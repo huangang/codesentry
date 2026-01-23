@@ -213,6 +213,8 @@
     "webhook": "Webhook 地址",
     "secret": "密钥",
     "isActive": "激活",
+    "errorNotify": "错误通知",
+    "errorNotifyHelp": "接收系统错误通知",
     "testBot": "测试",
     "testSuccess": "测试消息发送成功",
     "testFailed": "测试消息发送失败",

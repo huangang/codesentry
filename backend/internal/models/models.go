@@ -126,15 +126,16 @@ type SystemConfig struct {
 
 // IMBot represents an IM notification bot
 type IMBot struct {
-	ID        uint           `gorm:"primaryKey" json:"id"`
-	Name      string         `gorm:"size:100;not null" json:"name"`
-	Type      string         `gorm:"size:50;not null" json:"type"` // wechat_work, dingtalk, feishu, slack
-	Webhook   string         `gorm:"size:500;not null" json:"webhook"`
-	Secret    string         `gorm:"size:255" json:"-"`
-	IsActive  bool           `gorm:"default:true" json:"is_active"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	ID          uint           `gorm:"primaryKey" json:"id"`
+	Name        string         `gorm:"size:100;not null" json:"name"`
+	Type        string         `gorm:"size:50;not null" json:"type"` // wechat_work, dingtalk, feishu, slack
+	Webhook     string         `gorm:"size:500;not null" json:"webhook"`
+	Secret      string         `gorm:"size:255" json:"-"`
+	IsActive    bool           `gorm:"default:true" json:"is_active"`
+	ErrorNotify bool           `gorm:"default:false" json:"error_notify"` // Whether to receive error notifications
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // SystemLog represents a system operation log

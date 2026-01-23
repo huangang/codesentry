@@ -83,6 +83,7 @@ export interface IMBot {
   type: 'wechat_work' | 'dingtalk' | 'feishu' | 'slack';
   webhook: string;
   is_active: boolean;
+  error_notify: boolean;
   created_at: string;
   updated_at: string;
 }

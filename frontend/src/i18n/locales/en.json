@@ -213,6 +213,8 @@
     "webhook": "Webhook URL",
     "secret": "Secret",
     "isActive": "Active",
+    "errorNotify": "Error Notify",
+    "errorNotifyHelp": "Receive system error notifications",
     "testBot": "Test",
     "testSuccess": "Test message sent successfully",
     "testFailed": "Test message failed",
