@@ -121,6 +121,17 @@ cd frontend && npm run build
 | 飞书 | 4096 |
 | Slack | 40000 |
 
+### Git 凭证自动创建项目
+Git 凭证功能支持：
+1. **自动创建项目**: 当 webhook 回调触发时，如果项目不存在但匹配到凭证，自动创建项目
+2. **补全不完整数据**: 如果项目存在但 access_token 为空，自动从匹配的凭证中补全
+3. **私有服务器支持**: 通过 `base_url` 字段支持自托管 GitLab/GitHub Enterprise
+
+配置流程：
+1. 在「Git 凭证」页面创建凭证，填写平台、服务器地址、Access Token、Webhook Secret
+2. 在 GitLab/GitHub 配置统一 Webhook URL: `https://your-domain/webhook`
+3. 新仓库触发 webhook 时自动创建项目并开始代码审查
+
 ## 待完成功能
 
 （暂无）

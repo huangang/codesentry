@@ -50,6 +50,7 @@ func AutoMigrate() error {
 		&SystemConfig{},
 		&IMBot{},
 		&SystemLog{},
+		&GitCredential{},
 	)
 }
 

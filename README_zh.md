@@ -1,5 +1,9 @@
 # CodeSentry
 
+<div align="center">
+  <img src="frontend/public/codesentry-icon.png" alt="CodeSentry Logo" width="120" height="120">
+</div>
+
 基于 AI 的代码审查平台，支持 GitHub 和 GitLab。
 
 [English](./README.md)
@@ -80,6 +84,7 @@ docker run -d -p 8080:8080 -v codesentry-data:/app/data huangangzhang/codesentry
 ```
 
 本地开发（从源码构建）：
+
 ```bash
 docker-compose -f docker-compose.dev.yml up --build
 ```
@@ -160,12 +165,14 @@ https://你的域名/review/webhook
 ## API 接口
 
 ### 认证
+
 - `POST /api/auth/login` - 登录
 - `GET /api/auth/config` - 获取认证配置
 - `GET /api/auth/me` - 获取当前用户
 - `POST /api/auth/logout` - 退出登录
 
 ### 项目管理
+
 - `GET /api/projects` - 项目列表
 - `POST /api/projects` - 创建项目
 - `GET /api/projects/:id` - 获取项目
@@ -173,14 +180,17 @@ https://你的域名/review/webhook
 - `DELETE /api/projects/:id` - 删除项目
 
 ### 审查记录
+
 - `GET /api/review-logs` - 审查记录列表
 - `GET /api/review-logs/:id` - 审查详情
 - `POST /api/review-logs/:id/retry` - 重试失败的审查
 
 ### 看板
+
 - `GET /api/dashboard/stats` - 获取统计数据
 
 ### 大模型配置
+
 - `GET /api/llm-configs` - 模型列表
 - `GET /api/llm-configs/active` - 获取激活的模型列表（用于项目选择）
 - `POST /api/llm-configs` - 创建模型
@@ -188,6 +198,7 @@ https://你的域名/review/webhook
 - `DELETE /api/llm-configs/:id` - 删除模型
 
 ### 提示词模板
+
 - `GET /api/prompts` - 提示词列表
 - `POST /api/prompts` - 创建提示词
 - `PUT /api/prompts/:id` - 更新提示词
@@ -195,12 +206,14 @@ https://你的域名/review/webhook
 - `PUT /api/prompts/:id/default` - 设为默认模板
 
 ### IM 机器人
+
 - `GET /api/im-bots` - 机器人列表
 - `POST /api/im-bots` - 创建机器人
 - `PUT /api/im-bots/:id` - 更新机器人
 - `DELETE /api/im-bots/:id` - 删除机器人
 
 ### Webhooks
+
 - `POST /webhook` - **统一 Webhook（自动识别 GitLab/GitHub，推荐）**
 - `POST /review/webhook` - 统一 Webhook 别名
 - `POST /api/webhook` - /api 前缀下的统一 Webhook
@@ -211,12 +224,14 @@ https://你的域名/review/webhook
 - `POST /api/webhook/github/:project_id` - GitHub Webhook（指定项目ID）
 
 ### 同步审查（用于 Git Hooks）
+
 - `POST /review/sync` - 同步代码审查，用于 pre-receive hook
 - `POST /api/review/sync` - /api 前缀下的同步审查
 - `GET /review/score?commit_sha=xxx` - 通过 commit SHA 查询审查状态/分数
 - `GET /api/review/score?commit_sha=xxx` - /api 前缀下的查询接口
 
 请求体:
+
 ```json
 {
   "project_url": "https://gitlab.example.com/group/project",
@@ -229,6 +244,7 @@ https://你的域名/review/webhook
 ```
 
 响应:
+
 ```json
 {
   "passed": true,
@@ -242,6 +258,7 @@ https://你的域名/review/webhook
 参考 `scripts/pre-receive-hook.sh` 获取 GitLab pre-receive hook 示例脚本。
 
 ### 系统日志
+
 - `GET /api/system-logs` - 日志列表
 - `GET /api/system-logs/modules` - 获取模块列表
 - `GET /api/system-logs/retention` - 获取日志保留天数
@@ -249,6 +266,7 @@ https://你的域名/review/webhook
 - `POST /api/system-logs/cleanup` - 手动清理过期日志
 
 ### 健康检查
+
 - `GET /health` - 服务健康检查
 
 ## 项目结构
@@ -284,6 +302,7 @@ codesentry/
 ## 技术栈
 
 ### 后端
+
 - Go 1.24
 - Gin v1.11 (HTTP 框架)
 - GORM v1.31 (ORM)
@@ -291,6 +310,7 @@ codesentry/
 - LDAP 支持
 
 ### 前端
+
 - React 19
 - TypeScript 5.9
 - Ant Design 5

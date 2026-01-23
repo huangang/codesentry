@@ -231,6 +231,76 @@ func (s *ProjectService) GetByURL(url string) (*models.Project, error) {
 	return &project, nil
 }
 
+type CreateProjectParams struct {
+	Name           string
+	URL            string
+	Platform       string
+	AccessToken    string
+	WebhookSecret  string
+	AIEnabled      bool
+	FileExtensions string
+	ReviewEvents   string
+	IgnorePatterns string
+}
+
+func (s *ProjectService) CreateFromCredential(params *CreateProjectParams) (*models.Project, error) {
+	if params.FileExtensions == "" {
+		params.FileExtensions = ".go,.js,.ts,.jsx,.tsx,.py,.java,.c,.cpp,.h,.hpp,.cs,.rb,.php,.swift,.kt,.rs,.vue,.svelte"
+	}
+	if params.ReviewEvents == "" {
+		params.ReviewEvents = "push,merge_request"
+	}
+
+	project := models.Project{
+		Name:           params.Name,
+		URL:            strings.TrimSuffix(params.URL, ".git"),
+		Platform:       params.Platform,
+		AccessToken:    params.AccessToken,
+		WebhookSecret:  params.WebhookSecret,
+		FileExtensions: params.FileExtensions,
+		ReviewEvents:   params.ReviewEvents,
+		IgnorePatterns: params.IgnorePatterns,
+		AIEnabled:      params.AIEnabled,
+		CreatedBy:      0,
+	}
+
+	if err := s.db.Create(&project).Error; err != nil {
+		return nil, err
+	}
+
+	return &project, nil
+}
+
+func (s *ProjectService) FillFromCredential(project *models.Project, credential *models.GitCredential) error {
+	updates := make(map[string]interface{})
+
+	if project.AccessToken == "" && credential.AccessToken != "" {
+		updates["access_token"] = credential.AccessToken
+		project.AccessToken = credential.AccessToken
+	}
+	if project.WebhookSecret == "" && credential.WebhookSecret != "" {
+		updates["webhook_secret"] = credential.WebhookSecret
+		project.WebhookSecret = credential.WebhookSecret
+	}
+	if project.FileExtensions == "" && credential.FileExtensions != "" {
+		updates["file_extensions"] = credential.FileExtensions
+		project.FileExtensions = credential.FileExtensions
+	}
+	if project.ReviewEvents == "" && credential.ReviewEvents != "" {
+		updates["review_events"] = credential.ReviewEvents
+		project.ReviewEvents = credential.ReviewEvents
+	}
+	if project.IgnorePatterns == "" && credential.IgnorePatterns != "" {
+		updates["ignore_patterns"] = credential.IgnorePatterns
+		project.IgnorePatterns = credential.IgnorePatterns
+	}
+
+	if len(updates) > 0 {
+		return s.db.Model(project).Updates(updates).Error
+	}
+	return nil
+}
+
 // GetDefaultPrompt returns the default AI review prompt
 func (s *ProjectService) GetDefaultPrompt() string {
 	return s.GetDefaultPromptByLang("zh")

@@ -113,6 +113,24 @@ export interface SystemLog {
   created_at: string;
 }
 
+export interface GitCredential {
+  id: number;
+  name: string;
+  platform: 'github' | 'gitlab';
+  base_url: string;
+  access_token_mask: string;
+  webhook_secret_set: boolean;
+  auto_create: boolean;
+  default_enabled: boolean;
+  file_extensions: string;
+  review_events: string;
+  ignore_patterns: string;
+  is_active: boolean;
+  created_by: number;
+  created_at: string;
+  updated_at: string;
+}
+
 // API Response Types
 export interface PaginatedResponse<T> {
   total: number;

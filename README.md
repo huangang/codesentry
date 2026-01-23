@@ -1,5 +1,9 @@
 # CodeSentry
 
+<div align="center">
+  <img src="frontend/public/codesentry-icon.png" alt="CodeSentry Logo" width="120" height="120">
+</div>
+
 AI-powered Code Review Platform for GitHub and GitLab.
 
 [中文文档](./README_zh.md)
@@ -80,6 +84,7 @@ docker run -d -p 8080:8080 -v codesentry-data:/app/data huangangzhang/codesentry
 ```
 
 For local development (build from source):
+
 ```bash
 docker-compose -f docker-compose.dev.yml up --build
 ```
@@ -160,12 +165,14 @@ The system automatically detects the platform via request headers.
 ## API Endpoints
 
 ### Authentication
+
 - `POST /api/auth/login` - Login
 - `GET /api/auth/config` - Get auth config
 - `GET /api/auth/me` - Get current user
 - `POST /api/auth/logout` - Logout
 
 ### Projects
+
 - `GET /api/projects` - List projects
 - `POST /api/projects` - Create project
 - `GET /api/projects/:id` - Get project
@@ -173,14 +180,17 @@ The system automatically detects the platform via request headers.
 - `DELETE /api/projects/:id` - Delete project
 
 ### Review Logs
+
 - `GET /api/review-logs` - List review logs
 - `GET /api/review-logs/:id` - Get review detail
 - `POST /api/review-logs/:id/retry` - Retry failed review
 
 ### Dashboard
+
 - `GET /api/dashboard/stats` - Get statistics
 
 ### LLM Config
+
 - `GET /api/llm-configs` - List LLM configs
 - `GET /api/llm-configs/active` - List active LLM configs (for project selection)
 - `POST /api/llm-configs` - Create LLM config
@@ -188,6 +198,7 @@ The system automatically detects the platform via request headers.
 - `DELETE /api/llm-configs/:id` - Delete LLM config
 
 ### Prompt Templates
+
 - `GET /api/prompts` - List prompt templates
 - `POST /api/prompts` - Create prompt template
 - `PUT /api/prompts/:id` - Update prompt template
@@ -195,12 +206,14 @@ The system automatically detects the platform via request headers.
 - `PUT /api/prompts/:id/default` - Set as default template
 
 ### IM Bots
+
 - `GET /api/im-bots` - List IM bots
 - `POST /api/im-bots` - Create IM bot
 - `PUT /api/im-bots/:id` - Update IM bot
 - `DELETE /api/im-bots/:id` - Delete IM bot
 
 ### Webhooks
+
 - `POST /webhook` - **Unified webhook (auto-detect GitLab/GitHub, recommended)**
 - `POST /review/webhook` - Alias for unified webhook
 - `POST /api/webhook` - Unified webhook under /api prefix
@@ -211,12 +224,14 @@ The system automatically detects the platform via request headers.
 - `POST /api/webhook/github/:project_id` - GitHub webhook (with project ID)
 
 ### Sync Review (for Git Hooks)
+
 - `POST /review/sync` - Synchronous code review for pre-receive hooks
 - `POST /api/review/sync` - Same endpoint under /api prefix
 - `GET /review/score?commit_sha=xxx` - Query review status/score by commit SHA
 - `GET /api/review/score?commit_sha=xxx` - Same endpoint under /api prefix
 
 Request body:
+
 ```json
 {
   "project_url": "https://gitlab.example.com/group/project",
@@ -229,6 +244,7 @@ Request body:
 ```
 
 Response:
+
 ```json
 {
   "passed": true,
@@ -242,6 +258,7 @@ Response:
 See `scripts/pre-receive-hook.sh` for GitLab pre-receive hook example.
 
 ### System Logs
+
 - `GET /api/system-logs` - List system logs
 - `GET /api/system-logs/modules` - Get module list
 - `GET /api/system-logs/retention` - Get log retention days
@@ -249,6 +266,7 @@ See `scripts/pre-receive-hook.sh` for GitLab pre-receive hook example.
 - `POST /api/system-logs/cleanup` - Manually cleanup old logs
 
 ### Health Check
+
 - `GET /health` - Service health check
 
 ## Project Structure
@@ -284,6 +302,7 @@ codesentry/
 ## Tech Stack
 
 ### Backend
+
 - Go 1.24
 - Gin v1.11 (HTTP framework)
 - GORM v1.31 (ORM)
@@ -291,6 +310,7 @@ codesentry/
 - LDAP support
 
 ### Frontend
+
 - React 19
 - TypeScript 5.9
 - Ant Design 5

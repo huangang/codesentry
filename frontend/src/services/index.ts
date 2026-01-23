@@ -9,7 +9,8 @@ import type {
   IMBot,
   PromptTemplate,
   PaginatedResponse,
-  DashboardResponse 
+  DashboardResponse,
+  GitCredential
 } from '../types';
 
 // Auth
@@ -174,4 +175,21 @@ export const systemLogApi = {
   setRetentionDays: (days: number) => api.put<{ retention_days: number }>('/system-logs/retention', { days }),
 
   cleanup: (days?: number) => api.post<{ deleted: number; retention_days: number }>('/system-logs/cleanup', { days }),
+};
+
+export const gitCredentialApi = {
+  list: (params?: { page?: number; page_size?: number; name?: string; platform?: string; is_active?: boolean }) =>
+    api.get<PaginatedResponse<GitCredential>>('/git-credentials', { params }),
+  
+  getById: (id: number) => api.get<GitCredential>(`/git-credentials/${id}`),
+  
+  getActive: () => api.get<GitCredential[]>('/git-credentials/active'),
+  
+  create: (data: Partial<GitCredential> & { access_token?: string; webhook_secret?: string }) =>
+    api.post<GitCredential>('/git-credentials', data),
+  
+  update: (id: number, data: Partial<GitCredential> & { access_token?: string; webhook_secret?: string }) =>
+    api.put<GitCredential>(`/git-credentials/${id}`, data),
+  
+  delete: (id: number) => api.delete(`/git-credentials/${id}`),
 };

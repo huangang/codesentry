@@ -169,6 +169,15 @@ func main() {
 			protected.GET("/system-logs/retention", systemLogHandler.GetRetentionDays)
 			protected.PUT("/system-logs/retention", systemLogHandler.SetRetentionDays)
 			protected.POST("/system-logs/cleanup", systemLogHandler.Cleanup)
+
+			// Git Credentials
+			gitCredentialHandler := handlers.NewGitCredentialHandler(models.GetDB())
+			protected.GET("/git-credentials", gitCredentialHandler.List)
+			protected.GET("/git-credentials/active", gitCredentialHandler.GetActive)
+			protected.GET("/git-credentials/:id", gitCredentialHandler.GetByID)
+			protected.POST("/git-credentials", gitCredentialHandler.Create)
+			protected.PUT("/git-credentials/:id", gitCredentialHandler.Update)
+			protected.DELETE("/git-credentials/:id", gitCredentialHandler.Delete)
 		}
 
 		// Webhook routes (public with signature verification)

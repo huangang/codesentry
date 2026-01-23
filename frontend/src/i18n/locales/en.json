@@ -72,6 +72,7 @@
     "llmModels": "LLM Models",
     "imBots": "IM Bots",
     "prompts": "Prompts",
+    "gitCredentials": "Git Credentials",
     "systemLogs": "System Logs",
     "settings": "Settings"
   },
@@ -288,5 +289,27 @@
     "duplicate": "Duplicate",
     "pleaseInputName": "Please input prompt name",
     "pleaseInputContent": "Please input prompt content"
+  },
+  "gitCredentials": {
+    "title": "Git Credentials",
+    "createCredential": "Create Credential",
+    "editCredential": "Edit Credential",
+    "deleteConfirm": "Are you sure you want to delete this credential?",
+    "name": "Name",
+    "platform": "Platform",
+    "baseUrl": "Base URL",
+    "accessToken": "Access Token",
+    "webhookSecret": "Webhook Secret",
+    "autoCreate": "Auto Create Projects",
+    "defaultEnabled": "Default AI Enabled",
+    "fileExtensions": "File Extensions",
+    "reviewEvents": "Review Events",
+    "ignorePatterns": "Ignore Patterns",
+    "isActive": "Active",
+    "createSuccess": "Credential created successfully",
+    "updateSuccess": "Credential updated successfully",
+    "deleteSuccess": "Credential deleted successfully",
+    "pleaseInputName": "Please input credential name",
+    "pleaseSelectPlatform": "Please select platform"
   }
 }

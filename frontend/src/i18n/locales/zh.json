@@ -72,6 +72,7 @@
     "llmModels": "大模型管理",
     "imBots": "通知机器人",
     "prompts": "提示词管理",
+    "gitCredentials": "Git 凭证",
     "systemLogs": "系统日志",
     "settings": "系统设置"
   },
@@ -288,5 +289,27 @@
     "duplicate": "复制为新模板",
     "pleaseInputName": "请输入提示词名称",
     "pleaseInputContent": "请输入提示词内容"
+  },
+  "gitCredentials": {
+    "title": "Git 凭证管理",
+    "createCredential": "创建凭证",
+    "editCredential": "编辑凭证",
+    "deleteConfirm": "确定要删除此凭证吗？",
+    "name": "名称",
+    "platform": "平台",
+    "baseUrl": "服务器地址",
+    "accessToken": "访问令牌",
+    "webhookSecret": "Webhook 密钥",
+    "autoCreate": "自动创建项目",
+    "defaultEnabled": "默认启用 AI",
+    "fileExtensions": "文件扩展名",
+    "reviewEvents": "审查事件",
+    "ignorePatterns": "忽略路径",
+    "isActive": "启用",
+    "createSuccess": "凭证创建成功",
+    "updateSuccess": "凭证更新成功",
+    "deleteSuccess": "凭证删除成功",
+    "pleaseInputName": "请输入凭证名称",
+    "pleaseSelectPlatform": "请选择平台"
   }
 }
