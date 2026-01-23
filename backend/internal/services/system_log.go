@@ -224,8 +224,11 @@ func (s *SystemLogService) SetRetentionDays(days int) error {
 		Update("value", strconv.Itoa(days)).Error
 }
 
-// StartCleanupScheduler starts a goroutine that periodically cleans up old logs
+var logCleanupStopChan chan struct{}
+
+// StartLogCleanupScheduler starts a goroutine that periodically cleans up old logs
 func StartLogCleanupScheduler(db *gorm.DB) {
+	logCleanupStopChan = make(chan struct{})
 	go func() {
 		service := NewSystemLogService(db)
 
@@ -236,10 +239,23 @@ func StartLogCleanupScheduler(db *gorm.DB) {
 		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
 
-		for range ticker.C {
-			runCleanup(service)
+		for {
+			select {
+			case <-ticker.C:
+				runCleanup(service)
+			case <-logCleanupStopChan:
+				log.Println("[SystemLog] Log cleanup scheduler stopped")
+				return
+			}
 		}
 	}()
+}
+
+// StopLogCleanupScheduler stops the log cleanup scheduler
+func StopLogCleanupScheduler() {
+	if logCleanupStopChan != nil {
+		close(logCleanupStopChan)
+	}
 }
 
 func runCleanup(service *SystemLogService) {

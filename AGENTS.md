@@ -246,6 +246,23 @@ Git 凭证功能支持：
 - 同一天的日报任务只会被一个 Pod 执行
 - 锁有效期 10 分钟，超时自动释放
 
+### 优雅关闭 (Graceful Shutdown)
+服务器支持优雅关闭，确保在收到终止信号时正确清理资源。
+
+**触发信号**: SIGINT (Ctrl+C), SIGTERM (Docker/K8s)
+
+**关闭流程**:
+1. 停止所有定时器调度器（DailyReport、LogCleanup、Retry）
+2. 等待进行中的 HTTP 请求完成（超时 30 秒）
+3. 关闭数据库连接
+4. 输出日志确认退出
+
+**涉及文件**:
+- `/backend/cmd/server/main.go` - 信号监听和关闭协调
+- `/backend/internal/services/daily_report.go` - `StopScheduler()`
+- `/backend/internal/services/system_log.go` - `StopLogCleanupScheduler()`
+- `/backend/internal/services/retry.go` - `StopRetryScheduler()`
+
 ## 待完成功能
 
 （暂无）

@@ -30,17 +30,33 @@ func NewRetryService(db *gorm.DB, aiCfg *config.OpenAIConfig) *RetryService {
 	}
 }
 
+var retryStopChan chan struct{}
+
 func StartRetryScheduler(db *gorm.DB, aiCfg *config.OpenAIConfig) {
 	service := NewRetryService(db, aiCfg)
 	ticker := time.NewTicker(RetryInterval)
+	retryStopChan = make(chan struct{})
 
 	go func() {
-		for range ticker.C {
-			service.ProcessFailedReviews()
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				service.ProcessFailedReviews()
+			case <-retryStopChan:
+				log.Println("[Retry] Scheduler stopped")
+				return
+			}
 		}
 	}()
 
 	log.Printf("[Retry] Scheduler started, interval: %v, max retries: %d", RetryInterval, MaxRetryCount)
+}
+
+func StopRetryScheduler() {
+	if retryStopChan != nil {
+		close(retryStopChan)
+	}
 }
 
 func (s *RetryService) ProcessFailedReviews() {
