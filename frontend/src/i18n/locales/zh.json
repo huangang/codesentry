@@ -85,7 +85,8 @@
     "gitCredentials": "Git 凭证",
     "users": "用户管理",
     "systemLogs": "系统日志",
-    "settings": "系统设置"
+    "settings": "系统设置",
+    "dailyReports": "日报"
   },
   "dashboard": {
     "title": "仪表盘",
@@ -251,7 +252,9 @@
     "discord": "Discord",
     "teams": "Microsoft Teams",
     "telegram": "Telegram",
-    "custom": "自定义 Webhook"
+    "custom": "自定义 Webhook",
+    "dailyReportEnabled": "日报通知",
+    "dailyReportHelp": "接收每日审查汇总报告"
   },
   "memberAnalysis": {
     "title": "成员分析",
@@ -339,6 +342,20 @@
   },
   "settings": {
     "title": "系统设置",
+    "dailyReport": {
+      "title": "日报设置",
+      "enabled": "启用日报",
+      "time": "发送时间",
+      "lowScore": "低分阈值",
+      "lowScoreHint": "低于此分数的审查将被特别标注",
+      "saveSuccess": "日报设置保存成功",
+      "llmModel": "AI 模型",
+      "llmModelHint": "选择用于 AI 分析的模型，留空则使用系统默认",
+      "selectLLM": "选择 AI 模型",
+      "imBots": "通知机器人",
+      "imBotsHint": "仅显示已启用日报通知的机器人",
+      "selectIMBots": "选择通知机器人"
+    },
     "ldap": {
       "title": "LDAP 配置",
       "enabled": "启用 LDAP",
@@ -376,5 +393,35 @@
     "updateSuccess": "用户更新成功",
     "deleteSuccess": "用户删除成功",
     "deleteConfirm": "确定要删除此用户吗？"
+  },
+  "dailyReports": {
+    "title": "日报",
+    "reportDate": "报告日期",
+    "totalCommits": "审查数",
+    "totalAuthors": "贡献者",
+    "totalProjects": "项目数",
+    "averageScore": "平均分",
+    "passRate": "通过率",
+    "passed": "通过",
+    "failed": "未通过",
+    "pending": "待发送",
+    "sent": "已发送",
+    "generate": "生成日报",
+    "generateSuccess": "日报生成成功",
+    "resend": "重新发送",
+    "resendSuccess": "发送成功",
+    "resendConfirm": "确定重新发送通知?",
+    "reportDetail": "日报详情",
+    "topProjects": "Top 项目",
+    "topAuthors": "Top 作者",
+    "aiAnalysis": "AI 分析",
+    "notifyStatus": "通知状态",
+    "notifyError": "通知错误",
+    "additions": "新增行",
+    "deletions": "删除行",
+    "projectName": "项目名",
+    "authorName": "作者",
+    "commitCount": "提交数",
+    "avgScore": "均分"
   }
 }

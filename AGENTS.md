@@ -62,6 +62,29 @@ c.JSON(http.StatusBadRequest, gin.H{"error": "message"})
 log.Printf("[ModuleName] message: %v", value)
 ```
 
+### 数据库列名规范
+
+**⚠️ 重要**: 查询 `system_configs` 表时，必须使用反引号包裹保留字列名：
+
+```go
+// ✅ 正确: 使用反引号
+db.Where("`key` = ?", key)
+db.Where("`group` = ?", group)
+
+// ❌ 错误: 不使用反引号或使用错误的列名
+db.Where("key = ?", key)        // MySQL 中 key 是保留字，可能报错
+db.Where("config_key = ?", key) // 列名不存在
+```
+
+**system_configs 表结构**:
+| 列名 | 类型 | 说明 |
+|------|------|------|
+| `key` | varchar(100) | 配置键（MySQL 保留字，查询需加反引号） |
+| `value` | text | 配置值 |
+| `type` | varchar(20) | 值类型: string/int/bool/json |
+| `group` | varchar(50) | 分组（MySQL 保留字，查询需加反引号） |
+| `label` | varchar(200) | 显示标签 |
+
 ### React 前端
 
 ```tsx
@@ -179,11 +202,44 @@ Git 凭证功能支持：
 - Users
 - System Logs
 - Settings
+- Daily Reports
 
 **Admin-only 操作**:
 - 项目的创建、编辑、删除
 - 审查记录的删除和重试
 - 用户的编辑和删除
+- 日报的生成和发送
+
+### 日报功能
+系统支持自动生成每日代码审查报告，并通过 IM 机器人发送。
+
+**功能特性**:
+- 自动统计当日审查数据（提交数、通过率、平均分等）
+- AI 分析生成摘要和建议
+- 定时自动发送或手动触发
+- 同一天多次生成会覆盖更新
+
+**配置项**（系统设置页面）:
+| 配置 | 说明 | 默认值 |
+|------|------|--------|
+| 启用日报 | 是否启用定时日报 | false |
+| 发送时间 | 每日发送时间 | 18:00 |
+| 低分阈值 | 低于此分数的提交会被标注 | 60 |
+| AI 模型 | 用于生成分析的 LLM | 系统默认 |
+| 通知机器人 | 接收日报的 IM 机器人（多选） | 启用日报的机器人 |
+
+**API**:
+- `GET /api/daily-reports` - 日报列表
+- `GET /api/daily-reports/:id` - 日报详情
+- `POST /api/daily-reports/generate` - 手动生成（不发送通知）
+- `POST /api/daily-reports/:id/resend` - 发送通知
+
+**行为说明**:
+| 操作 | 生成数据 | 保存数据库 | 发送通知 |
+|------|---------|-----------|---------|
+| 手动生成 | ✅ | ✅ | ❌ |
+| 手动发送 | ❌ | ✅ (更新 notified_at) | ✅ |
+| 定时器 | ✅ | ✅ | ✅ |
 
 ## 待完成功能
 

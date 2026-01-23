@@ -85,7 +85,8 @@
     "gitCredentials": "Git Credentials",
     "users": "Users",
     "systemLogs": "System Logs",
-    "settings": "Settings"
+    "settings": "Settings",
+    "dailyReports": "Daily Reports"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -251,7 +252,9 @@
     "discord": "Discord",
     "teams": "Microsoft Teams",
     "telegram": "Telegram",
-    "custom": "Custom Webhook"
+    "custom": "Custom Webhook",
+    "dailyReportEnabled": "Daily Report",
+    "dailyReportHelp": "Receive daily review summary reports"
   },
   "memberAnalysis": {
     "title": "Member Analysis",
@@ -339,6 +342,20 @@
   },
   "settings": {
     "title": "Settings",
+    "dailyReport": {
+      "title": "Daily Report Settings",
+      "enabled": "Enable Daily Report",
+      "time": "Send Time",
+      "lowScore": "Low Score Threshold",
+      "lowScoreHint": "Reviews below this score will be highlighted",
+      "saveSuccess": "Daily report settings saved successfully",
+      "llmModel": "AI Model",
+      "llmModelHint": "Select a model for AI analysis, or use system default",
+      "selectLLM": "Select AI Model",
+      "imBots": "Notification Bots",
+      "imBotsHint": "Only bots with daily report enabled are shown",
+      "selectIMBots": "Select Notification Bots"
+    },
     "ldap": {
       "title": "LDAP Configuration",
       "enabled": "Enable LDAP",
@@ -376,5 +393,35 @@
     "updateSuccess": "User updated successfully",
     "deleteSuccess": "User deleted successfully",
     "deleteConfirm": "Are you sure you want to delete this user?"
+  },
+  "dailyReports": {
+    "title": "Daily Reports",
+    "reportDate": "Report Date",
+    "totalCommits": "Reviews",
+    "totalAuthors": "Contributors",
+    "totalProjects": "Projects",
+    "averageScore": "Avg Score",
+    "passRate": "Pass Rate",
+    "passed": "Passed",
+    "failed": "Failed",
+    "pending": "Pending",
+    "sent": "Sent",
+    "generate": "Generate",
+    "generateSuccess": "Report generated successfully",
+    "resend": "Resend",
+    "resendSuccess": "Notification sent successfully",
+    "resendConfirm": "Resend notification?",
+    "reportDetail": "Report Detail",
+    "topProjects": "Top Projects",
+    "topAuthors": "Top Authors",
+    "aiAnalysis": "AI Analysis",
+    "notifyStatus": "Notify Status",
+    "notifyError": "Notify Error",
+    "additions": "Additions",
+    "deletions": "Deletions",
+    "projectName": "Project",
+    "authorName": "Author",
+    "commitCount": "Commits",
+    "avgScore": "Avg Score"
   }
 }

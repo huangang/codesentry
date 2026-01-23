@@ -31,23 +31,25 @@ type IMBotListResponse struct {
 }
 
 type CreateIMBotRequest struct {
-	Name        string `json:"name" binding:"required"`
-	Type        string `json:"type" binding:"required,oneof=wechat_work dingtalk feishu slack discord teams telegram"`
-	Webhook     string `json:"webhook" binding:"required"`
-	Secret      string `json:"secret"`
-	Extra       string `json:"extra"`
-	IsActive    bool   `json:"is_active"`
-	ErrorNotify bool   `json:"error_notify"`
+	Name               string `json:"name" binding:"required"`
+	Type               string `json:"type" binding:"required,oneof=wechat_work dingtalk feishu slack discord teams telegram"`
+	Webhook            string `json:"webhook" binding:"required"`
+	Secret             string `json:"secret"`
+	Extra              string `json:"extra"`
+	IsActive           bool   `json:"is_active"`
+	ErrorNotify        bool   `json:"error_notify"`
+	DailyReportEnabled bool   `json:"daily_report_enabled"`
 }
 
 type UpdateIMBotRequest struct {
-	Name        string `json:"name"`
-	Type        string `json:"type" binding:"omitempty,oneof=wechat_work dingtalk feishu slack discord teams telegram"`
-	Webhook     string `json:"webhook"`
-	Secret      string `json:"secret"`
-	Extra       string `json:"extra"`
-	IsActive    *bool  `json:"is_active"`
-	ErrorNotify *bool  `json:"error_notify"`
+	Name               string `json:"name"`
+	Type               string `json:"type" binding:"omitempty,oneof=wechat_work dingtalk feishu slack discord teams telegram"`
+	Webhook            string `json:"webhook"`
+	Secret             string `json:"secret"`
+	Extra              string `json:"extra"`
+	IsActive           *bool  `json:"is_active"`
+	ErrorNotify        *bool  `json:"error_notify"`
+	DailyReportEnabled *bool  `json:"daily_report_enabled"`
 }
 
 // List returns paginated IM bots
@@ -101,13 +103,14 @@ func (s *IMBotService) GetByID(id uint) (*models.IMBot, error) {
 // Create creates a new IM bot
 func (s *IMBotService) Create(req *CreateIMBotRequest) (*models.IMBot, error) {
 	bot := models.IMBot{
-		Name:        req.Name,
-		Type:        req.Type,
-		Webhook:     req.Webhook,
-		Secret:      req.Secret,
-		Extra:       req.Extra,
-		IsActive:    req.IsActive,
-		ErrorNotify: req.ErrorNotify,
+		Name:               req.Name,
+		Type:               req.Type,
+		Webhook:            req.Webhook,
+		Secret:             req.Secret,
+		Extra:              req.Extra,
+		IsActive:           req.IsActive,
+		ErrorNotify:        req.ErrorNotify,
+		DailyReportEnabled: req.DailyReportEnabled,
 	}
 
 	if err := s.db.Create(&bot).Error; err != nil {
@@ -146,6 +149,9 @@ func (s *IMBotService) Update(id uint, req *UpdateIMBotRequest) (*models.IMBot, 
 	}
 	if req.ErrorNotify != nil {
 		updates["error_notify"] = *req.ErrorNotify
+	}
+	if req.DailyReportEnabled != nil {
+		updates["daily_report_enabled"] = *req.DailyReportEnabled
 	}
 
 	if err := s.db.Model(&bot).Updates(updates).Error; err != nil {

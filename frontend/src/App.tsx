@@ -19,6 +19,7 @@ const SystemLogs = React.lazy(() => import('./pages/SystemLogs'));
 const GitCredentials = React.lazy(() => import('./pages/GitCredentials'));
 const Settings = React.lazy(() => import('./pages/Settings'));
 const Users = React.lazy(() => import('./pages/Users'));
+const DailyReports = React.lazy(() => import('./pages/DailyReports'));
 
 const PageLoader: React.FC = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', minHeight: 300 }}>
@@ -67,6 +68,7 @@ const App: React.FC = () => {
             <Route path="git-credentials" element={<Suspense fallback={<PageLoader />}><GitCredentials /></Suspense>} />
             <Route path="settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
             <Route path="users" element={<Suspense fallback={<PageLoader />}><Users /></Suspense>} />
+            <Route path="daily-reports" element={<Suspense fallback={<PageLoader />}><DailyReports /></Suspense>} />
           </Route>
           <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />

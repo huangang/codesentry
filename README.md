@@ -28,6 +28,7 @@ AI-powered Code Review Platform for GitHub and GitLab.
 - **LLM Configuration**: Configure multiple AI models with custom endpoints
 - **Prompt Templates**: System and custom prompt templates with copy functionality
 - **IM Notifications**: Send review results to DingTalk, Feishu, WeCom, Slack, Discord, Microsoft Teams, Telegram
+- **Daily Reports**: Automated daily code review summary with AI analysis, sent via IM bots
 - **Error Notifications**: Real-time error alerts via IM bots
 - **Git Credentials**: Auto-create projects from webhooks with credential management
 - **System Logging**: Comprehensive logging for webhook events, errors, and system operations
@@ -242,6 +243,13 @@ The system automatically detects the platform via request headers.
 - `POST /api/im-bots` - Create IM bot
 - `PUT /api/im-bots/:id` - Update IM bot
 - `DELETE /api/im-bots/:id` - Delete IM bot
+
+### Daily Reports
+
+- `GET /api/daily-reports` - List daily reports
+- `GET /api/daily-reports/:id` - Get daily report detail
+- `POST /api/daily-reports/generate` - Generate daily report (manual, no notification)
+- `POST /api/daily-reports/:id/resend` - Send/resend notification
 
 ### Webhooks
 

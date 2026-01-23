@@ -126,17 +126,47 @@ type SystemConfig struct {
 
 // IMBot represents an IM notification bot
 type IMBot struct {
-	ID          uint           `gorm:"primaryKey" json:"id"`
-	Name        string         `gorm:"size:100;not null" json:"name"`
-	Type        string         `gorm:"size:50;not null" json:"type"` // wechat_work, dingtalk, feishu, slack, discord, teams, telegram
-	Webhook     string         `gorm:"size:500;not null" json:"webhook"`
-	Secret      string         `gorm:"size:255" json:"-"`
-	Extra       string         `gorm:"size:500" json:"extra"` // Extra config (e.g., Telegram chat_id)
-	IsActive    bool           `gorm:"default:true" json:"is_active"`
-	ErrorNotify bool           `gorm:"default:false" json:"error_notify"` // Whether to receive error notifications
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
-	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                 uint           `gorm:"primaryKey" json:"id"`
+	Name               string         `gorm:"size:100;not null" json:"name"`
+	Type               string         `gorm:"size:50;not null" json:"type"` // wechat_work, dingtalk, feishu, slack, discord, teams, telegram
+	Webhook            string         `gorm:"size:500;not null" json:"webhook"`
+	Secret             string         `gorm:"size:255" json:"-"`
+	Extra              string         `gorm:"size:500" json:"extra"` // Extra config (e.g., Telegram chat_id)
+	IsActive           bool           `gorm:"default:true" json:"is_active"`
+	ErrorNotify        bool           `gorm:"default:false" json:"error_notify"`         // Whether to receive error notifications
+	DailyReportEnabled bool           `gorm:"default:false" json:"daily_report_enabled"` // Whether to receive daily reports
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
+	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// DailyReport represents a daily code review report
+type DailyReport struct {
+	ID         uint      `gorm:"primaryKey" json:"id"`
+	ReportDate time.Time `gorm:"uniqueIndex;not null" json:"report_date"`
+	ReportType string    `gorm:"size:20;default:daily" json:"report_type"` // daily, weekly
+
+	TotalProjects  int     `json:"total_projects"`
+	TotalCommits   int     `json:"total_commits"`
+	TotalAuthors   int     `json:"total_authors"`
+	TotalAdditions int     `json:"total_additions"`
+	TotalDeletions int     `json:"total_deletions"`
+	AverageScore   float64 `json:"average_score"`
+	PassedCount    int     `json:"passed_count"`
+	FailedCount    int     `json:"failed_count"`
+	PendingCount   int     `json:"pending_count"`
+
+	TopProjects     string `gorm:"type:text" json:"top_projects"`
+	TopAuthors      string `gorm:"type:text" json:"top_authors"`
+	LowScoreReviews string `gorm:"type:text" json:"low_score_reviews"`
+
+	AIAnalysis  string `gorm:"type:text" json:"ai_analysis"`
+	AIModelUsed string `gorm:"size:100" json:"ai_model_used"`
+
+	NotifiedAt  *time.Time `json:"notified_at"`
+	NotifyError string     `gorm:"type:text" json:"notify_error"`
+
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // SystemLog represents a system operation log
@@ -183,6 +213,7 @@ func (SystemConfig) TableName() string   { return "system_configs" }
 func (IMBot) TableName() string          { return "im_bots" }
 func (SystemLog) TableName() string      { return "system_logs" }
 func (GitCredential) TableName() string  { return "git_credentials" }
+func (DailyReport) TableName() string    { return "daily_reports" }
 
 // MaskAPIKey returns masked API key for display
 func (l *LLMConfig) MaskAPIKey() string {

@@ -15,6 +15,7 @@ import {
   BookOutlined,
   KeyOutlined,
   LockOutlined,
+  ScheduleOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -43,6 +44,7 @@ const MainLayout: React.FC = () => {
     { key: '/admin/llm-models', icon: <RobotOutlined />, label: t('menu.llmModels') },
     { key: '/admin/prompts', icon: <BookOutlined />, label: t('menu.prompts') },
     { key: '/admin/im-bots', icon: <NotificationOutlined />, label: t('menu.imBots') },
+    { key: '/admin/daily-reports', icon: <ScheduleOutlined />, label: t('menu.dailyReports') },
     { key: '/admin/git-credentials', icon: <KeyOutlined />, label: t('menu.gitCredentials') },
     { key: '/admin/users', icon: <UserOutlined />, label: t('menu.users') },
     { key: '/admin/sys-logs', icon: <FileTextOutlined />, label: t('menu.systemLogs') },

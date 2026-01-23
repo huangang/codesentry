@@ -9,6 +9,7 @@ export const ADMIN_ONLY_ROUTES = [
   '/admin/llm-models',
   '/admin/prompts',
   '/admin/im-bots',
+  '/admin/daily-reports',
   '/admin/git-credentials',
   '/admin/users',
   '/admin/sys-logs',

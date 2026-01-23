@@ -1045,7 +1045,7 @@ func (s *WebhookService) getEffectiveMinScore(project *models.Project) float64 {
 
 	// 2. Check System level
 	var sysConfig models.SystemConfig
-	if err := s.db.Where("config_key = ?", "system.min_score").First(&sysConfig).Error; err == nil {
+	if err := s.db.Where("`key` = ?", "system.min_score").First(&sysConfig).Error; err == nil {
 		// Parse value
 		var score float64
 		// Assuming value is simple string like "60"

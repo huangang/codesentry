@@ -143,6 +143,7 @@ const IMBots: React.FC = () => {
       type: IM_BOT_TYPES.WECHAT_WORK,
       is_active: true,
       error_notify: false,
+      daily_report_enabled: false,
     });
   };
 
@@ -215,6 +216,16 @@ const IMBots: React.FC = () => {
       render: (_, record) => (
         <Tag color={record.error_notify ? 'warning' : 'default'}>
           {record.error_notify ? t('common.enabled') : t('common.disabled')}
+        </Tag>
+      ),
+    },
+    {
+      title: t('imBots.dailyReportEnabled'),
+      key: 'daily_report_enabled',
+      width: 100,
+      render: (_, record) => (
+        <Tag color={record.daily_report_enabled ? 'processing' : 'default'}>
+          {record.daily_report_enabled ? t('common.enabled') : t('common.disabled')}
         </Tag>
       ),
     },
@@ -355,6 +366,9 @@ const IMBots: React.FC = () => {
             <Switch />
           </Form.Item>
           <Form.Item name="error_notify" label={t('imBots.errorNotify')} valuePropName="checked" extra={t('imBots.errorNotifyHelp')}>
+            <Switch />
+          </Form.Item>
+          <Form.Item name="daily_report_enabled" label={t('imBots.dailyReportEnabled')} valuePropName="checked" extra={t('imBots.dailyReportHelp')}>
             <Switch />
           </Form.Item>
         </Form>

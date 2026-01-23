@@ -10,36 +10,69 @@ import {
   Spin,
   Row,
   Col,
+  TimePicker,
+  Space,
+  Select,
 } from 'antd';
 import { SaveOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
-import { systemConfigApi } from '../services';
-import type { LDAPConfig } from '../types';
+import dayjs from 'dayjs';
+import { systemConfigApi, llmConfigApi, imBotApi, type DailyReportConfig } from '../services';
+import type { LDAPConfig, LLMConfig, IMBot } from '../types';
 
 const Settings: React.FC = () => {
   const { t } = useTranslation();
-  const [form] = Form.useForm();
+  const [ldapForm] = Form.useForm();
+  const [dailyReportForm] = Form.useForm();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [ldapSaving, setLdapSaving] = useState(false);
+  const [dailyReportSaving, setDailyReportSaving] = useState(false);
   const [ldapEnabled, setLdapEnabled] = useState(false);
+  const [dailyReportEnabled, setDailyReportEnabled] = useState(false);
+  const [llmConfigs, setLlmConfigs] = useState<LLMConfig[]>([]);
+  const [imBots, setImBots] = useState<IMBot[]>([]);
 
   const fetchConfig = async () => {
     try {
       setLoading(true);
-      const res = await systemConfigApi.getLDAPConfig();
-      const config = res.data;
-      form.setFieldsValue({
-        ...config,
-        port: config.port || 389,
-        user_filter: config.user_filter || '(uid=%s)',
+      const [ldapRes, dailyReportRes, llmRes, imBotRes] = await Promise.all([
+        systemConfigApi.getLDAPConfig(),
+        systemConfigApi.getDailyReportConfig(),
+        llmConfigApi.getActive(),
+        imBotApi.getActive(),
+      ]);
+
+      const ldapConfig = ldapRes.data;
+      ldapForm.setFieldsValue({
+        ...ldapConfig,
+        port: ldapConfig.port || 389,
+        user_filter: ldapConfig.user_filter || '(uid=%s)',
         bind_password: '',
       });
-      setLdapEnabled(config.enabled);
-    } catch (error) {
-      form.setFieldsValue({
+      setLdapEnabled(ldapConfig.enabled);
+
+      const dailyReportConfig = dailyReportRes.data;
+      dailyReportForm.setFieldsValue({
+        enabled: dailyReportConfig.enabled,
+        time: dailyReportConfig.time ? dayjs(dailyReportConfig.time, 'HH:mm') : dayjs('18:00', 'HH:mm'),
+        low_score: dailyReportConfig.low_score || 60,
+        llm_config_id: dailyReportConfig.llm_config_id || undefined,
+        im_bot_ids: dailyReportConfig.im_bot_ids || [],
+      });
+      setDailyReportEnabled(dailyReportConfig.enabled);
+
+      setLlmConfigs(llmRes.data || []);
+      setImBots(imBotRes.data || []);
+    } catch {
+      ldapForm.setFieldsValue({
         enabled: false,
         port: 389,
         user_filter: '(uid=%s)',
+      });
+      dailyReportForm.setFieldsValue({
+        enabled: false,
+        time: dayjs('18:00', 'HH:mm'),
+        low_score: 60,
       });
       message.error(t('common.error'));
     } finally {
@@ -51,16 +84,16 @@ const Settings: React.FC = () => {
     fetchConfig();
   }, []);
 
-  const handleSave = async () => {
+  const handleLdapSave = async () => {
     try {
-      const values = await form.validateFields();
-      setSaving(true);
-      
+      const values = await ldapForm.validateFields();
+      setLdapSaving(true);
+
       const payload: Partial<LDAPConfig> = { ...values };
       if (!values.bind_password) {
         delete payload.bind_password;
       }
-      
+
       await systemConfigApi.updateLDAPConfig(payload);
       message.success(t('settings.ldap.saveSuccess'));
       setLdapEnabled(values.enabled);
@@ -68,12 +101,40 @@ const Settings: React.FC = () => {
       const err = error as { response?: { data?: { error?: string } } };
       message.error(err.response?.data?.error || t('settings.ldap.saveFailed'));
     } finally {
-      setSaving(false);
+      setLdapSaving(false);
     }
   };
 
-  const handleEnabledChange = (checked: boolean) => {
+  const handleDailyReportSave = async () => {
+    try {
+      const values = await dailyReportForm.validateFields();
+      setDailyReportSaving(true);
+
+      const payload: Partial<DailyReportConfig> = {
+        enabled: values.enabled,
+        time: values.time ? values.time.format('HH:mm') : '18:00',
+        low_score: values.low_score,
+        llm_config_id: values.llm_config_id || 0,
+        im_bot_ids: values.im_bot_ids || [],
+      };
+
+      await systemConfigApi.updateDailyReportConfig(payload);
+      message.success(t('settings.dailyReport.saveSuccess'));
+      setDailyReportEnabled(values.enabled);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: string } } };
+      message.error(err.response?.data?.error || t('common.error'));
+    } finally {
+      setDailyReportSaving(false);
+    }
+  };
+
+  const handleLdapEnabledChange = (checked: boolean) => {
     setLdapEnabled(checked);
+  };
+
+  const handleDailyReportEnabledChange = (checked: boolean) => {
+    setDailyReportEnabled(checked);
   };
 
   if (loading) {
@@ -85,77 +146,149 @@ const Settings: React.FC = () => {
   }
 
   return (
-    <Card
-      title={t('settings.ldap.title')}
-      extra={
-        <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave}>
-          {t('common.save')}
-        </Button>
-      }
-    >
-      <Form form={form} layout="vertical" style={{ maxWidth: 600 }}>
-        <Form.Item name="enabled" label={t('settings.ldap.enabled')} valuePropName="checked">
-          <Switch onChange={handleEnabledChange} />
-        </Form.Item>
+    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      <Card
+        title={t('settings.dailyReport.title')}
+        extra={
+          <Button type="primary" icon={<SaveOutlined />} loading={dailyReportSaving} onClick={handleDailyReportSave}>
+            {t('common.save')}
+          </Button>
+        }
+      >
+        <Form form={dailyReportForm} layout="vertical" style={{ maxWidth: 600 }}>
+          <Form.Item name="enabled" label={t('settings.dailyReport.enabled')} valuePropName="checked">
+            <Switch onChange={handleDailyReportEnabledChange} />
+          </Form.Item>
 
-        <Row gutter={16}>
-          <Col span={16}>
-            <Form.Item
-              name="host"
-              label={t('settings.ldap.host')}
-              rules={[{ required: ldapEnabled, message: t('settings.ldap.pleaseInputHost') }]}
-            >
-              <Input placeholder="ldap.example.com" disabled={!ldapEnabled} />
-            </Form.Item>
-          </Col>
-          <Col span={8}>
-            <Form.Item
-              name="port"
-              label={t('settings.ldap.port')}
-              rules={[{ required: ldapEnabled, message: t('settings.ldap.pleaseInputPort') }]}
-            >
-              <InputNumber min={1} max={65535} style={{ width: '100%' }} disabled={!ldapEnabled} />
-            </Form.Item>
-          </Col>
-        </Row>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="time"
+                label={t('settings.dailyReport.time')}
+              >
+                <TimePicker format="HH:mm" style={{ width: '100%' }} disabled={!dailyReportEnabled} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="low_score"
+                label={t('settings.dailyReport.lowScore')}
+                extra={t('settings.dailyReport.lowScoreHint')}
+              >
+                <InputNumber min={0} max={100} style={{ width: '100%' }} disabled={!dailyReportEnabled} />
+              </Form.Item>
+            </Col>
+          </Row>
 
-        <Form.Item
-          name="base_dn"
-          label={t('settings.ldap.baseDn')}
-          rules={[{ required: ldapEnabled, message: t('settings.ldap.pleaseInputBaseDn') }]}
-        >
-          <Input placeholder="dc=example,dc=com" disabled={!ldapEnabled} />
-        </Form.Item>
+          <Form.Item
+            name="llm_config_id"
+            label={t('settings.dailyReport.llmModel')}
+            extra={t('settings.dailyReport.llmModelHint')}
+          >
+            <Select
+              allowClear
+              placeholder={t('settings.dailyReport.selectLLM')}
+              disabled={!dailyReportEnabled}
+              options={llmConfigs.map((c) => ({
+                value: c.id,
+                label: `${c.name} (${c.model})`,
+              }))}
+            />
+          </Form.Item>
 
-        <Form.Item
-          name="bind_dn"
-          label={t('settings.ldap.bindDn')}
-          rules={[{ required: ldapEnabled, message: t('settings.ldap.pleaseInputBindDn') }]}
-        >
-          <Input placeholder="cn=admin,dc=example,dc=com" disabled={!ldapEnabled} />
-        </Form.Item>
+          <Form.Item
+            name="im_bot_ids"
+            label={t('settings.dailyReport.imBots')}
+            extra={t('settings.dailyReport.imBotsHint')}
+          >
+            <Select
+              mode="multiple"
+              allowClear
+              placeholder={t('settings.dailyReport.selectIMBots')}
+              disabled={!dailyReportEnabled}
+              options={imBots
+                .filter((b) => b.daily_report_enabled)
+                .map((b) => ({
+                  value: b.id,
+                  label: `${b.name} (${b.type})`,
+                }))}
+            />
+          </Form.Item>
+        </Form>
+      </Card>
 
-        <Form.Item
-          name="bind_password"
-          label={t('settings.ldap.bindPassword')}
-          extra={t('settings.ldap.passwordHint')}
-        >
-          <Input.Password placeholder="••••••••" disabled={!ldapEnabled} />
-        </Form.Item>
+      <Card
+        title={t('settings.ldap.title')}
+        extra={
+          <Button type="primary" icon={<SaveOutlined />} loading={ldapSaving} onClick={handleLdapSave}>
+            {t('common.save')}
+          </Button>
+        }
+      >
+        <Form form={ldapForm} layout="vertical" style={{ maxWidth: 600 }}>
+          <Form.Item name="enabled" label={t('settings.ldap.enabled')} valuePropName="checked">
+            <Switch onChange={handleLdapEnabledChange} />
+          </Form.Item>
 
-        <Form.Item
-          name="user_filter"
-          label={t('settings.ldap.userFilter')}
-          rules={[{ required: ldapEnabled, message: t('settings.ldap.pleaseInputUserFilter') }]}
-        >
-          <Input placeholder="(uid=%s)" disabled={!ldapEnabled} />
-        </Form.Item>
+          <Row gutter={16}>
+            <Col span={16}>
+              <Form.Item
+                name="host"
+                label={t('settings.ldap.host')}
+                rules={[{ required: ldapEnabled, message: t('settings.ldap.pleaseInputHost') }]}
+              >
+                <Input placeholder="ldap.example.com" disabled={!ldapEnabled} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="port"
+                label={t('settings.ldap.port')}
+                rules={[{ required: ldapEnabled, message: t('settings.ldap.pleaseInputPort') }]}
+              >
+                <InputNumber min={1} max={65535} style={{ width: '100%' }} disabled={!ldapEnabled} />
+              </Form.Item>
+            </Col>
+          </Row>
 
-        <Form.Item name="use_ssl" label={t('settings.ldap.useSsl')} valuePropName="checked">
-          <Switch disabled={!ldapEnabled} />
-        </Form.Item>
-      </Form>
-    </Card>
+          <Form.Item
+            name="base_dn"
+            label={t('settings.ldap.baseDn')}
+            rules={[{ required: ldapEnabled, message: t('settings.ldap.pleaseInputBaseDn') }]}
+          >
+            <Input placeholder="dc=example,dc=com" disabled={!ldapEnabled} />
+          </Form.Item>
+
+          <Form.Item
+            name="bind_dn"
+            label={t('settings.ldap.bindDn')}
+            rules={[{ required: ldapEnabled, message: t('settings.ldap.pleaseInputBindDn') }]}
+          >
+            <Input placeholder="cn=admin,dc=example,dc=com" disabled={!ldapEnabled} />
+          </Form.Item>
+
+          <Form.Item
+            name="bind_password"
+            label={t('settings.ldap.bindPassword')}
+            extra={t('settings.ldap.passwordHint')}
+          >
+            <Input.Password placeholder="••••••••" disabled={!ldapEnabled} />
+          </Form.Item>
+
+          <Form.Item
+            name="user_filter"
+            label={t('settings.ldap.userFilter')}
+            rules={[{ required: ldapEnabled, message: t('settings.ldap.pleaseInputUserFilter') }]}
+          >
+            <Input placeholder="(uid=%s)" disabled={!ldapEnabled} />
+          </Form.Item>
+
+          <Form.Item name="use_ssl" label={t('settings.ldap.useSsl')} valuePropName="checked">
+            <Switch disabled={!ldapEnabled} />
+          </Form.Item>
+        </Form>
+      </Card>
+    </Space>
   );
 };
 

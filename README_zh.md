@@ -29,6 +29,7 @@
 - **大模型配置**: 配置多个 AI 模型和自定义接口
 - **提示词模板**: 系统和自定义提示词模板，支持复制为新模板
 - **IM 通知**: 发送审查结果到钉钉、飞书、企业微信、Slack、Discord、Microsoft Teams、Telegram
+- **日报功能**: 自动生成每日代码审查报告，AI 分析总结，通过 IM 机器人发送
 - **错误通知**: 通过 IM 机器人实时接收系统错误告警
 - **Git 凭证**: 支持通过 Webhook 自动创建项目，统一管理凭证
 - **系统日志**: 完整记录 Webhook 事件、错误和系统操作
@@ -243,6 +244,13 @@ https://你的域名/review/webhook
 - `POST /api/im-bots` - 创建机器人
 - `PUT /api/im-bots/:id` - 更新机器人
 - `DELETE /api/im-bots/:id` - 删除机器人
+
+### 日报
+
+- `GET /api/daily-reports` - 日报列表
+- `GET /api/daily-reports/:id` - 日报详情
+- `POST /api/daily-reports/generate` - 手动生成日报（不发送通知）
+- `POST /api/daily-reports/:id/resend` - 发送/重发通知
 
 ### Webhooks
 

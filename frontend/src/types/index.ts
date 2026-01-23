@@ -85,6 +85,7 @@ export interface IMBot {
   extra: string;
   is_active: boolean;
   error_notify: boolean;
+  daily_report_enabled: boolean;
   created_at: string;
   updated_at: string;
 }

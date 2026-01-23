@@ -203,7 +203,20 @@ export const systemConfigApi = {
   
   updateLDAPConfig: (data: Partial<LDAPConfig>) =>
     api.put<LDAPConfig>('/system-config/ldap', data),
+
+  getDailyReportConfig: () => api.get<DailyReportConfig>('/system-config/daily-report'),
+
+  updateDailyReportConfig: (data: Partial<DailyReportConfig>) =>
+    api.put<DailyReportConfig>('/system-config/daily-report', data),
 };
+
+export interface DailyReportConfig {
+  enabled: boolean;
+  time: string;
+  low_score: number;
+  llm_config_id: number;
+  im_bot_ids: number[];
+}
 
 export const userApi = {
   list: (params?: { page?: number; page_size?: number; username?: string; role?: string; auth_type?: string }) =>
@@ -217,4 +230,39 @@ export const userApi = {
 
 export const reviewLogApiExtra = {
   delete: (id: number) => api.delete(`/review-logs/${id}`),
+};
+
+// Daily Reports
+export interface DailyReport {
+  id: number;
+  report_date: string;
+  report_type: string;
+  total_projects: number;
+  total_commits: number;
+  total_authors: number;
+  total_additions: number;
+  total_deletions: number;
+  average_score: number;
+  passed_count: number;
+  failed_count: number;
+  pending_count: number;
+  top_projects: string;
+  top_authors: string;
+  low_score_reviews: string;
+  ai_analysis: string;
+  ai_model_used: string;
+  notified_at?: string;
+  notify_error?: string;
+  created_at: string;
+}
+
+export const dailyReportApi = {
+  list: (params?: { page?: number; page_size?: number }) =>
+    api.get<{ total: number; page: number; page_size: number; items: DailyReport[] }>('/daily-reports', { params }),
+
+  getById: (id: number) => api.get<DailyReport>(`/daily-reports/${id}`),
+
+  generate: () => api.post<{ message: string }>('/daily-reports/generate'),
+
+  resend: (id: number) => api.post<{ message: string }>(`/daily-reports/${id}/resend`),
 };

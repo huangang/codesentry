@@ -60,6 +60,12 @@ func main() {
 	// Start retry scheduler for failed reviews
 	services.StartRetryScheduler(models.GetDB(), &cfg.OpenAI)
 
+	// Initialize and start daily report scheduler
+	aiService := services.NewAIService(models.GetDB(), &cfg.OpenAI)
+	notificationService := services.NewNotificationService(models.GetDB())
+	dailyReportService := services.NewDailyReportService(models.GetDB(), aiService, notificationService)
+	dailyReportService.StartScheduler()
+
 	// Create default admin user
 	authHandler := handlers.NewAuthHandler(models.GetDB(), cfg)
 	if err := authHandler.CreateAdminIfNotExists(); err != nil {
@@ -202,6 +208,15 @@ func main() {
 			systemConfigHandler := handlers.NewSystemConfigHandler(models.GetDB())
 			admin.GET("/system-config/ldap", systemConfigHandler.GetLDAPConfig)
 			admin.PUT("/system-config/ldap", systemConfigHandler.UpdateLDAPConfig)
+			admin.GET("/system-config/daily-report", systemConfigHandler.GetDailyReportConfig)
+			admin.PUT("/system-config/daily-report", systemConfigHandler.UpdateDailyReportConfig)
+
+			// Daily Reports
+			dailyReportHandler := handlers.NewDailyReportHandler(dailyReportService)
+			admin.GET("/daily-reports", dailyReportHandler.List)
+			admin.GET("/daily-reports/:id", dailyReportHandler.Get)
+			admin.POST("/daily-reports/generate", dailyReportHandler.Generate)
+			admin.POST("/daily-reports/:id/resend", dailyReportHandler.Resend)
 		}
 
 		// Webhook routes (public with signature verification)

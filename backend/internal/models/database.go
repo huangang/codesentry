@@ -51,6 +51,7 @@ func AutoMigrate() error {
 		&IMBot{},
 		&SystemLog{},
 		&GitCredential{},
+		&DailyReport{},
 	)
 }
 
@@ -164,11 +165,14 @@ Please strictly follow this structure:
 		{Key: "ldap_user_filter", Value: "(uid=%s)", Type: "string", Group: "ldap", Label: "LDAP User Filter"},
 		{Key: "ldap_use_ssl", Value: "false", Type: "bool", Group: "ldap", Label: "Use SSL/TLS"},
 		{Key: "log_retention_days", Value: "30", Type: "int", Group: "system", Label: "System Log Retention Days"},
+		{Key: "daily_report_enabled", Value: "false", Type: "bool", Group: "daily_report", Label: "Enable Daily Report"},
+		{Key: "daily_report_time", Value: "18:00", Type: "string", Group: "daily_report", Label: "Daily Report Time"},
+		{Key: "daily_report_low_score", Value: "60", Type: "int", Group: "daily_report", Label: "Low Score Threshold"},
 	}
 
 	for _, cfg := range defaultConfigs {
 		var count int64
-		DB.Model(&SystemConfig{}).Where("config_key = ?", cfg.Key).Count(&count)
+		DB.Model(&SystemConfig{}).Where("`key` = ?", cfg.Key).Count(&count)
 		if count == 0 {
 			if err := DB.Create(&cfg).Error; err != nil {
 				return err

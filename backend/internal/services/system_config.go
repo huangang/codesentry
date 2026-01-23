@@ -2,6 +2,7 @@ package services
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/huangang/codesentry/backend/internal/models"
 	"gorm.io/gorm"
@@ -129,6 +130,91 @@ func (s *SystemConfigService) UpdateLDAPConfig(req *UpdateLDAPConfigRequest) err
 	}
 	if req.UseSSL != nil {
 		if err := s.Set("ldap_use_ssl", strconv.FormatBool(*req.UseSSL)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Daily Report Config
+type DailyReportConfigResponse struct {
+	Enabled     bool   `json:"enabled"`
+	Time        string `json:"time"`
+	LowScore    int    `json:"low_score"`
+	LLMConfigID int    `json:"llm_config_id"`
+	IMBotIDs    []int  `json:"im_bot_ids"`
+}
+
+func (s *SystemConfigService) GetDailyReportConfig() *DailyReportConfigResponse {
+	lowScore, _ := strconv.Atoi(s.GetWithDefault("daily_report_low_score", "60"))
+	llmConfigID, _ := strconv.Atoi(s.GetWithDefault("daily_report_llm_config_id", "0"))
+	imBotIDsStr := s.GetWithDefault("daily_report_im_bot_ids", "")
+	var imBotIDs []int
+	if imBotIDsStr != "" {
+		for _, idStr := range splitAndTrim(imBotIDsStr, ",") {
+			if id, err := strconv.Atoi(idStr); err == nil {
+				imBotIDs = append(imBotIDs, id)
+			}
+		}
+	}
+	return &DailyReportConfigResponse{
+		Enabled:     s.GetWithDefault("daily_report_enabled", "false") == "true",
+		Time:        s.GetWithDefault("daily_report_time", "18:00"),
+		LowScore:    lowScore,
+		LLMConfigID: llmConfigID,
+		IMBotIDs:    imBotIDs,
+	}
+}
+
+func splitAndTrim(s, sep string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := make([]string, 0)
+	for _, p := range strings.Split(s, sep) {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			parts = append(parts, p)
+		}
+	}
+	return parts
+}
+
+type UpdateDailyReportConfigRequest struct {
+	Enabled     *bool   `json:"enabled"`
+	Time        *string `json:"time"`
+	LowScore    *int    `json:"low_score"`
+	LLMConfigID *int    `json:"llm_config_id"`
+	IMBotIDs    []int   `json:"im_bot_ids"`
+}
+
+func (s *SystemConfigService) UpdateDailyReportConfig(req *UpdateDailyReportConfigRequest) error {
+	if req.Enabled != nil {
+		if err := s.Set("daily_report_enabled", strconv.FormatBool(*req.Enabled)); err != nil {
+			return err
+		}
+	}
+	if req.Time != nil {
+		if err := s.Set("daily_report_time", *req.Time); err != nil {
+			return err
+		}
+	}
+	if req.LowScore != nil {
+		if err := s.Set("daily_report_low_score", strconv.Itoa(*req.LowScore)); err != nil {
+			return err
+		}
+	}
+	if req.LLMConfigID != nil {
+		if err := s.Set("daily_report_llm_config_id", strconv.Itoa(*req.LLMConfigID)); err != nil {
+			return err
+		}
+	}
+	if req.IMBotIDs != nil {
+		var ids []string
+		for _, id := range req.IMBotIDs {
+			ids = append(ids, strconv.Itoa(id))
+		}
+		if err := s.Set("daily_report_im_bot_ids", strings.Join(ids, ",")); err != nil {
 			return err
 		}
 	}

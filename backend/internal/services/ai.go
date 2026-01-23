@@ -259,3 +259,32 @@ func extractScore(content string) float64 {
 	}
 	return 0
 }
+
+func (s *AIService) CallWithConfig(ctx context.Context, llmConfigID uint, prompt string) (string, string, error) {
+	var llmConfig models.LLMConfig
+
+	if llmConfigID > 0 {
+		if err := s.db.Where("id = ? AND is_active = ?", llmConfigID, true).First(&llmConfig).Error; err != nil {
+			log.Printf("[AI] Specified LLM config %d not found or inactive, falling back to default", llmConfigID)
+		}
+	}
+
+	if llmConfig.ID == 0 {
+		if err := s.db.Where("is_default = ? AND is_active = ?", true, true).First(&llmConfig).Error; err != nil {
+			var anyConfig models.LLMConfig
+			if err := s.db.Where("is_active = ?", true).First(&anyConfig).Error; err != nil {
+				return "", "", fmt.Errorf("no active LLM configuration available")
+			}
+			llmConfig = anyConfig
+		}
+	}
+
+	log.Printf("[AI] CallWithConfig using LLM: %s (ID: %d)", llmConfig.Name, llmConfig.ID)
+
+	result, err := s.callLLM(ctx, &llmConfig, prompt)
+	if err != nil {
+		return "", "", err
+	}
+
+	return result.Content, llmConfig.Name, nil
+}
