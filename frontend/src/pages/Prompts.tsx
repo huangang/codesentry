@@ -15,6 +15,7 @@ import {
   Drawer,
   Typography,
   Tooltip,
+  Segmented,
 } from 'antd';
 import {
   PlusOutlined,
@@ -30,6 +31,8 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { promptApi } from '../services';
 import type { PromptTemplate } from '../types';
 import { usePaginatedList, useModal } from '../hooks';
@@ -43,12 +46,13 @@ interface PromptFilters {
 }
 
 const Prompts: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [form] = Form.useForm();
   const [searchName, setSearchName] = React.useState('');
   const [filterType, setFilterType] = React.useState<string>('');
   const [drawerVisible, setDrawerVisible] = React.useState(false);
   const [viewingPrompt, setViewingPrompt] = React.useState<PromptTemplate | null>(null);
+  const [viewMode, setViewMode] = React.useState<'rendered' | 'source'>('rendered');
 
   const modal = useModal<PromptTemplate>();
 
@@ -379,22 +383,51 @@ const Prompts: React.FC = () => {
                 <strong>{t('prompts.description')}:</strong> {viewingPrompt.description}
               </div>
             )}
-            <div style={{ marginBottom: 8 }}>
+            <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <strong>{t('prompts.content')}:</strong>
+              <Segmented
+                size="small"
+                value={viewMode}
+                onChange={(val) => setViewMode(val as 'rendered' | 'source')}
+                options={[
+                  { label: i18n.language?.startsWith('zh') ? '渲染' : 'Rendered', value: 'rendered' },
+                  { label: i18n.language?.startsWith('zh') ? '源码' : 'Source', value: 'source' },
+                ]}
+              />
             </div>
-            <Paragraph
-              copyable
-              style={{
-                whiteSpace: 'pre-wrap',
-                backgroundColor: '#f5f5f5',
-                padding: 16,
-                borderRadius: 8,
-                maxHeight: 500,
-                overflow: 'auto',
-              }}
-            >
-              {viewingPrompt.content}
-            </Paragraph>
+            {viewMode === 'rendered' ? (
+              <div
+                style={{
+                  backgroundColor: '#fafafa',
+                  padding: 16,
+                  borderRadius: 8,
+                  maxHeight: 500,
+                  overflow: 'auto',
+                  border: '1px solid #f0f0f0',
+                }}
+                className="markdown-body"
+              >
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {viewingPrompt.content}
+                </ReactMarkdown>
+              </div>
+            ) : (
+              <Paragraph
+                copyable
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  backgroundColor: '#f5f5f5',
+                  padding: 16,
+                  borderRadius: 8,
+                  maxHeight: 500,
+                  overflow: 'auto',
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                }}
+              >
+                {viewingPrompt.content}
+              </Paragraph>
+            )}
           </div>
         )}
       </Drawer>

@@ -70,10 +70,10 @@ const Dashboard: React.FC = () => {
   }, [dateRange, customRange]);
 
   const statsCards = [
-    { title: t('dashboard.totalProjects'), value: data?.stats.active_projects || 0, icon: <ProjectOutlined />, color: '#1890ff' },
-    { title: t('dashboard.totalReviews'), value: data?.stats.contributors || 0, icon: <TeamOutlined />, color: '#52c41a' },
-    { title: t('dashboard.todayReviews'), value: data?.stats.total_commits || 0, icon: <CodeOutlined />, color: '#722ed1' },
-    { title: t('dashboard.avgScore'), value: data?.stats.average_score?.toFixed(2) || '0', icon: <TrophyOutlined />, color: '#fa8c16' },
+    { title: t('dashboard.totalProjects'), value: data?.stats.active_projects || 0, icon: <ProjectOutlined />, color: '#06b6d4', bg: 'rgba(6,182,212,0.1)' },
+    { title: t('dashboard.totalReviews'), value: data?.stats.contributors || 0, icon: <TeamOutlined />, color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)' },
+    { title: t('dashboard.todayReviews'), value: data?.stats.total_commits || 0, icon: <CodeOutlined />, color: '#10b981', bg: 'rgba(16,185,129,0.1)' },
+    { title: t('dashboard.avgScore'), value: data?.stats.average_score?.toFixed(2) || '0', icon: <TrophyOutlined />, color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
   ];
 
   const dateRangeOptions = [
@@ -87,7 +87,7 @@ const Dashboard: React.FC = () => {
     <Spin spinning={loading}>
       <div style={{ marginBottom: 24 }}>
         <Space>
-          <Radio.Group value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
+          <Radio.Group value={dateRange} onChange={(e) => setDateRange(e.target.value)} buttonStyle="solid">
             {dateRangeOptions.map(opt => (
               <Radio.Button key={opt.value} value={opt.value}>{opt.label}</Radio.Button>
             ))}
@@ -101,100 +101,128 @@ const Dashboard: React.FC = () => {
         </Space>
       </div>
 
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+      <Row gutter={[24, 24]} style={{ marginBottom: 24 }}>
         {statsCards.map((card, index) => (
           <Col xs={24} sm={12} lg={6} key={index}>
-            <Card>
+            <Card hoverable bordered={false} style={{ height: '100%', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
               <Statistic
-                title={card.title}
+                title={<span style={{ color: '#64748b', fontSize: 14 }}>{card.title}</span>}
                 value={card.value}
-                prefix={React.cloneElement(card.icon, { style: { color: card.color } })}
-                valueStyle={{ color: card.color }}
+                prefix={
+                  <div style={{
+                    backgroundColor: card.bg,
+                    padding: 8,
+                    borderRadius: 8,
+                    display: 'flex',
+                    marginRight: 12
+                  }}>
+                    {React.cloneElement(card.icon, { style: { color: card.color, fontSize: 20 } })}
+                  </div>
+                }
+                valueStyle={{ color: '#0f172a', fontWeight: 600, fontSize: 24 }}
               />
             </Card>
           </Col>
         ))}
       </Row>
 
-      <Row gutter={[16, 16]}>
+      <Row gutter={[24, 24]}>
         <Col xs={24} lg={12}>
-          <Card title={t('dashboard.projectCommits', 'Project Commits')} size="small">
+          <Card title={t('dashboard.projectCommits', 'Project Commits')} bordered={false} hoverable>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={data?.project_stats || []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="project_name" tick={{ fontSize: 12 }} />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="commit_count" fill="#1890ff" name={t('dashboard.commits', 'Commits')} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="project_name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
+                <Tooltip
+                  cursor={{ fill: '#f1f5f9' }}
+                  contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                />
+                <Bar dataKey="commit_count" fill="#3b82f6" radius={[4, 4, 0, 0]} name={t('dashboard.commits', 'Commits')} />
               </BarChart>
             </ResponsiveContainer>
           </Card>
         </Col>
         <Col xs={24} lg={12}>
-          <Card title={t('dashboard.authorCommits', 'Author Commits')} size="small">
+          <Card title={t('dashboard.authorCommits', 'Author Commits')} bordered={false} hoverable>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={data?.author_stats || []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="author" tick={{ fontSize: 12 }} />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="commit_count" fill="#1890ff" name={t('dashboard.commits', 'Commits')} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="author" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
+                <Tooltip
+                  cursor={{ fill: '#f1f5f9' }}
+                  contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                />
+                <Bar dataKey="commit_count" fill="#8b5cf6" radius={[4, 4, 0, 0]} name={t('dashboard.commits', 'Commits')} />
               </BarChart>
             </ResponsiveContainer>
           </Card>
         </Col>
         <Col xs={24} lg={12}>
-          <Card title={t('dashboard.projectAvgScore', 'Project Average Score')} size="small">
+          <Card title={t('dashboard.projectAvgScore', 'Project Average Score')} bordered={false} hoverable>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={data?.project_stats || []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="project_name" tick={{ fontSize: 12 }} />
-                <YAxis domain={[0, 100]} />
-                <Tooltip />
-                <Bar dataKey="avg_score" fill="#52c41a" name={t('dashboard.avgScore')} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="project_name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
+                <Tooltip
+                  cursor={{ fill: '#f1f5f9' }}
+                  contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                />
+                <Bar dataKey="avg_score" fill="#10b981" radius={[4, 4, 0, 0]} name={t('dashboard.avgScore')} />
               </BarChart>
             </ResponsiveContainer>
           </Card>
         </Col>
         <Col xs={24} lg={12}>
-          <Card title={t('dashboard.authorAvgScore', 'Author Average Score')} size="small">
+          <Card title={t('dashboard.authorAvgScore', 'Author Average Score')} bordered={false} hoverable>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={data?.author_stats || []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="author" tick={{ fontSize: 12 }} />
-                <YAxis domain={[0, 100]} />
-                <Tooltip />
-                <Bar dataKey="avg_score" fill="#52c41a" name={t('dashboard.avgScore')} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="author" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
+                <Tooltip
+                  cursor={{ fill: '#f1f5f9' }}
+                  contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                />
+                <Bar dataKey="avg_score" fill="#f59e0b" radius={[4, 4, 0, 0]} name={t('dashboard.avgScore')} />
               </BarChart>
             </ResponsiveContainer>
           </Card>
         </Col>
         <Col xs={24} lg={12}>
-          <Card title={t('dashboard.projectCodeChanges', 'Project Code Changes')} size="small">
+          <Card title={t('dashboard.projectCodeChanges', 'Project Code Changes')} bordered={false} hoverable>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={data?.project_stats || []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="project_name" tick={{ fontSize: 12 }} />
-                <YAxis />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="project_name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
+                <Tooltip
+                  cursor={{ fill: '#f1f5f9' }}
+                  contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                />
                 <Legend />
-                <Bar dataKey="additions" stackId="a" fill="#52c41a" name={t('dashboard.additions', 'Additions')} />
-                <Bar dataKey="deletions" stackId="a" fill="#ff4d4f" name={t('dashboard.deletions', 'Deletions')} />
+                <Bar dataKey="additions" stackId="a" fill="#10b981" radius={[0, 0, 4, 4]} name={t('dashboard.additions', 'Additions')} />
+                <Bar dataKey="deletions" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} name={t('dashboard.deletions', 'Deletions')} />
               </BarChart>
             </ResponsiveContainer>
           </Card>
         </Col>
         <Col xs={24} lg={12}>
-          <Card title={t('dashboard.authorCodeChanges', 'Author Code Changes')} size="small">
+          <Card title={t('dashboard.authorCodeChanges', 'Author Code Changes')} bordered={false} hoverable>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={data?.author_stats || []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="author" tick={{ fontSize: 12 }} />
-                <YAxis />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="author" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
+                <Tooltip
+                  cursor={{ fill: '#f1f5f9' }}
+                  contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                />
                 <Legend />
-                <Bar dataKey="additions" stackId="a" fill="#52c41a" name={t('dashboard.additions', 'Additions')} />
-                <Bar dataKey="deletions" stackId="a" fill="#ff4d4f" name={t('dashboard.deletions', 'Deletions')} />
+                <Bar dataKey="additions" stackId="a" fill="#10b981" radius={[0, 0, 4, 4]} name={t('dashboard.additions', 'Additions')} />
+                <Bar dataKey="deletions" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} name={t('dashboard.deletions', 'Deletions')} />
               </BarChart>
             </ResponsiveContainer>
           </Card>
@@ -203,5 +231,6 @@ const Dashboard: React.FC = () => {
     </Spin>
   );
 };
+
 
 export default Dashboard;

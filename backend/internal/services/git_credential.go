@@ -91,9 +91,10 @@ func (s *GitCredentialService) FindMatchingCredential(projectURL string, platfor
 	for _, cred := range credentials {
 		baseURL := strings.ToLower(strings.TrimSuffix(cred.BaseURL, "/"))
 		if baseURL == "" {
-			if platform == "github" {
+			switch platform {
+			case "github":
 				baseURL = "https://github.com"
-			} else if platform == "gitlab" {
+			case "gitlab":
 				baseURL = "https://gitlab.com"
 			}
 		}
