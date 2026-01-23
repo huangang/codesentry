@@ -1,7 +1,7 @@
 # CodeSentry
 
 <div align="center">
-  <img src="frontend/public/codesentry-icon.png" alt="CodeSentry Logo" width="120" height="120">
+  <img src="https://raw.githubusercontent.com/huangang/codesentry/main/frontend/public/codesentry-icon.png" alt="CodeSentry Logo" width="120" height="120">
 </div>
 
 AI-powered Code Review Platform for GitHub and GitLab.
@@ -23,7 +23,7 @@ AI-powered Code Review Platform for GitHub and GitLab.
 
 ## Preview
 
-![CodeSentry Dashboard](frontend/public/dashboard-preview.png)
+![CodeSentry Dashboard](https://raw.githubusercontent.com/huangang/codesentry/main/frontend/public/dashboard-preview.png)
 
 - **LLM Configuration**: Configure multiple AI models with custom endpoints
 - **Prompt Templates**: System and custom prompt templates with copy functionality

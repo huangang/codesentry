@@ -1,7 +1,7 @@
 # CodeSentry
 
 <div align="center">
-  <img src="frontend/public/codesentry-icon.png" alt="CodeSentry Logo" width="120" height="120">
+  <img src="https://raw.githubusercontent.com/huangang/codesentry/main/frontend/public/codesentry-icon.png" alt="CodeSentry Logo" width="120" height="120">
 </div>
 
 基于 AI 的代码审查平台，支持 GitHub 和 GitLab。
@@ -24,7 +24,7 @@
 
 ## 界面预览
 
-![CodeSentry Dashboard](frontend/public/dashboard-preview.png)
+![CodeSentry Dashboard](https://raw.githubusercontent.com/huangang/codesentry/main/frontend/public/dashboard-preview.png)
 
 - **大模型配置**: 配置多个 AI 模型和自定义接口
 - **提示词模板**: 系统和自定义提示词模板，支持复制为新模板
