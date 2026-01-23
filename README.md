@@ -180,6 +180,7 @@ The system automatically detects the platform via request headers.
 - `GET /api/auth/config` - Get auth config
 - `GET /api/auth/me` - Get current user
 - `POST /api/auth/logout` - Logout
+- `POST /api/auth/change-password` - Change password (local users only)
 
 ### Projects
 

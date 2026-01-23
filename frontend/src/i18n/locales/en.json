@@ -62,7 +62,17 @@
     "pleaseInputPassword": "Please input password",
     "accountLogin": "Account Login",
     "ldapLogin": "LDAP Login",
-    "defaultCredentials": "Default credentials: admin / admin"
+    "defaultCredentials": "Default credentials: admin / admin",
+    "changePassword": "Change Password",
+    "oldPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "pleaseInputOldPassword": "Please input current password",
+    "pleaseInputNewPassword": "Please input new password",
+    "pleaseConfirmPassword": "Please confirm password",
+    "passwordMinLength": "Password must be at least 6 characters",
+    "passwordMismatch": "Passwords do not match",
+    "changePasswordSuccess": "Password changed successfully"
   },
   "menu": {
     "dashboard": "Dashboard",

@@ -181,6 +181,7 @@ https://你的域名/review/webhook
 - `GET /api/auth/config` - 获取认证配置
 - `GET /api/auth/me` - 获取当前用户
 - `POST /api/auth/logout` - 退出登录
+- `POST /api/auth/change-password` - 修改密码（仅本地用户）
 
 ### 项目管理
 

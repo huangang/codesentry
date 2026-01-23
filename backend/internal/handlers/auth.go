@@ -67,3 +67,22 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 func (h *AuthHandler) CreateAdminIfNotExists() error {
 	return h.authService.CreateAdminIfNotExists()
 }
+
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+
+	var req services.ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.authService.ChangePassword(userID.(uint), &req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	uid := userID.(uint)
+	services.LogInfo("Auth", "ChangePassword", "User changed password", &uid, c.ClientIP(), c.Request.UserAgent(), nil)
+	c.JSON(http.StatusOK, gin.H{"message": "password changed successfully"})
+}

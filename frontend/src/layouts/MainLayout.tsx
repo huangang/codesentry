@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Layout, Menu, Dropdown, Avatar, Space, Typography, Select } from 'antd';
+import React, { useMemo, useState } from 'react';
+import { Layout, Menu, Dropdown, Avatar, Space, Typography, Select, Modal, Form, Input, message } from 'antd';
 import {
   DashboardOutlined,
   FileSearchOutlined,
@@ -14,11 +14,13 @@ import {
   GlobalOutlined,
   BookOutlined,
   KeyOutlined,
+  LockOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../stores/authStore';
 import { usePermission } from '../hooks';
+import { authApi } from '../services';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -29,6 +31,9 @@ const MainLayout: React.FC = () => {
   const { user, logout } = useAuthStore();
   const { t, i18n } = useTranslation();
   const { canAccess } = usePermission();
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordForm] = Form.useForm();
 
   const allMenuItems = [
     { key: '/admin/dashboard', icon: <DashboardOutlined />, label: t('menu.dashboard') },
@@ -62,12 +67,35 @@ const MainLayout: React.FC = () => {
     i18n.changeLanguage(lang);
   };
 
+  const handleChangePassword = async (values: { oldPassword: string; newPassword: string }) => {
+    setPasswordLoading(true);
+    try {
+      await authApi.changePassword(values.oldPassword, values.newPassword);
+      message.success(t('auth.changePasswordSuccess', 'Password changed successfully'));
+      setPasswordModalVisible(false);
+      passwordForm.resetFields();
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: string } } };
+      message.error(err.response?.data?.error || t('common.error'));
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  const isLocalUser = user?.auth_type === 'local';
+
   const userMenuItems = [
     {
       key: 'profile',
       icon: <SettingOutlined />,
       label: t('menu.settings'),
     },
+    ...(isLocalUser ? [{
+      key: 'changePassword',
+      icon: <LockOutlined />,
+      label: t('auth.changePassword', 'Change Password'),
+      onClick: () => setPasswordModalVisible(true),
+    }] : []),
     {
       type: 'divider' as const,
     },
@@ -228,6 +256,61 @@ const MainLayout: React.FC = () => {
           <Outlet />
         </Content>
       </Layout>
+
+      <Modal
+        title={t('auth.changePassword', 'Change Password')}
+        open={passwordModalVisible}
+        onCancel={() => {
+          setPasswordModalVisible(false);
+          passwordForm.resetFields();
+        }}
+        onOk={() => passwordForm.submit()}
+        confirmLoading={passwordLoading}
+        okText={t('common.confirm')}
+        cancelText={t('common.cancel')}
+      >
+        <Form
+          form={passwordForm}
+          layout="vertical"
+          onFinish={handleChangePassword}
+        >
+          <Form.Item
+            name="oldPassword"
+            label={t('auth.oldPassword', 'Current Password')}
+            rules={[{ required: true, message: t('auth.pleaseInputOldPassword', 'Please input current password') }]}
+          >
+            <Input.Password />
+          </Form.Item>
+          <Form.Item
+            name="newPassword"
+            label={t('auth.newPassword', 'New Password')}
+            rules={[
+              { required: true, message: t('auth.pleaseInputNewPassword', 'Please input new password') },
+              { min: 6, message: t('auth.passwordMinLength', 'Password must be at least 6 characters') },
+            ]}
+          >
+            <Input.Password />
+          </Form.Item>
+          <Form.Item
+            name="confirmPassword"
+            label={t('auth.confirmPassword', 'Confirm Password')}
+            dependencies={['newPassword']}
+            rules={[
+              { required: true, message: t('auth.pleaseConfirmPassword', 'Please confirm password') },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('newPassword') === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error(t('auth.passwordMismatch', 'Passwords do not match')));
+                },
+              }),
+            ]}
+          >
+            <Input.Password />
+          </Form.Item>
+        </Form>
+      </Modal>
     </Layout>
   );
 };

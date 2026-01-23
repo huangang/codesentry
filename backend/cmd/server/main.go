@@ -108,6 +108,7 @@ func main() {
 			// Auth
 			protected.GET("/auth/me", authHandler.GetCurrentUser)
 			protected.POST("/auth/logout", authHandler.Logout)
+			protected.POST("/auth/change-password", authHandler.ChangePassword)
 
 			// Dashboard (all users)
 			dashboardHandler := handlers.NewDashboardHandler(models.GetDB())

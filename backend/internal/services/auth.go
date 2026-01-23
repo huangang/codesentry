@@ -175,3 +175,31 @@ func (s *AuthService) CreateAdminIfNotExists() error {
 func (s *AuthService) IsLDAPEnabled() bool {
 	return s.ldapService.IsEnabled()
 }
+
+type ChangePasswordRequest struct {
+	OldPassword string `json:"old_password" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=6"`
+}
+
+func (s *AuthService) ChangePassword(userID uint, req *ChangePasswordRequest) error {
+	var user models.User
+	if err := s.db.First(&user, userID).Error; err != nil {
+		return errors.New("user not found")
+	}
+
+	if user.AuthType != "local" {
+		return errors.New("LDAP users cannot change password here")
+	}
+
+	if !utils.CheckPassword(req.OldPassword, user.Password) {
+		return errors.New("incorrect old password")
+	}
+
+	hashedPassword, err := utils.HashPassword(req.NewPassword)
+	if err != nil {
+		return err
+	}
+
+	user.Password = hashedPassword
+	return s.db.Save(&user).Error
+}

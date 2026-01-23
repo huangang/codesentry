@@ -62,7 +62,17 @@
     "pleaseInputPassword": "请输入密码",
     "accountLogin": "账号登录",
     "ldapLogin": "LDAP登录",
-    "defaultCredentials": "默认管理员账号: admin / admin"
+    "defaultCredentials": "默认管理员账号: admin / admin",
+    "changePassword": "修改密码",
+    "oldPassword": "当前密码",
+    "newPassword": "新密码",
+    "confirmPassword": "确认密码",
+    "pleaseInputOldPassword": "请输入当前密码",
+    "pleaseInputNewPassword": "请输入新密码",
+    "pleaseConfirmPassword": "请确认密码",
+    "passwordMinLength": "密码长度至少为6位",
+    "passwordMismatch": "两次输入的密码不一致",
+    "changePasswordSuccess": "密码修改成功"
   },
   "menu": {
     "dashboard": "仪表盘",
