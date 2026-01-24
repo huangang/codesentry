@@ -1,0 +1,419 @@
+/* ============================================
+   CodeSentry Responsive Styles
+   Mobile-first responsive design
+   Breakpoints:
+   - Mobile: < 768px
+   - Tablet: 768px - 1024px
+   - Desktop: > 1024px
+   ============================================ */
+
+/* ============================================
+   CSS Variables for responsive values
+   ============================================ */
+:root {
+  --sidebar-width: 240px;
+  --header-height: 64px;
+  --content-padding: 32px;
+  --mobile-content-padding: 16px;
+}
+
+/* ============================================
+   Mobile Layout (< 768px)
+   ============================================ */
+@media screen and (max-width: 767px) {
+  /* Hide desktop sidebar */
+  .ant-layout-sider {
+    display: none !important;
+  }
+
+  /* Adjust main layout margin when sidebar is hidden */
+  .ant-layout.main-layout {
+    margin-left: 0 !important;
+  }
+
+  /* Header adjustments for mobile */
+  .ant-layout-header.main-header {
+    padding: 0 12px !important;
+    height: 56px !important;
+  }
+
+  .main-header .header-title {
+    font-size: 16px !important;
+  }
+
+  /* Content padding for mobile */
+  .ant-layout-content.main-content {
+    margin: 16px 12px !important;
+  }
+
+  /* Cards - full width on mobile */
+  .ant-card {
+    border-radius: 8px !important;
+  }
+
+  .ant-card-body {
+    padding: 12px !important;
+  }
+
+  /* Tables - horizontal scroll */
+  .ant-table-wrapper {
+    overflow-x: auto !important;
+  }
+
+  .ant-table {
+    min-width: 600px;
+  }
+
+  /* Table pagination - compact */
+  .ant-pagination {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .ant-pagination-total-text {
+    display: none !important;
+  }
+
+  .ant-pagination-options {
+    display: none !important;
+  }
+
+  /* Forms - stack vertically */
+  .ant-form-item {
+    margin-bottom: 12px !important;
+  }
+
+  .ant-form-item-label {
+    padding-bottom: 4px !important;
+  }
+
+  /* Buttons - adjust for touch */
+  .ant-btn {
+    min-height: 36px !important;
+  }
+
+  /* Space component - wrap on mobile */
+  .ant-space {
+    flex-wrap: wrap !important;
+  }
+
+  /* Filter area - stack filters */
+  .filter-area .ant-space {
+    width: 100% !important;
+  }
+
+  .filter-area .ant-picker,
+  .filter-area .ant-select,
+  .filter-area .ant-input {
+    width: 100% !important;
+    margin-bottom: 8px !important;
+  }
+
+  /* Drawer - full width on mobile */
+  .ant-drawer-content-wrapper {
+    width: 100% !important;
+    max-width: 100vw !important;
+  }
+
+  .ant-drawer-body {
+    padding: 12px !important;
+  }
+
+  /* Modal - nearly full width */
+  .ant-modal {
+    max-width: calc(100vw - 32px) !important;
+    margin: 16px !important;
+  }
+
+  .ant-modal-body {
+    padding: 12px !important;
+    max-height: 60vh !important;
+    overflow-y: auto !important;
+  }
+
+  /* Descriptions - single column */
+  .ant-descriptions-bordered .ant-descriptions-item-label,
+  .ant-descriptions-bordered .ant-descriptions-item-content {
+    padding: 8px !important;
+  }
+
+  .ant-descriptions-bordered .ant-descriptions-row {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  /* Statistic cards - adjust layout */
+  .ant-statistic-title {
+    font-size: 12px !important;
+  }
+
+  .ant-statistic-content-value {
+    font-size: 20px !important;
+  }
+
+  /* Radio buttons - smaller on mobile */
+  .ant-radio-button-wrapper {
+    padding: 0 8px !important;
+    font-size: 12px !important;
+  }
+
+  /* DatePicker */
+  .ant-picker {
+    width: 100% !important;
+  }
+
+  /* Tags */
+  .ant-tag {
+    font-size: 11px !important;
+  }
+
+  /* Typography adjustments */
+  .ant-typography h1 {
+    font-size: 20px !important;
+  }
+
+  .ant-typography h2 {
+    font-size: 18px !important;
+  }
+
+  .ant-typography h3 {
+    font-size: 16px !important;
+  }
+
+  /* Login page specific */
+  .login-card {
+    width: calc(100vw - 32px) !important;
+    max-width: 420px !important;
+    margin: 16px !important;
+  }
+
+  /* Dashboard specific */
+  .dashboard-stats-card .ant-statistic {
+    text-align: center !important;
+  }
+
+  .dashboard-stats-card .ant-statistic-content-prefix {
+    display: block !important;
+    margin-bottom: 8px !important;
+    margin-right: 0 !important;
+  }
+
+  /* Chart container */
+  .recharts-wrapper {
+    font-size: 10px !important;
+  }
+
+  /* Mobile menu drawer */
+  .mobile-menu-drawer .ant-drawer-body {
+    padding: 0 !important;
+    background: linear-gradient(180deg, #0f172a 0%, #1e3a8a 100%) !important;
+  }
+
+  .mobile-menu-drawer .ant-menu {
+    background: transparent !important;
+  }
+
+  /* User dropdown in header */
+  .header-user-dropdown span {
+    display: none !important;
+  }
+
+  /* Language selector */
+  .header-language-select {
+    width: 80px !important;
+  }
+
+  .header-language-select .ant-select-selection-item {
+    font-size: 12px !important;
+  }
+
+  /* Hide expand button text on mobile */
+  .chart-expand-btn span:last-child {
+    display: none !important;
+  }
+
+  /* Markdown content */
+  .markdown-body {
+    font-size: 13px !important;
+  }
+
+  .markdown-body pre {
+    padding: 8px !important;
+    font-size: 11px !important;
+  }
+
+  /* Settings page tabs */
+  .ant-tabs-nav {
+    margin-bottom: 12px !important;
+  }
+
+  .ant-tabs-tab {
+    padding: 8px 12px !important;
+    font-size: 13px !important;
+  }
+
+  /* Collapse panels */
+  .ant-collapse-header {
+    padding: 8px 12px !important;
+  }
+}
+
+/* ============================================
+   Tablet Layout (768px - 1024px)
+   ============================================ */
+@media screen and (min-width: 768px) and (max-width: 1024px) {
+  /* Sidebar - collapsible on tablet */
+  .ant-layout-sider {
+    width: 80px !important;
+    min-width: 80px !important;
+    max-width: 80px !important;
+  }
+
+  .ant-layout-sider.sider-expanded {
+    width: 240px !important;
+    min-width: 240px !important;
+    max-width: 240px !important;
+  }
+
+  .ant-layout.main-layout {
+    margin-left: 80px !important;
+  }
+
+  .ant-layout.main-layout.sider-expanded {
+    margin-left: 240px !important;
+  }
+
+  /* Header */
+  .ant-layout-header.main-header {
+    padding: 0 20px !important;
+  }
+
+  /* Content */
+  .ant-layout-content.main-content {
+    margin: 24px 20px !important;
+  }
+
+  /* Cards */
+  .ant-card-body {
+    padding: 16px !important;
+  }
+
+  /* Tables */
+  .ant-table-wrapper {
+    overflow-x: auto !important;
+  }
+}
+
+/* ============================================
+   Touch Device Optimizations
+   ============================================ */
+@media (hover: none) and (pointer: coarse) {
+  /* Increase touch targets */
+  .ant-btn {
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+
+  .ant-btn-icon-only {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  /* Menu items */
+  .ant-menu-item {
+    min-height: 48px !important;
+    line-height: 48px !important;
+  }
+
+  /* Form inputs */
+  .ant-input,
+  .ant-select-selector,
+  .ant-picker {
+    min-height: 44px !important;
+  }
+
+  /* Checkboxes and radios */
+  .ant-checkbox-wrapper,
+  .ant-radio-wrapper {
+    padding: 8px 0 !important;
+  }
+
+  /* Table rows */
+  .ant-table-tbody > tr > td {
+    padding: 12px 8px !important;
+  }
+
+  /* Clickable elements */
+  .ant-btn,
+  .ant-menu-item,
+  .ant-table-row {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* ============================================
+   Hide elements responsively
+   ============================================ */
+.hide-on-mobile {
+  display: block;
+}
+
+.show-on-mobile {
+  display: none !important;
+}
+
+@media screen and (max-width: 767px) {
+  .hide-on-mobile {
+    display: none !important;
+  }
+
+  .show-on-mobile {
+    display: block !important;
+  }
+
+  .show-on-mobile-flex {
+    display: flex !important;
+  }
+
+  .show-on-mobile-inline {
+    display: inline !important;
+  }
+}
+
+/* ============================================
+   Safe area insets for notched devices
+   ============================================ */
+@supports (padding: max(0px)) {
+  .ant-layout-header.main-header {
+    padding-left: max(12px, env(safe-area-inset-left)) !important;
+    padding-right: max(12px, env(safe-area-inset-right)) !important;
+  }
+
+  .ant-layout-content.main-content {
+    padding-bottom: max(16px, env(safe-area-inset-bottom)) !important;
+  }
+
+  .mobile-menu-drawer .ant-drawer-body {
+    padding-bottom: max(24px, env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* ============================================
+   Print styles
+   ============================================ */
+@media print {
+  .ant-layout-sider,
+  .ant-layout-header,
+  .ant-btn,
+  .ant-pagination {
+    display: none !important;
+  }
+
+  .ant-layout.main-layout {
+    margin-left: 0 !important;
+  }
+
+  .ant-layout-content.main-content {
+    margin: 0 !important;
+  }
+}

@@ -284,6 +284,7 @@ const SystemLogs: React.FC = () => {
           dataSource={data}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 1000 }}
           pagination={{
             current: page,
             pageSize,

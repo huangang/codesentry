@@ -250,6 +250,7 @@ const Users: React.FC = () => {
           dataSource={data}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 800 }}
           pagination={{
             current: page,
             pageSize,

@@ -279,6 +279,7 @@ const MemberAnalysis: React.FC = () => {
           rowKey="author"
           loading={loading}
           onChange={handleTableChange}
+          scroll={{ x: 800 }}
           pagination={{
             current: page,
             pageSize,

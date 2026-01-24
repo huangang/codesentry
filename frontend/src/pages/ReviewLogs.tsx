@@ -236,16 +236,17 @@ const ReviewLogs: React.FC = () => {
 
   return (
     <>
-      <Card>
-        <Space wrap style={{ marginBottom: 16 }}>
+      <Card styles={{ body: { padding: '16px 12px' } }}>
+        <Space wrap style={{ marginBottom: 16, width: '100%' }} className="filter-area">
           <RangePicker
             value={dateRange}
             onChange={(dates) => setDateRange(dates as [dayjs.Dayjs, dayjs.Dayjs])}
+            style={{ minWidth: 220 }}
           />
           <Select
             placeholder={t('reviewLogs.eventType')}
             allowClear
-            style={{ width: 120 }}
+            style={{ minWidth: 100 }}
             value={eventType || undefined}
             onChange={setEventType}
             options={[
@@ -258,20 +259,20 @@ const ReviewLogs: React.FC = () => {
             allowClear
             showSearch
             optionFilterProp="label"
-            style={{ width: 180 }}
+            style={{ minWidth: 140 }}
             value={projectId}
             onChange={setProjectId}
             options={projects.map(p => ({ value: p.id, label: p.name }))}
           />
           <Input
             placeholder={t('reviewLogs.author')}
-            style={{ width: 120 }}
+            style={{ minWidth: 100, maxWidth: 120 }}
             value={author}
             onChange={(e) => setAuthor(e.target.value)}
           />
           <Input
             placeholder={t('reviewLogs.commitMessage')}
-            style={{ width: 180 }}
+            style={{ minWidth: 140 }}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
           />
@@ -288,6 +289,8 @@ const ReviewLogs: React.FC = () => {
           dataSource={data}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 900 }}
+          size="middle"
           pagination={{
             current: page,
             pageSize,
@@ -295,15 +298,17 @@ const ReviewLogs: React.FC = () => {
             showSizeChanger: true,
             showTotal: (total) => `${t('common.total')} ${total}`,
             onChange: handlePageChange,
+            size: 'small',
           }}
         />
       </Card>
 
       <Drawer
         title={t('reviewLogs.reviewDetail')}
-        width={720}
+        width={typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : 720}
         open={drawerVisible}
         onClose={() => setDrawerVisible(false)}
+        styles={{ body: { padding: '16px 12px' } }}
         extra={
           isAdmin && selectedLog && (
             <Popconfirm
@@ -321,7 +326,7 @@ const ReviewLogs: React.FC = () => {
       >
         {selectedLog && (
           <>
-            <Descriptions column={2} bordered size="small">
+            <Descriptions column={{ xs: 1, sm: 2 }} bordered size="small">
               <Descriptions.Item label={t('reviewLogs.project')}>{selectedLog.project?.name}</Descriptions.Item>
               <Descriptions.Item label={t('reviewLogs.eventType')}>
                 <Tag>{selectedLog.event_type}</Tag>

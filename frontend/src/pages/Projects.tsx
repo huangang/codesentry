@@ -361,7 +361,8 @@ const Projects: React.FC = () => {
         open={modal.visible}
         onOk={handleSubmit}
         onCancel={modal.close}
-        width={640}
+        width={typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : 640}
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
       >
         <Form form={form} layout="vertical">
           <Form.Item name="name" label={t('projects.projectName')} rules={[{ required: true, message: t('projects.pleaseInputName') }]}>
@@ -450,7 +451,7 @@ const Projects: React.FC = () => {
 
       <Drawer
         title={t('projects.aiPrompt')}
-        width={640}
+        width={typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : 640}
         open={promptDrawerVisible}
         onClose={() => setPromptDrawerVisible(false)}
         extra={

@@ -113,10 +113,13 @@ const Login: React.FC = () => {
       justifyContent: 'center',
       alignItems: 'center',
       background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+      padding: '16px',
     }}>
       <Card 
+        className="login-card"
         style={{ 
-          width: 420, 
+          width: '100%',
+          maxWidth: 420, 
           boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
           borderRadius: 8,
         }}

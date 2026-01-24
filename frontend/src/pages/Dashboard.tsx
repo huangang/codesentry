@@ -194,15 +194,24 @@ const Dashboard: React.FC = () => {
 
   const renderChart = (config: ChartConfig, chartData: DashboardResponse | null, height: number) => (
     <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={chartData?.[config.dataKey] || []}>
+      <BarChart data={chartData?.[config.dataKey] || []} margin={{ top: 5, right: 5, left: -15, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-        <XAxis dataKey={config.xKey} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-        <YAxis domain={config.yDomain} axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
+        <XAxis 
+          dataKey={config.xKey} 
+          tick={{ fontSize: 10, fill: '#64748b' }} 
+          axisLine={false} 
+          tickLine={false}
+          interval={0}
+          angle={-45}
+          textAnchor="end"
+          height={60}
+        />
+        <YAxis domain={config.yDomain} axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} width={35} />
         <Tooltip
           cursor={{ fill: '#f1f5f9' }}
-          contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+          contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', fontSize: 12 }}
         />
-        {config.showLegend && <Legend />}
+        {config.showLegend && <Legend wrapperStyle={{ fontSize: 12 }} />}
         {config.bars.map((bar) => (
           <Bar
             key={bar.dataKey}
@@ -222,8 +231,8 @@ const Dashboard: React.FC = () => {
   return (
     <Spin spinning={loading}>
       <div style={{ marginBottom: 24 }}>
-        <Space>
-          <Radio.Group value={dateRange} onChange={(e) => setDateRange(e.target.value)} buttonStyle="solid">
+        <Space wrap>
+          <Radio.Group value={dateRange} onChange={(e) => setDateRange(e.target.value)} buttonStyle="solid" size="middle">
             {dateRangeOptions.map(opt => (
               <Radio.Button key={opt.value} value={opt.value}>{opt.label}</Radio.Button>
             ))}
@@ -232,55 +241,64 @@ const Dashboard: React.FC = () => {
             <RangePicker
               value={customRange}
               onChange={(dates) => setCustomRange(dates as [dayjs.Dayjs, dayjs.Dayjs])}
+              style={{ width: '100%', maxWidth: 280 }}
             />
           )}
         </Space>
       </div>
 
-      <Row gutter={[24, 24]} style={{ marginBottom: 24 }}>
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         {statsCards.map((card, index) => (
-          <Col xs={24} sm={12} lg={6} key={index}>
-            <Card hoverable bordered={false} style={{ height: '100%', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
+          <Col xs={12} sm={12} lg={6} key={index}>
+            <Card 
+              hoverable 
+              bordered={false} 
+              style={{ height: '100%', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}
+              className="dashboard-stats-card"
+              styles={{ body: { padding: '16px 12px' } }}
+            >
               <Statistic
-                title={<span style={{ color: '#64748b', fontSize: 14 }}>{card.title}</span>}
+                title={<span style={{ color: '#64748b', fontSize: 12 }}>{card.title}</span>}
                 value={card.value}
                 prefix={
                   <div style={{
                     backgroundColor: card.bg,
-                    padding: 8,
+                    padding: 6,
                     borderRadius: 8,
                     display: 'flex',
-                    marginRight: 12
+                    marginRight: 8
                   }}>
-                    {React.cloneElement(card.icon, { style: { color: card.color, fontSize: 20 } })}
+                    {React.cloneElement(card.icon, { style: { color: card.color, fontSize: 16 } })}
                   </div>
                 }
-                valueStyle={{ color: '#0f172a', fontWeight: 600, fontSize: 24 }}
+                valueStyle={{ color: '#0f172a', fontWeight: 600, fontSize: 20 }}
               />
             </Card>
           </Col>
         ))}
       </Row>
 
-      <Row gutter={[24, 24]}>
+      <Row gutter={[16, 16]}>
         {chartConfigs.map((config) => (
           <Col xs={24} lg={12} key={config.key}>
             <Card
-              title={config.title}
+              title={<span style={{ fontSize: 14 }}>{config.title}</span>}
               bordered={false}
               hoverable
+              styles={{ body: { padding: '12px 8px' } }}
               extra={
                 <Button
                   type="text"
                   size="small"
                   icon={<FullscreenOutlined />}
                   onClick={() => handleExpand(config.key)}
+                  className="chart-expand-btn"
                 >
-                  {t('dashboard.expand', 'Expand')}
+                  <span className="hide-on-mobile">{t('dashboard.expand', 'Expand')}</span>
                 </Button>
               }
             >
-              {renderChart(config, data, 300)}
+              {renderChart(config, data, 250)}
             </Card>
           </Col>
         ))}

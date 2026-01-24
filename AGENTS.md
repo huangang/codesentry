@@ -17,9 +17,11 @@ codesentry/
 ├── frontend/               # React 前端
 │   ├── src/
 │   │   ├── components/     # 通用组件
+│   │   ├── layouts/        # 布局组件
 │   │   ├── pages/          # 页面组件
 │   │   ├── services/       # API 服务
 │   │   ├── i18n/           # 国际化
+│   │   ├── responsive.css  # 响应式样式
 │   │   └── App.tsx
 │   └── package.json
 ├── docker-compose.yml
@@ -101,6 +103,43 @@ export const projectAPI = {
 const { t } = useTranslation();
 <span>{t('projects.title')}</span>
 ```
+
+### 响应式设计规范
+
+项目已适配移动端，开发时需遵循以下规范：
+
+**断点定义**:
+- 移动端: `< 768px`
+- 平板: `768px - 1024px`  
+- 桌面: `> 1024px`
+
+**布局规范**:
+```tsx
+// 表格必须添加水平滚动
+<Table scroll={{ x: 800 }} ... />
+
+// Modal/Drawer 在移动端全屏
+width={typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : 640}
+
+// 使用 Ant Design 响应式栅格
+<Col xs={24} sm={12} lg={6}>  // 移动端全宽，平板半宽，桌面1/4宽
+
+// Descriptions 响应式列数
+<Descriptions column={{ xs: 1, sm: 2 }}>
+
+// Space 组件添加 wrap
+<Space wrap>
+```
+
+**CSS 类**:
+- `.hide-on-mobile` - 移动端隐藏
+- `.show-on-mobile` - 仅移动端显示
+- `.filter-area` - 筛选区域（自动换行）
+
+**MainLayout 移动端行为**:
+- 侧边栏隐藏，显示汉堡菜单按钮
+- 点击菜单按钮弹出抽屉式菜单
+- Header 高度从 64px 减少到 56px
 
 ## 重要约束
 

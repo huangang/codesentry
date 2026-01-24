@@ -36,6 +36,7 @@ AI-powered Code Review Platform for GitHub and GitLab.
 - **Role-based Access Control**: Admin and User roles with different permission levels
 - **Multi-Database**: SQLite for development, MySQL/PostgreSQL for production
 - **Internationalization**: Support for English and Chinese (including DatePicker localization)
+- **Responsive Design**: Mobile-friendly interface with adaptive layouts for phones and tablets
 
 ## Quick Start
 

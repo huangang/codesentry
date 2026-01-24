@@ -161,7 +161,7 @@ const Settings: React.FC = () => {
           </Form.Item>
 
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item
                 name="time"
                 label={t('settings.dailyReport.time')}
@@ -169,7 +169,7 @@ const Settings: React.FC = () => {
                 <TimePicker format="HH:mm" style={{ width: '100%' }} disabled={!dailyReportEnabled} />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item
                 name="low_score"
                 label={t('settings.dailyReport.lowScore')}
@@ -231,7 +231,7 @@ const Settings: React.FC = () => {
           </Form.Item>
 
           <Row gutter={16}>
-            <Col span={16}>
+            <Col xs={24} sm={16}>
               <Form.Item
                 name="host"
                 label={t('settings.ldap.host')}
@@ -240,7 +240,7 @@ const Settings: React.FC = () => {
                 <Input placeholder="ldap.example.com" disabled={!ldapEnabled} />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={8}>
               <Form.Item
                 name="port"
                 label={t('settings.ldap.port')}

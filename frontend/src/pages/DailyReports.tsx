@@ -197,6 +197,7 @@ const DailyReports: React.FC = () => {
         dataSource={data}
         rowKey="id"
         loading={loading}
+        scroll={{ x: 800 }}
         pagination={{
           current: page,
           pageSize,
@@ -213,7 +214,7 @@ const DailyReports: React.FC = () => {
       <Drawer
         title={t('dailyReports.reportDetail')}
         placement="right"
-        width={700}
+        width={typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : 700}
         open={drawerVisible}
         onClose={() => setDrawerVisible(false)}
       >

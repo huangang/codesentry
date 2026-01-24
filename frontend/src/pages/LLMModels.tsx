@@ -222,6 +222,7 @@ const LLMModels: React.FC = () => {
           dataSource={data}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 900 }}
           pagination={{
             current: page,
             pageSize,
