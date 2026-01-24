@@ -346,6 +346,7 @@
       "title": "日报设置",
       "enabled": "启用日报",
       "time": "发送时间",
+      "timezone": "时区",
       "lowScore": "低分阈值",
       "lowScoreHint": "低于此分数的审查将被特别标注",
       "saveSuccess": "日报设置保存成功",

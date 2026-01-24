@@ -213,6 +213,7 @@ export const systemConfigApi = {
 export interface DailyReportConfig {
   enabled: boolean;
   time: string;
+  timezone: string;
   low_score: number;
   llm_config_id: number;
   im_bot_ids: number[];

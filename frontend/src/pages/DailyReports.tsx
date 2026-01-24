@@ -17,6 +17,7 @@ import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import { dailyReportApi, type DailyReport } from '../services';
+import { getResponsiveWidth } from '../hooks';
 
 const { Paragraph, Title } = Typography;
 
@@ -214,7 +215,7 @@ const DailyReports: React.FC = () => {
       <Drawer
         title={t('dailyReports.reportDetail')}
         placement="right"
-        width={typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : 700}
+        width={getResponsiveWidth(700)}
         open={drawerVisible}
         onClose={() => setDrawerVisible(false)}
       >

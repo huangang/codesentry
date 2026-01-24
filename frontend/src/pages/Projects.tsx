@@ -31,7 +31,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { useTranslation } from 'react-i18next';
 import { projectApi, imBotApi, promptApi, llmConfigApi } from '../services';
 import type { Project, IMBot, PromptTemplate, LLMConfig } from '../types';
-import { usePaginatedList, useModal, usePermission } from '../hooks';
+import { usePaginatedList, useModal, usePermission, getResponsiveWidth } from '../hooks';
 import { PLATFORMS } from '../constants';
 
 const { TextArea } = Input;
@@ -361,7 +361,7 @@ const Projects: React.FC = () => {
         open={modal.visible}
         onOk={handleSubmit}
         onCancel={modal.close}
-        width={typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : 640}
+        width={getResponsiveWidth(640)}
         styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
       >
         <Form form={form} layout="vertical">
@@ -451,7 +451,7 @@ const Projects: React.FC = () => {
 
       <Drawer
         title={t('projects.aiPrompt')}
-        width={typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : 640}
+        width={getResponsiveWidth(640)}
         open={promptDrawerVisible}
         onClose={() => setPromptDrawerVisible(false)}
         extra={

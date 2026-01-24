@@ -26,6 +26,7 @@ type WebhookService struct {
 	reviewService       *ReviewLogService
 	aiService           *AIService
 	notificationService *NotificationService
+	configService       *SystemConfigService
 	httpClient          *http.Client
 }
 
@@ -36,6 +37,7 @@ func NewWebhookService(db *gorm.DB, aiCfg *config.OpenAIConfig) *WebhookService 
 		reviewService:       NewReviewLogService(db),
 		aiService:           NewAIService(db, aiCfg),
 		notificationService: NewNotificationService(db),
+		configService:       NewSystemConfigService(db),
 		httpClient:          &http.Client{Timeout: 30 * time.Second},
 	}
 }
@@ -1044,14 +1046,9 @@ func (s *WebhookService) getEffectiveMinScore(project *models.Project) float64 {
 	}
 
 	// 2. Check System level
-	var sysConfig models.SystemConfig
-	if err := s.db.Where("`key` = ?", "system.min_score").First(&sysConfig).Error; err == nil {
-		// Parse value
-		var score float64
-		// Assuming value is simple string like "60"
-		if _, err := fmt.Sscanf(sysConfig.Value, "%f", &score); err == nil {
-			return score
-		}
+	var score float64
+	if _, err := fmt.Sscanf(s.configService.GetWithDefault("system.min_score", "60"), "%f", &score); err == nil {
+		return score
 	}
 
 	// 3. Default fallback

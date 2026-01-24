@@ -133,7 +133,44 @@ const MainLayout: React.FC = () => {
 
   const currentPageTitle = menuItems.find(item => item.key === location.pathname)?.label || 'CodeSentry';
 
-  const sidebarContent = (
+  const userInfoCard = (
+    <div style={{
+      padding: '16px',
+      background: 'rgba(255,255,255,0.05)',
+      borderRadius: 12,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      border: '1px solid rgba(255,255,255,0.05)',
+      backdropFilter: 'blur(10px)'
+    }}>
+      <Avatar
+        size={40}
+        icon={<UserOutlined />}
+        style={{
+          backgroundColor: '#06b6d4',
+          boxShadow: '0 4px 6px rgba(6, 182, 212, 0.2)'
+        }}
+      />
+      <div style={{ flex: 1, overflow: 'hidden' }}>
+        <div style={{
+          color: '#fff',
+          fontWeight: 600,
+          fontSize: 14,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}>
+          {user?.nickname || user?.username || 'User'}
+        </div>
+        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
+          {user?.role === 'admin' ? (i18n.language === 'zh' ? '管理员' : 'Admin') : (i18n.language === 'zh' ? '用户' : 'User')}
+        </div>
+      </div>
+    </div>
+  );
+
+  const sidebarContent = (forMobile: boolean) => (
     <>
       <div style={{
         height: 80,
@@ -176,48 +213,21 @@ const MainLayout: React.FC = () => {
           padding: '0 12px'
         }}
       />
-      <div style={{
-        position: 'absolute',
-        bottom: 24,
-        left: 0,
-        right: 0,
-        padding: '0 24px',
-      }}>
-        <div style={{
-          padding: '16px',
-          background: 'rgba(255,255,255,0.05)',
-          borderRadius: 12,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          border: '1px solid rgba(255,255,255,0.05)',
-          backdropFilter: 'blur(10px)'
-        }}>
-          <Avatar
-            size={40}
-            icon={<UserOutlined />}
-            style={{
-              backgroundColor: '#06b6d4',
-              boxShadow: '0 4px 6px rgba(6, 182, 212, 0.2)'
-            }}
-          />
-          <div style={{ flex: 1, overflow: 'hidden' }}>
-            <div style={{
-              color: '#fff',
-              fontWeight: 600,
-              fontSize: 14,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}>
-              {user?.nickname || user?.username || 'User'}
-            </div>
-            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
-              {user?.role === 'admin' ? (i18n.language === 'zh' ? '管理员' : 'Admin') : (i18n.language === 'zh' ? '用户' : 'User')}
-            </div>
-          </div>
+      {forMobile ? (
+        <div style={{ padding: '24px' }}>
+          {userInfoCard}
         </div>
-      </div>
+      ) : (
+        <div style={{
+          position: 'absolute',
+          bottom: 24,
+          left: 0,
+          right: 0,
+          padding: '0 24px',
+        }}>
+          {userInfoCard}
+        </div>
+      )}
     </>
   );
 
@@ -237,7 +247,7 @@ const MainLayout: React.FC = () => {
             borderRight: '1px solid rgba(255,255,255,0.05)'
           }}
         >
-          {sidebarContent}
+          {sidebarContent(false)}
         </Sider>
       )}
 
@@ -269,7 +279,7 @@ const MainLayout: React.FC = () => {
             onClick={() => setMobileMenuVisible(false)}
           />
         </div>
-        {sidebarContent}
+        {sidebarContent(true)}
       </Drawer>
 
       <Layout

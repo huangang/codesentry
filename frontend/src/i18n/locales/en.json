@@ -346,6 +346,7 @@
       "title": "Daily Report Settings",
       "enabled": "Enable Daily Report",
       "time": "Send Time",
+      "timezone": "Timezone",
       "lowScore": "Low Score Threshold",
       "lowScoreHint": "Reviews below this score will be highlighted",
       "saveSuccess": "Daily report settings saved successfully",

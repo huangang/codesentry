@@ -18,6 +18,7 @@ type DailyReportService struct {
 	db                  *gorm.DB
 	aiService           *AIService
 	notificationService *NotificationService
+	configService       *SystemConfigService
 	cronScheduler       *cron.Cron
 	currentEntryID      cron.EntryID
 }
@@ -27,6 +28,7 @@ func NewDailyReportService(db *gorm.DB, aiService *AIService, notificationServic
 		db:                  db,
 		aiService:           aiService,
 		notificationService: notificationService,
+		configService:       NewSystemConfigService(db),
 	}
 }
 
@@ -62,12 +64,27 @@ type LowScoreReview struct {
 }
 
 func (s *DailyReportService) StartScheduler() {
-	s.cronScheduler = cron.New()
+	loc := s.getTimezoneLocation()
+	s.cronScheduler = cron.New(cron.WithLocation(loc))
 
 	s.updateSchedule()
 
 	s.cronScheduler.Start()
-	log.Println("[DailyReport] Scheduler started")
+	log.Printf("[DailyReport] Scheduler started with timezone: %s", loc.String())
+}
+
+func (s *DailyReportService) getTimezone() string {
+	return s.configService.GetWithDefault("daily_report_timezone", "Asia/Shanghai")
+}
+
+func (s *DailyReportService) getTimezoneLocation() *time.Location {
+	tz := s.getTimezone()
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		log.Printf("[DailyReport] Invalid timezone %s, using Asia/Shanghai: %v", tz, err)
+		loc, _ = time.LoadLocation("Asia/Shanghai")
+	}
+	return loc
 }
 
 func (s *DailyReportService) StopScheduler() {
@@ -105,27 +122,15 @@ func (s *DailyReportService) updateSchedule() {
 }
 
 func (s *DailyReportService) getReportTime() string {
-	var config models.SystemConfig
-	if err := s.db.Where("`key` = ?", "daily_report_time").First(&config).Error; err != nil {
-		return "18:00"
-	}
-	return config.Value
+	return s.configService.GetWithDefault("daily_report_time", "18:00")
 }
 
 func (s *DailyReportService) isEnabled() bool {
-	var config models.SystemConfig
-	if err := s.db.Where("`key` = ?", "daily_report_enabled").First(&config).Error; err != nil {
-		return false
-	}
-	return config.Value == "true"
+	return s.configService.GetWithDefault("daily_report_enabled", "false") == "true"
 }
 
 func (s *DailyReportService) getLowScoreThreshold() float64 {
-	var config models.SystemConfig
-	if err := s.db.Where("`key` = ?", "daily_report_low_score").First(&config).Error; err != nil {
-		return 60
-	}
-	threshold, err := strconv.ParseFloat(config.Value, 64)
+	threshold, err := strconv.ParseFloat(s.configService.GetWithDefault("daily_report_low_score", "60"), 64)
 	if err != nil {
 		return 60
 	}
@@ -133,11 +138,7 @@ func (s *DailyReportService) getLowScoreThreshold() float64 {
 }
 
 func (s *DailyReportService) getLLMConfigID() uint {
-	var config models.SystemConfig
-	if err := s.db.Where("`key` = ?", "daily_report_llm_config_id").First(&config).Error; err != nil {
-		return 0
-	}
-	id, err := strconv.ParseUint(config.Value, 10, 64)
+	id, err := strconv.ParseUint(s.configService.GetWithDefault("daily_report_llm_config_id", "0"), 10, 64)
 	if err != nil {
 		return 0
 	}
@@ -509,15 +510,12 @@ func (s *DailyReportService) buildDefaultSummary(stats ReportStats, topProjects 
 }
 
 func (s *DailyReportService) getIMBotIDs() []uint {
-	var config models.SystemConfig
-	if err := s.db.Where("`key` = ?", "daily_report_im_bot_ids").First(&config).Error; err != nil {
-		return nil
-	}
-	if config.Value == "" {
+	value := s.configService.GetWithDefault("daily_report_im_bot_ids", "")
+	if value == "" {
 		return nil
 	}
 	var ids []uint
-	for _, idStr := range strings.Split(config.Value, ",") {
+	for _, idStr := range strings.Split(value, ",") {
 		idStr = strings.TrimSpace(idStr)
 		if id, err := strconv.ParseUint(idStr, 10, 64); err == nil {
 			ids = append(ids, uint(id))

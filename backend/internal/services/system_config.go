@@ -140,6 +140,7 @@ func (s *SystemConfigService) UpdateLDAPConfig(req *UpdateLDAPConfigRequest) err
 type DailyReportConfigResponse struct {
 	Enabled     bool   `json:"enabled"`
 	Time        string `json:"time"`
+	Timezone    string `json:"timezone"`
 	LowScore    int    `json:"low_score"`
 	LLMConfigID int    `json:"llm_config_id"`
 	IMBotIDs    []int  `json:"im_bot_ids"`
@@ -160,6 +161,7 @@ func (s *SystemConfigService) GetDailyReportConfig() *DailyReportConfigResponse 
 	return &DailyReportConfigResponse{
 		Enabled:     s.GetWithDefault("daily_report_enabled", "false") == "true",
 		Time:        s.GetWithDefault("daily_report_time", "18:00"),
+		Timezone:    s.GetWithDefault("daily_report_timezone", "Asia/Shanghai"),
 		LowScore:    lowScore,
 		LLMConfigID: llmConfigID,
 		IMBotIDs:    imBotIDs,
@@ -183,6 +185,7 @@ func splitAndTrim(s, sep string) []string {
 type UpdateDailyReportConfigRequest struct {
 	Enabled     *bool   `json:"enabled"`
 	Time        *string `json:"time"`
+	Timezone    *string `json:"timezone"`
 	LowScore    *int    `json:"low_score"`
 	LLMConfigID *int    `json:"llm_config_id"`
 	IMBotIDs    []int   `json:"im_bot_ids"`
@@ -196,6 +199,11 @@ func (s *SystemConfigService) UpdateDailyReportConfig(req *UpdateDailyReportConf
 	}
 	if req.Time != nil {
 		if err := s.Set("daily_report_time", *req.Time); err != nil {
+			return err
+		}
+	}
+	if req.Timezone != nil {
+		if err := s.Set("daily_report_timezone", *req.Timezone); err != nil {
 			return err
 		}
 	}

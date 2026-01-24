@@ -55,6 +55,7 @@ const Settings: React.FC = () => {
       dailyReportForm.setFieldsValue({
         enabled: dailyReportConfig.enabled,
         time: dailyReportConfig.time ? dayjs(dailyReportConfig.time, 'HH:mm') : dayjs('18:00', 'HH:mm'),
+        timezone: dailyReportConfig.timezone || 'Asia/Shanghai',
         low_score: dailyReportConfig.low_score || 60,
         llm_config_id: dailyReportConfig.llm_config_id || undefined,
         im_bot_ids: dailyReportConfig.im_bot_ids || [],
@@ -72,6 +73,7 @@ const Settings: React.FC = () => {
       dailyReportForm.setFieldsValue({
         enabled: false,
         time: dayjs('18:00', 'HH:mm'),
+        timezone: 'Asia/Shanghai',
         low_score: 60,
       });
       message.error(t('common.error'));
@@ -113,6 +115,7 @@ const Settings: React.FC = () => {
       const payload: Partial<DailyReportConfig> = {
         enabled: values.enabled,
         time: values.time ? values.time.format('HH:mm') : '18:00',
+        timezone: values.timezone || 'Asia/Shanghai',
         low_score: values.low_score,
         llm_config_id: values.llm_config_id || 0,
         im_bot_ids: values.im_bot_ids || [],
@@ -161,7 +164,7 @@ const Settings: React.FC = () => {
           </Form.Item>
 
           <Row gutter={16}>
-            <Col xs={24} sm={12}>
+            <Col xs={24} sm={8}>
               <Form.Item
                 name="time"
                 label={t('settings.dailyReport.time')}
@@ -169,7 +172,32 @@ const Settings: React.FC = () => {
                 <TimePicker format="HH:mm" style={{ width: '100%' }} disabled={!dailyReportEnabled} />
               </Form.Item>
             </Col>
-            <Col xs={24} sm={12}>
+            <Col xs={24} sm={8}>
+              <Form.Item
+                name="timezone"
+                label={t('settings.dailyReport.timezone')}
+              >
+                <Select
+                  showSearch
+                  disabled={!dailyReportEnabled}
+                  options={[
+                    { value: 'Asia/Shanghai', label: 'Asia/Shanghai (UTC+8)' },
+                    { value: 'Asia/Tokyo', label: 'Asia/Tokyo (UTC+9)' },
+                    { value: 'Asia/Singapore', label: 'Asia/Singapore (UTC+8)' },
+                    { value: 'Asia/Hong_Kong', label: 'Asia/Hong_Kong (UTC+8)' },
+                    { value: 'Asia/Seoul', label: 'Asia/Seoul (UTC+9)' },
+                    { value: 'Europe/London', label: 'Europe/London (UTC+0/+1)' },
+                    { value: 'Europe/Paris', label: 'Europe/Paris (UTC+1/+2)' },
+                    { value: 'Europe/Berlin', label: 'Europe/Berlin (UTC+1/+2)' },
+                    { value: 'America/New_York', label: 'America/New_York (UTC-5/-4)' },
+                    { value: 'America/Los_Angeles', label: 'America/Los_Angeles (UTC-8/-7)' },
+                    { value: 'America/Chicago', label: 'America/Chicago (UTC-6/-5)' },
+                    { value: 'UTC', label: 'UTC (UTC+0)' },
+                  ]}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
               <Form.Item
                 name="low_score"
                 label={t('settings.dailyReport.lowScore')}

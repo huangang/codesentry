@@ -103,11 +103,15 @@ func writeLog(level, module, action, message string, userID *uint, ip, userAgent
 }
 
 type SystemLogService struct {
-	db *gorm.DB
+	db            *gorm.DB
+	configService *SystemConfigService
 }
 
 func NewSystemLogService(db *gorm.DB) *SystemLogService {
-	return &SystemLogService{db: db}
+	return &SystemLogService{
+		db:            db,
+		configService: NewSystemConfigService(db),
+	}
 }
 
 type SystemLogListRequest struct {
@@ -205,12 +209,7 @@ func (s *SystemLogService) CleanupOldLogs(retentionDays int) (int64, error) {
 
 // GetRetentionDays gets the log retention days from system config
 func (s *SystemLogService) GetRetentionDays() int {
-	var cfg models.SystemConfig
-	if err := s.db.Where("`key` = ?", "log_retention_days").First(&cfg).Error; err != nil {
-		return 30 // default 30 days
-	}
-
-	days, err := strconv.Atoi(cfg.Value)
+	days, err := strconv.Atoi(s.configService.GetWithDefault("log_retention_days", "30"))
 	if err != nil {
 		return 30
 	}
@@ -219,9 +218,7 @@ func (s *SystemLogService) GetRetentionDays() int {
 
 // SetRetentionDays sets the log retention days in system config
 func (s *SystemLogService) SetRetentionDays(days int) error {
-	return s.db.Model(&models.SystemConfig{}).
-		Where("`key` = ?", "log_retention_days").
-		Update("value", strconv.Itoa(days)).Error
+	return s.configService.Set("log_retention_days", strconv.Itoa(days))
 }
 
 var logCleanupStopChan chan struct{}

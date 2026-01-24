@@ -20,7 +20,7 @@ import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import { reviewLogApi, projectApi, reviewLogApiExtra } from '../services';
 import type { ReviewLog, Project } from '../types';
-import { usePaginatedList, usePermission } from '../hooks';
+import { usePaginatedList, usePermission, getResponsiveWidth } from '../hooks';
 import { MarkdownContent } from '../components';
 import { REVIEW_STATUS, EVENT_TYPES, getScoreColor, getStatusColor } from '../constants';
 
@@ -305,7 +305,7 @@ const ReviewLogs: React.FC = () => {
 
       <Drawer
         title={t('reviewLogs.reviewDetail')}
-        width={typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : 720}
+        width={getResponsiveWidth(720)}
         open={drawerVisible}
         onClose={() => setDrawerVisible(false)}
         styles={{ body: { padding: '16px 12px' } }}

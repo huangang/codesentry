@@ -6,3 +6,5 @@ export type { UseModalReturn } from './useModal';
 
 export { usePermission } from './usePermission';
 export type { UsePermissionReturn } from './usePermission';
+
+export { useIsMobile, getResponsiveWidth } from './useIsMobile';

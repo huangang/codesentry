@@ -17,6 +17,7 @@ codesentry/
 ├── frontend/               # React 前端
 │   ├── src/
 │   │   ├── components/     # 通用组件
+│   │   ├── hooks/          # 自定义 Hooks
 │   │   ├── layouts/        # 布局组件
 │   │   ├── pages/          # 页面组件
 │   │   ├── services/       # API 服务
@@ -25,8 +26,7 @@ codesentry/
 │   │   └── App.tsx
 │   └── package.json
 ├── docker-compose.yml
-├── Dockerfile
-└── DEVELOPMENT_CONTEXT.md  # 开发上下文（必读）
+└── Dockerfile
 ```
 
 ## 技术栈
@@ -87,6 +87,36 @@ db.Where("config_key = ?", key) // 列名不存在
 | `group` | varchar(50) | 分组（MySQL 保留字，查询需加反引号） |
 | `label` | varchar(200) | 显示标签 |
 
+### 系统配置读取规范
+
+**⚠️ 重要**: 读取系统配置时，必须使用 `SystemConfigService`，不要直接查询数据库：
+
+```go
+// ✅ 正确: 使用 SystemConfigService
+configService := NewSystemConfigService(db)
+value := configService.GetWithDefault("daily_report_timezone", "Asia/Shanghai")
+
+// ❌ 错误: 直接查询数据库（重复代码）
+var config models.SystemConfig
+db.Where("`key` = ?", "daily_report_timezone").First(&config)
+```
+
+**Service 依赖注入模式**:
+```go
+type DailyReportService struct {
+    db            *gorm.DB
+    configService *SystemConfigService  // 注入 SystemConfigService
+    // ...
+}
+
+func NewDailyReportService(db *gorm.DB) *DailyReportService {
+    return &DailyReportService{
+        db:            db,
+        configService: NewSystemConfigService(db),
+    }
+}
+```
+
 ### React 前端
 
 ```tsx
@@ -118,8 +148,10 @@ const { t } = useTranslation();
 // 表格必须添加水平滚动
 <Table scroll={{ x: 800 }} ... />
 
-// Modal/Drawer 在移动端全屏
-width={typeof window !== 'undefined' && window.innerWidth < 768 ? '100%' : 640}
+// Modal/Drawer 响应式宽度：使用 getResponsiveWidth 工具函数
+import { getResponsiveWidth } from '../hooks';
+<Modal width={getResponsiveWidth(640)} ... />
+<Drawer width={getResponsiveWidth(720)} ... />
 
 // 使用 Ant Design 响应式栅格
 <Col xs={24} sm={12} lg={6}>  // 移动端全宽，平板半宽，桌面1/4宽
@@ -263,6 +295,7 @@ Git 凭证功能支持：
 |------|------|--------|
 | 启用日报 | 是否启用定时日报 | false |
 | 发送时间 | 每日发送时间 | 18:00 |
+| 时区 | 定时器使用的时区 | Asia/Shanghai |
 | 低分阈值 | 低于此分数的提交会被标注 | 60 |
 | AI 模型 | 用于生成分析的 LLM | 系统默认 |
 | 通知机器人 | 接收日报的 IM 机器人（多选） | 启用日报的机器人 |
