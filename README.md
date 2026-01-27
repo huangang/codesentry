@@ -10,7 +10,7 @@ AI-powered Code Review Platform for GitHub and GitLab.
 
 ## Features
 
-- **AI Code Review**: Automatically review code changes using OpenAI-compatible models
+- **AI Code Review**: Native API support for OpenAI, Anthropic (Claude), Ollama, Google Gemini, and Azure OpenAI
 - **Auto-Scoring**: Automatically appends scoring instructions if custom prompts lack them
 - **Commit Comments**: Post AI review results as comments on commits (GitLab/GitHub)
 - **Commit Status**: Set commit status to block merges when score is below threshold (GitLab/GitHub)
@@ -25,7 +25,7 @@ AI-powered Code Review Platform for GitHub and GitLab.
 
 ![CodeSentry Dashboard](https://raw.githubusercontent.com/huangang/codesentry/main/frontend/public/dashboard-preview.png)
 
-- **LLM Configuration**: Configure multiple AI models with custom endpoints
+- **LLM Configuration**: Configure multiple AI models with native SDK integration (no proxy required for Anthropic/Gemini)
 - **Prompt Templates**: System and custom prompt templates with copy functionality
 - **IM Notifications**: Send review results to DingTalk, Feishu, WeCom, Slack, Discord, Microsoft Teams, Telegram
 - **Daily Reports**: Automated daily code review summary with AI analysis, sent via IM bots

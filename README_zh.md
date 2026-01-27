@@ -10,7 +10,7 @@
 
 ## 功能特性
 
-- **AI 代码审查**: 使用 OpenAI 兼容模型自动审查代码变更
+- **AI 代码审查**: 原生支持 OpenAI、Anthropic (Claude)、Ollama、Google Gemini、Azure OpenAI
 - **自动打分**: 自定义提示词缺少打分指令时，系统自动追加评分要求
 - **Commit 评论**: 将 AI 审查结果作为评论发布到 commit（支持 GitLab/GitHub）
 - **Commit 状态**: 设置 commit 状态，分数低于阈值时阻止合并（支持 GitLab/GitHub）
@@ -26,7 +26,7 @@
 
 ![CodeSentry Dashboard](https://raw.githubusercontent.com/huangang/codesentry/main/frontend/public/dashboard-preview.png)
 
-- **大模型配置**: 配置多个 AI 模型和自定义接口
+- **大模型配置**: 配置多个 AI 模型，原生 SDK 集成（Anthropic/Gemini 无需代理）
 - **提示词模板**: 系统和自定义提示词模板，支持复制为新模板
 - **IM 通知**: 发送审查结果到钉钉、飞书、企业微信、Slack、Discord、Microsoft Teams、Telegram
 - **日报功能**: 自动生成每日代码审查报告，AI 分析总结，通过 IM 机器人发送

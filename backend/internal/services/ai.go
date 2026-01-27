@@ -4,13 +4,19 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/huangang/codesentry/backend/internal/config"
 	"github.com/huangang/codesentry/backend/internal/models"
+	"github.com/ollama/ollama/api"
 	"github.com/sashabaranov/go-openai"
+	"google.golang.org/genai"
 	"gorm.io/gorm"
 )
 
@@ -121,9 +127,27 @@ func (s *AIService) getOrderedLLMConfigs(project *models.Project) []models.LLMCo
 	return configs
 }
 
+// callLLM dispatches to the appropriate provider-specific function based on Provider field
 func (s *AIService) callLLM(ctx context.Context, llmConfig *models.LLMConfig, prompt string) (*ReviewResult, error) {
-	log.Printf("[AI] Using LLM: %s, model: %s", llmConfig.BaseURL, llmConfig.Model)
+	log.Printf("[AI] Using provider: %s, model: %s, baseURL: %s", llmConfig.Provider, llmConfig.Model, llmConfig.BaseURL)
 
+	switch llmConfig.Provider {
+	case "anthropic":
+		return s.callAnthropic(ctx, llmConfig, prompt)
+	case "ollama":
+		return s.callOllama(ctx, llmConfig, prompt)
+	case "gemini":
+		return s.callGemini(ctx, llmConfig, prompt)
+	case "azure":
+		return s.callAzure(ctx, llmConfig, prompt)
+	default:
+		// openai and other OpenAI-compatible services
+		return s.callOpenAI(ctx, llmConfig, prompt)
+	}
+}
+
+// callOpenAI handles OpenAI and OpenAI-compatible APIs (including custom endpoints)
+func (s *AIService) callOpenAI(ctx context.Context, llmConfig *models.LLMConfig, prompt string) (*ReviewResult, error) {
 	clientConfig := openai.DefaultConfig(llmConfig.APIKey)
 	if llmConfig.BaseURL != "" {
 		clientConfig.BaseURL = llmConfig.BaseURL
@@ -147,22 +171,178 @@ func (s *AIService) callLLM(ctx context.Context, llmConfig *models.LLMConfig, pr
 	})
 
 	if err != nil {
-		log.Printf("[AI] API error: %v", err)
-		return nil, fmt.Errorf("AI review failed: %w", err)
+		log.Printf("[AI] OpenAI API error: %v", err)
+		return nil, fmt.Errorf("OpenAI API error: %w", err)
 	}
 
 	if len(resp.Choices) == 0 {
-		return nil, fmt.Errorf("no response from AI")
+		return nil, fmt.Errorf("no response from OpenAI")
 	}
 
 	content := resp.Choices[0].Message.Content
-	log.Printf("[AI] Response length: %d chars", len(content))
-
-	score := extractScore(content)
+	log.Printf("[AI] OpenAI response length: %d chars", len(content))
 
 	return &ReviewResult{
 		Content: content,
-		Score:   score,
+		Score:   extractScore(content),
+	}, nil
+}
+
+// callAnthropic handles Anthropic Claude API using the native SDK
+func (s *AIService) callAnthropic(ctx context.Context, llmConfig *models.LLMConfig, prompt string) (*ReviewResult, error) {
+	client := anthropic.NewClient(
+		option.WithAPIKey(llmConfig.APIKey),
+	)
+
+	maxTokens := int64(llmConfig.MaxTokens)
+	if maxTokens == 0 {
+		maxTokens = 4096
+	}
+
+	model := llmConfig.Model
+	if model == "" {
+		model = "claude-sonnet-4-20250514"
+	}
+
+	resp, err := client.Messages.New(ctx, anthropic.MessageNewParams{
+		Model:     anthropic.Model(model),
+		MaxTokens: maxTokens,
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(prompt)),
+		},
+	})
+	if err != nil {
+		log.Printf("[AI] Anthropic API error: %v", err)
+		return nil, fmt.Errorf("Anthropic API error: %w", err)
+	}
+
+	// Extract text content from response
+	var content string
+	for _, block := range resp.Content {
+		if block.Type == "text" {
+			content += block.Text
+		}
+	}
+
+	log.Printf("[AI] Anthropic response length: %d chars", len(content))
+
+	return &ReviewResult{
+		Content: content,
+		Score:   extractScore(content),
+	}, nil
+}
+
+// callOllama handles Ollama API using the native SDK
+func (s *AIService) callOllama(ctx context.Context, llmConfig *models.LLMConfig, prompt string) (*ReviewResult, error) {
+	baseURL := llmConfig.BaseURL
+	if baseURL == "" {
+		baseURL = "http://localhost:11434"
+	}
+
+	// Parse URL and create client
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid Ollama base URL: %w", err)
+	}
+	client := api.NewClient(u, http.DefaultClient)
+
+	model := llmConfig.Model
+	if model == "" {
+		model = "llama3"
+	}
+
+	var content strings.Builder
+	err = client.Chat(ctx, &api.ChatRequest{
+		Model: model,
+		Messages: []api.Message{
+			{Role: "user", Content: prompt},
+		},
+		Options: map[string]interface{}{
+			"temperature": llmConfig.Temperature,
+		},
+	}, func(resp api.ChatResponse) error {
+		content.WriteString(resp.Message.Content)
+		return nil
+	})
+
+	if err != nil {
+		log.Printf("[AI] Ollama API error: %v", err)
+		return nil, fmt.Errorf("Ollama API error: %w", err)
+	}
+
+	result := content.String()
+	log.Printf("[AI] Ollama response length: %d chars", len(result))
+
+	return &ReviewResult{
+		Content: result,
+		Score:   extractScore(result),
+	}, nil
+}
+
+// callGemini handles Google Gemini API using the native SDK
+func (s *AIService) callGemini(ctx context.Context, llmConfig *models.LLMConfig, prompt string) (*ReviewResult, error) {
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey: llmConfig.APIKey,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Gemini client error: %w", err)
+	}
+
+	model := llmConfig.Model
+	if model == "" {
+		model = "gemini-3.0-flash"
+	}
+
+	resp, err := client.Models.GenerateContent(ctx, model, genai.Text(prompt), nil)
+	if err != nil {
+		log.Printf("[AI] Gemini API error: %v", err)
+		return nil, fmt.Errorf("Gemini API error: %w", err)
+	}
+
+	content := resp.Text()
+	log.Printf("[AI] Gemini response length: %d chars", len(content))
+
+	return &ReviewResult{
+		Content: content,
+		Score:   extractScore(content),
+	}, nil
+}
+
+// callAzure handles Azure OpenAI API using special configuration
+func (s *AIService) callAzure(ctx context.Context, llmConfig *models.LLMConfig, prompt string) (*ReviewResult, error) {
+	// Azure requires BaseURL format: https://{resource-name}.openai.azure.com
+	// Model field is used as deployment name
+	config := openai.DefaultAzureConfig(llmConfig.APIKey, llmConfig.BaseURL)
+	client := openai.NewClientWithConfig(config)
+
+	temperature := float32(0.3)
+	if llmConfig.Temperature > 0 {
+		temperature = float32(llmConfig.Temperature)
+	}
+
+	resp, err := client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+		Model: llmConfig.Model, // In Azure, this is the deployment name
+		Messages: []openai.ChatCompletionMessage{
+			{Role: openai.ChatMessageRoleUser, Content: prompt},
+		},
+		Temperature: temperature,
+	})
+
+	if err != nil {
+		log.Printf("[AI] Azure OpenAI API error: %v", err)
+		return nil, fmt.Errorf("Azure OpenAI API error: %w", err)
+	}
+
+	if len(resp.Choices) == 0 {
+		return nil, fmt.Errorf("no response from Azure OpenAI")
+	}
+
+	content := resp.Choices[0].Message.Content
+	log.Printf("[AI] Azure OpenAI response length: %d chars", len(content))
+
+	return &ReviewResult{
+		Content: content,
+		Score:   extractScore(content),
 	}, nil
 }
 

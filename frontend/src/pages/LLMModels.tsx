@@ -34,6 +34,7 @@ const LLMModels: React.FC = () => {
   const [form] = Form.useForm();
   const [searchName, setSearchName] = React.useState('');
   const [provider, setProvider] = React.useState<string>('');
+  const [selectedProvider, setSelectedProvider] = React.useState<string>('');
 
   const modal = useModal<LLMConfig>();
 
@@ -132,6 +133,61 @@ const LLMModels: React.FC = () => {
     { value: LLM_PROVIDERS.OLLAMA, label: t('llmModels.ollama') },
     { value: LLM_PROVIDERS.GEMINI, label: t('llmModels.gemini') },
   ];
+
+  const handleProviderChange = (value: string) => {
+    setSelectedProvider(value);
+    // Native API providers handle endpoints internally via SDK
+    // Only set Base URL for providers that need custom endpoints
+    switch (value) {
+      case LLM_PROVIDERS.OLLAMA:
+        // Ollama needs server address (no /v1 suffix for native API)
+        form.setFieldsValue({ base_url: 'http://localhost:11434' });
+        break;
+      case LLM_PROVIDERS.AZURE:
+        // Azure needs resource URL
+        form.setFieldsValue({ base_url: 'https://your-resource.openai.azure.com' });
+        break;
+      case LLM_PROVIDERS.OPENAI:
+        // OpenAI default endpoint
+        form.setFieldsValue({ base_url: 'https://api.openai.com/v1' });
+        break;
+      default:
+        // Anthropic and Gemini use native SDKs, no Base URL needed
+        form.setFieldsValue({ base_url: '' });
+        break;
+    }
+  };
+
+  // Get dynamic placeholder and hint for base_url based on provider
+  const getBaseUrlConfig = () => {
+    switch (selectedProvider) {
+      case LLM_PROVIDERS.ANTHROPIC:
+        return {
+          placeholder: t('llmModels.anthropicBaseUrlPlaceholder', 'Optional - SDK uses https://api.anthropic.com'),
+          hint: t('llmModels.anthropicBaseUrlHint', 'Leave empty to use official API (native SDK)'),
+        };
+      case LLM_PROVIDERS.GEMINI:
+        return {
+          placeholder: t('llmModels.geminiBaseUrlPlaceholder', 'Optional - SDK uses Google AI API'),
+          hint: t('llmModels.geminiBaseUrlHint', 'Leave empty to use official API (native SDK)'),
+        };
+      case LLM_PROVIDERS.OLLAMA:
+        return {
+          placeholder: 'http://localhost:11434',
+          hint: t('llmModels.ollamaBaseUrlHint', 'Ollama server address'),
+        };
+      case LLM_PROVIDERS.AZURE:
+        return {
+          placeholder: 'https://your-resource.openai.azure.com',
+          hint: t('llmModels.azureBaseUrlHint', 'Azure OpenAI resource URL'),
+        };
+      default:
+        return {
+          placeholder: 'https://api.openai.com/v1',
+          hint: t('llmModels.openaiBaseUrlHint', 'OpenAI API endpoint or compatible proxy'),
+        };
+    }
+  };
 
   const columns: ColumnsType<LLMConfig> = [
     {
@@ -247,10 +303,10 @@ const LLMModels: React.FC = () => {
             <Input placeholder="GPT-4 Turbo" />
           </Form.Item>
           <Form.Item name="provider" label={t('llmModels.provider')} rules={[{ required: true }]}>
-            <Select options={providerOptions} />
+            <Select options={providerOptions} onChange={handleProviderChange} />
           </Form.Item>
-          <Form.Item name="base_url" label={t('llmModels.baseUrl')} rules={[{ required: true, message: t('llmModels.pleaseInputBaseUrl') }]}>
-            <Input placeholder="https://api.openai.com/v1" />
+          <Form.Item name="base_url" label={t('llmModels.baseUrl')} extra={getBaseUrlConfig().hint}>
+            <Input placeholder={getBaseUrlConfig().placeholder} />
           </Form.Item>
           <Form.Item
             name="api_key"
