@@ -218,7 +218,8 @@
     "pleaseInputModel": "请输入模型名称",
     "openai": "OpenAI",
     "azure": "Azure OpenAI",
-    "custom": "自定义"
+    "ollama": "Ollama",
+    "gemini": "Gemini"
   },
   "imBots": {
     "title": "通知机器人",

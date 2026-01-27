@@ -218,7 +218,8 @@
     "pleaseInputModel": "Please input model name",
     "openai": "OpenAI",
     "azure": "Azure OpenAI",
-    "custom": "Custom"
+    "ollama": "Ollama",
+    "gemini": "Gemini"
   },
   "imBots": {
     "title": "IM Bots",

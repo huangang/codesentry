@@ -37,7 +37,8 @@ export const LLM_PROVIDERS = {
   OPENAI: 'openai',
   AZURE: 'azure',
   ANTHROPIC: 'anthropic',
-  OTHER: 'other',
+  OLLAMA: 'ollama',
+  GEMINI: 'gemini',
 } as const;
 
 export type LLMProvider = typeof LLM_PROVIDERS[keyof typeof LLM_PROVIDERS];

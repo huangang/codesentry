@@ -100,7 +100,7 @@ const LLMModels: React.FC = () => {
       if (modal.current && !values.api_key) {
         delete values.api_key;
       }
-      
+
       if (modal.current) {
         await llmConfigApi.update(modal.current.id, values);
         message.success(t('llmModels.updateSuccess'));
@@ -129,7 +129,8 @@ const LLMModels: React.FC = () => {
     { value: LLM_PROVIDERS.OPENAI, label: t('llmModels.openai') },
     { value: LLM_PROVIDERS.AZURE, label: t('llmModels.azure') },
     { value: LLM_PROVIDERS.ANTHROPIC, label: 'Anthropic' },
-    { value: LLM_PROVIDERS.OTHER, label: t('llmModels.custom') },
+    { value: LLM_PROVIDERS.OLLAMA, label: t('llmModels.ollama') },
+    { value: LLM_PROVIDERS.GEMINI, label: t('llmModels.gemini') },
   ];
 
   const columns: ColumnsType<LLMConfig> = [
@@ -251,9 +252,9 @@ const LLMModels: React.FC = () => {
           <Form.Item name="base_url" label={t('llmModels.baseUrl')} rules={[{ required: true, message: t('llmModels.pleaseInputBaseUrl') }]}>
             <Input placeholder="https://api.openai.com/v1" />
           </Form.Item>
-          <Form.Item 
-            name="api_key" 
-            label={t('llmModels.apiKey')} 
+          <Form.Item
+            name="api_key"
+            label={t('llmModels.apiKey')}
             rules={[{ required: !modal.current }]}
             extra={modal.current ? t('llmModels.keepExistingKey', 'Leave empty to keep existing key') : undefined}
           >
