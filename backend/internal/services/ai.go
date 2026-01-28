@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -21,14 +22,16 @@ import (
 )
 
 type AIService struct {
-	db     *gorm.DB
-	config *config.OpenAIConfig
+	db            *gorm.DB
+	config        *config.OpenAIConfig
+	configService *SystemConfigService
 }
 
 func NewAIService(db *gorm.DB, cfg *config.OpenAIConfig) *AIService {
 	return &AIService{
-		db:     db,
-		config: cfg,
+		db:            db,
+		config:        cfg,
+		configService: NewSystemConfigService(db),
 	}
 }
 
@@ -467,4 +470,108 @@ func (s *AIService) CallWithConfig(ctx context.Context, llmConfigID uint, prompt
 	}
 
 	return result.Content, llmConfig.Name, nil
+}
+
+func (s *AIService) getChunkedReviewEnabled() bool {
+	return s.configService.GetWithDefault("chunked_review_enabled", "true") == "true"
+}
+
+func (s *AIService) getChunkThreshold() int {
+	val, err := strconv.Atoi(s.configService.GetWithDefault("chunked_review_threshold", "50000"))
+	if err != nil || val <= 0 {
+		return 50000
+	}
+	return val
+}
+
+func (s *AIService) getMaxTokensPerBatch() int {
+	val, err := strconv.Atoi(s.configService.GetWithDefault("chunked_review_max_tokens_per_batch", "30000"))
+	if err != nil || val <= 0 {
+		return 30000
+	}
+	return val
+}
+
+func (s *AIService) ReviewChunked(ctx context.Context, req *ReviewRequest) (*ReviewResult, error) {
+	if !s.getChunkedReviewEnabled() {
+		return s.Review(ctx, req)
+	}
+
+	diffSize := len(req.Diffs)
+	threshold := s.getChunkThreshold()
+
+	if diffSize < threshold {
+		return s.Review(ctx, req)
+	}
+
+	files := ParseDiffToFiles(req.Diffs)
+	if len(files) <= 1 {
+		log.Printf("[AI] Large diff (%d chars) but only %d file(s), using regular review", diffSize, len(files))
+		return s.Review(ctx, req)
+	}
+
+	maxTokens := s.getMaxTokensPerBatch()
+	batches := CreateBatches(files, maxTokens)
+
+	log.Printf("[AI] Large diff detected (%d chars, %d files), using chunked review with %d batches",
+		diffSize, len(files), len(batches))
+
+	var (
+		batchResults []BatchResult
+		mu           sync.Mutex
+		wg           sync.WaitGroup
+	)
+
+	for i, batch := range batches {
+		wg.Add(1)
+		go func(batchIdx int, b ReviewBatch) {
+			defer wg.Done()
+
+			batchDiff := ReconstructDiff(b.Files)
+			fileNames := GetBatchFileNames(b)
+			weight := GetBatchWeight(b)
+
+			log.Printf("[AI] Reviewing batch %d/%d: %d files, ~%d tokens",
+				batchIdx+1, len(batches), len(b.Files), b.TotalTokens)
+
+			result, err := s.Review(ctx, &ReviewRequest{
+				ProjectID: req.ProjectID,
+				Diffs:     batchDiff,
+				Commits:   req.Commits,
+			})
+
+			if err != nil {
+				log.Printf("[AI] Batch %d/%d failed: %v", batchIdx+1, len(batches), err)
+				return
+			}
+
+			mu.Lock()
+			batchResults = append(batchResults, BatchResult{
+				BatchIndex: batchIdx,
+				Files:      fileNames,
+				Score:      result.Score,
+				Content:    result.Content,
+				Weight:     weight,
+			})
+			mu.Unlock()
+
+			log.Printf("[AI] Batch %d/%d completed: score=%.0f", batchIdx+1, len(batches), result.Score)
+		}(i, batch)
+	}
+
+	wg.Wait()
+
+	if len(batchResults) == 0 {
+		return nil, fmt.Errorf("all batches failed during chunked review")
+	}
+
+	aggregated := AggregateResults(batchResults)
+
+	log.Printf("[AI] Chunked review completed: %d/%d batches succeeded, aggregated score=%.0f",
+		len(batchResults), len(batches), aggregated.Score)
+
+	return &ReviewResult{
+		Content: aggregated.Content,
+		Score:   aggregated.Score,
+	}, nil
 }

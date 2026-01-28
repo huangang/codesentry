@@ -376,6 +376,16 @@
       "pleaseInputBindDn": "请输入 Bind DN",
       "pleaseInputUserFilter": "请输入用户过滤器",
       "passwordHint": "留空则保留原密码"
+    },
+    "chunkedReview": {
+      "title": "分批审查设置",
+      "enabled": "启用分批审查",
+      "enabledHint": "自动将大型 MR/PR 拆分为多个批次进行审查",
+      "threshold": "分批阈值（字符数）",
+      "thresholdHint": "触发分批审查的 Diff 大小阈值",
+      "maxTokensPerBatch": "每批最大 Token 数",
+      "maxTokensPerBatchHint": "每个审查批次的最大 Token 数量",
+      "saveSuccess": "分批审查设置保存成功"
     }
   },
   "users": {

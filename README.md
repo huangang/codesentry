@@ -11,6 +11,8 @@ AI-powered Code Review Platform for GitHub and GitLab.
 ## Features
 
 - **AI Code Review**: Native API support for OpenAI, Anthropic (Claude), Ollama, Google Gemini, and Azure OpenAI
+- **Chunked Review**: Automatically splits large MRs/PRs into batches for optimal review quality
+- **Smart Filtering**: Auto-skips config files, lock files, and generated files (customizable)
 - **Auto-Scoring**: Automatically appends scoring instructions if custom prompts lack them
 - **Commit Comments**: Post AI review results as comments on commits (GitLab/GitHub)
 - **Commit Status**: Set commit status to block merges when score is below threshold (GitLab/GitHub)

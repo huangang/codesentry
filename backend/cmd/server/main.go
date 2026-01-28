@@ -218,6 +218,8 @@ func main() {
 			admin.PUT("/system-config/ldap", systemConfigHandler.UpdateLDAPConfig)
 			admin.GET("/system-config/daily-report", systemConfigHandler.GetDailyReportConfig)
 			admin.PUT("/system-config/daily-report", systemConfigHandler.UpdateDailyReportConfig)
+			admin.GET("/system-config/chunked-review", systemConfigHandler.GetChunkedReviewConfig)
+			admin.PUT("/system-config/chunked-review", systemConfigHandler.UpdateChunkedReviewConfig)
 
 			// Daily Reports
 			dailyReportHandler := handlers.NewDailyReportHandler(dailyReportService)

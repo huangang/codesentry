@@ -20,6 +20,13 @@ import (
 	"gorm.io/gorm"
 )
 
+// DefaultIgnorePatterns - files that should be skipped by default (config, lock, generated files)
+const DefaultIgnorePatterns = "*.json,*.yaml,*.yml,*.toml,*.xml,*.ini,*.env,*.config," +
+	"*.lock,package-lock.json,yarn.lock,pnpm-lock.yaml,go.sum,Cargo.lock,composer.lock,Gemfile.lock,poetry.lock," +
+	"*.min.js,*.min.css,*.bundle.js,*.bundle.css," +
+	"dist/,build/,out/,target/,.next/," +
+	"vendor/,node_modules/,__pycache__/,.venv/,venv/"
+
 type WebhookService struct {
 	db                  *gorm.DB
 	projectService      *ProjectService
@@ -376,7 +383,7 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 			project.FileExtensions, project.IgnorePatterns, len(diff), len(filteredDiff))
 	}
 
-	result, err := s.aiService.Review(ctx, &ReviewRequest{
+	result, err := s.aiService.ReviewChunked(ctx, &ReviewRequest{
 		ProjectID: project.ID,
 		Diffs:     filteredDiff,
 		Commits:   strings.Join(commits, "\n"),
@@ -469,7 +476,7 @@ func (s *WebhookService) processGitLabMR(ctx context.Context, project *models.Pr
 	s.reviewService.Create(reviewLog)
 
 	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
-	result, err := s.aiService.Review(ctx, &ReviewRequest{
+	result, err := s.aiService.ReviewChunked(ctx, &ReviewRequest{
 		ProjectID: project.ID,
 		Diffs:     filteredDiff,
 		Commits:   event.ObjectAttributes.Title + "\n" + event.ObjectAttributes.Description,
@@ -568,7 +575,7 @@ func (s *WebhookService) processGitHubPush(ctx context.Context, project *models.
 	s.reviewService.Create(reviewLog)
 
 	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
-	result, err := s.aiService.Review(ctx, &ReviewRequest{
+	result, err := s.aiService.ReviewChunked(ctx, &ReviewRequest{
 		ProjectID: project.ID,
 		Diffs:     filteredDiff,
 		Commits:   strings.Join(commits, "\n"),
@@ -645,7 +652,7 @@ func (s *WebhookService) processGitHubPR(ctx context.Context, project *models.Pr
 	s.reviewService.Create(reviewLog)
 
 	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
-	result, err := s.aiService.Review(ctx, &ReviewRequest{
+	result, err := s.aiService.ReviewChunked(ctx, &ReviewRequest{
 		ProjectID: project.ID,
 		Diffs:     filteredDiff,
 		Commits:   event.PullRequest.Title + "\n" + event.PullRequest.Body,
@@ -827,14 +834,25 @@ func (s *WebhookService) filterDiff(diff string, extensions string, ignorePatter
 		}
 	}
 
-	var ignoreList []string
+	ignoreSet := make(map[string]bool)
+	for _, pattern := range strings.Split(DefaultIgnorePatterns, ",") {
+		pattern = strings.TrimSpace(pattern)
+		if pattern != "" {
+			ignoreSet[pattern] = true
+		}
+	}
 	if ignorePatterns != "" {
 		for _, pattern := range strings.Split(ignorePatterns, ",") {
 			pattern = strings.TrimSpace(pattern)
 			if pattern != "" {
-				ignoreList = append(ignoreList, pattern)
+				ignoreSet[pattern] = true
 			}
 		}
+	}
+
+	var ignoreList []string
+	for pattern := range ignoreSet {
+		ignoreList = append(ignoreList, pattern)
 	}
 
 	if len(extMap) == 0 && len(ignoreList) == 0 {
@@ -1362,7 +1380,7 @@ func (s *WebhookService) SyncReview(ctx context.Context, project *models.Project
 	reviewLog.ReviewStatus = "processing"
 	s.reviewService.Update(reviewLog)
 
-	result, err := s.aiService.Review(ctx, &ReviewRequest{
+	result, err := s.aiService.ReviewChunked(ctx, &ReviewRequest{
 		ProjectID: project.ID,
 		Diffs:     req.Diffs,
 		Commits:   req.Message,

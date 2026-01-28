@@ -228,3 +228,45 @@ func (s *SystemConfigService) UpdateDailyReportConfig(req *UpdateDailyReportConf
 	}
 	return nil
 }
+
+// Chunked Review Config
+type ChunkedReviewConfigResponse struct {
+	Enabled           bool `json:"enabled"`
+	Threshold         int  `json:"threshold"`
+	MaxTokensPerBatch int  `json:"max_tokens_per_batch"`
+}
+
+func (s *SystemConfigService) GetChunkedReviewConfig() *ChunkedReviewConfigResponse {
+	threshold, _ := strconv.Atoi(s.GetWithDefault("chunked_review_threshold", "50000"))
+	maxTokens, _ := strconv.Atoi(s.GetWithDefault("chunked_review_max_tokens_per_batch", "30000"))
+	return &ChunkedReviewConfigResponse{
+		Enabled:           s.GetWithDefault("chunked_review_enabled", "true") == "true",
+		Threshold:         threshold,
+		MaxTokensPerBatch: maxTokens,
+	}
+}
+
+type UpdateChunkedReviewConfigRequest struct {
+	Enabled           *bool `json:"enabled"`
+	Threshold         *int  `json:"threshold"`
+	MaxTokensPerBatch *int  `json:"max_tokens_per_batch"`
+}
+
+func (s *SystemConfigService) UpdateChunkedReviewConfig(req *UpdateChunkedReviewConfigRequest) error {
+	if req.Enabled != nil {
+		if err := s.Set("chunked_review_enabled", strconv.FormatBool(*req.Enabled)); err != nil {
+			return err
+		}
+	}
+	if req.Threshold != nil {
+		if err := s.Set("chunked_review_threshold", strconv.Itoa(*req.Threshold)); err != nil {
+			return err
+		}
+	}
+	if req.MaxTokensPerBatch != nil {
+		if err := s.Set("chunked_review_max_tokens_per_batch", strconv.Itoa(*req.MaxTokensPerBatch)); err != nil {
+			return err
+		}
+	}
+	return nil
+}

@@ -376,6 +376,16 @@
       "pleaseInputBindDn": "Please input Bind DN",
       "pleaseInputUserFilter": "Please input user filter",
       "passwordHint": "Leave empty to keep existing password"
+    },
+    "chunkedReview": {
+      "title": "Chunked Review Settings",
+      "enabled": "Enable Chunked Review",
+      "enabledHint": "Automatically split large MRs/PRs into batches for review",
+      "threshold": "Chunk Threshold (chars)",
+      "thresholdHint": "Diff size threshold to trigger chunked review",
+      "maxTokensPerBatch": "Max Tokens Per Batch",
+      "maxTokensPerBatchHint": "Maximum tokens for each review batch",
+      "saveSuccess": "Chunked review settings saved successfully"
     }
   },
   "users": {

@@ -11,6 +11,8 @@
 ## 功能特性
 
 - **AI 代码审查**: 原生支持 OpenAI、Anthropic (Claude)、Ollama、Google Gemini、Azure OpenAI
+- **分批审查**: 大型 MR/PR 自动分批处理，确保审查质量
+- **智能过滤**: 自动跳过配置文件、锁文件、生成文件（可自定义）
 - **自动打分**: 自定义提示词缺少打分指令时，系统自动追加评分要求
 - **Commit 评论**: 将 AI 审查结果作为评论发布到 commit（支持 GitLab/GitHub）
 - **Commit 状态**: 设置 commit 状态，分数低于阈值时阻止合并（支持 GitLab/GitHub）

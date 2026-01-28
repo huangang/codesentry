@@ -318,6 +318,38 @@ Git 凭证功能支持：
 - 同一天的日报任务只会被一个 Pod 执行
 - 锁有效期 10 分钟，超时自动释放
 
+### 大型 MR/PR 分批审查
+当 Merge Request 或 Pull Request 涉及大量文件或改动时，系统会自动分批审查。
+
+**工作原理**:
+1. **过滤阶段**: 自动跳过不需要审查的文件（配置文件、锁文件、生成文件等）
+2. **分批阶段**: 按 token 预估将文件分组，每批控制在配置的上限内
+3. **审查阶段**: 并行审查每个批次
+4. **汇总阶段**: 使用加权平均（按代码改动量）计算最终分数，合并所有问题
+
+**默认忽略的文件类型** (`DefaultIgnorePatterns`):
+| 类型 | 模式 |
+|------|------|
+| 配置文件 | `*.json, *.yaml, *.yml, *.toml, *.xml, *.ini, *.env, *.config` |
+| 锁文件 | `package-lock.json, yarn.lock, pnpm-lock.yaml, go.sum, Cargo.lock, composer.lock, Gemfile.lock, poetry.lock` |
+| 压缩/打包文件 | `*.min.js, *.min.css, *.bundle.js, *.bundle.css` |
+| 构建目录 | `dist/, build/, out/, target/, .next/` |
+| 依赖目录 | `vendor/, node_modules/, __pycache__/, .venv/, venv/` |
+
+**注意**: 项目级别的 `ignore_patterns` 配置会与默认忽略模式合并，不会覆盖。
+
+**系统配置项**（数据库 `system_configs` 表）:
+| 配置键 | 默认值 | 说明 |
+|--------|--------|------|
+| `chunked_review_enabled` | `true` | 是否启用分批审查 |
+| `chunked_review_threshold` | `50000` | 触发分批的字符阈值 |
+| `chunked_review_max_tokens_per_batch` | `30000` | 每批最大 token 数 |
+
+**涉及文件**:
+- `/backend/internal/services/chunked_review.go` - 分批逻辑（解析、分组、汇总）
+- `/backend/internal/services/ai.go` - `ReviewChunked()` 方法
+- `/backend/internal/services/webhook.go` - `DefaultIgnorePatterns` 常量、`filterDiff()` 增强
+
 ### 优雅关闭 (Graceful Shutdown)
 服务器支持优雅关闭，确保在收到终止信号时正确清理资源。
 

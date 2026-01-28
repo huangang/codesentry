@@ -208,6 +208,11 @@ export const systemConfigApi = {
 
   updateDailyReportConfig: (data: Partial<DailyReportConfig>) =>
     api.put<DailyReportConfig>('/system-config/daily-report', data),
+
+  getChunkedReviewConfig: () => api.get<ChunkedReviewConfig>('/system-config/chunked-review'),
+
+  updateChunkedReviewConfig: (data: Partial<ChunkedReviewConfig>) =>
+    api.put<ChunkedReviewConfig>('/system-config/chunked-review', data),
 };
 
 export interface DailyReportConfig {
@@ -217,6 +222,12 @@ export interface DailyReportConfig {
   low_score: number;
   llm_config_id: number;
   im_bot_ids: number[];
+}
+
+export interface ChunkedReviewConfig {
+  enabled: boolean;
+  threshold: number;
+  max_tokens_per_batch: number;
 }
 
 export const userApi = {

@@ -57,3 +57,23 @@ func (h *SystemConfigHandler) UpdateDailyReportConfig(c *gin.Context) {
 
 	c.JSON(http.StatusOK, h.configService.GetDailyReportConfig())
 }
+
+func (h *SystemConfigHandler) GetChunkedReviewConfig(c *gin.Context) {
+	config := h.configService.GetChunkedReviewConfig()
+	c.JSON(http.StatusOK, config)
+}
+
+func (h *SystemConfigHandler) UpdateChunkedReviewConfig(c *gin.Context) {
+	var req services.UpdateChunkedReviewConfigRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.configService.UpdateChunkedReviewConfig(&req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, h.configService.GetChunkedReviewConfig())
+}
