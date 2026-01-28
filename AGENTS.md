@@ -226,8 +226,49 @@ Git 凭证功能支持：
 
 配置流程：
 1. 在「Git 凭证」页面创建凭证，填写平台、服务器地址、Access Token、Webhook Secret
-2. 在 GitLab/GitHub 配置统一 Webhook URL: `https://your-domain/webhook`
+2. 在 GitLab/GitHub/Bitbucket 配置统一 Webhook URL: `https://your-domain/webhook`
 3. 新仓库触发 webhook 时自动创建项目并开始代码审查
+
+### Bitbucket 支持
+系统支持 Bitbucket Cloud 的 webhook 集成，包括推送事件和 Pull Request 事件。
+
+**支持的事件**:
+| 事件类型 | Bitbucket Event Key | 说明 |
+|----------|---------------------|------|
+| 推送 | `repo:push` | 代码推送到仓库 |
+| PR 创建 | `pullrequest:created` | 创建新的 Pull Request |
+| PR 更新 | `pullrequest:updated` | 更新现有的 Pull Request |
+
+**Webhook 配置** (Bitbucket Cloud):
+1. 进入仓库 Settings > Webhooks
+2. 点击 "Add webhook"
+3. URL: `https://your-domain/webhook`
+4. Secret: 配置的 webhook 密钥（用于 HMAC-SHA256 签名验证）
+5. Triggers: 选择 "Repository push" 和 "Pull request created/updated"
+
+**API 端点**:
+- `POST /webhook` - 统一 webhook（自动检测平台，推荐）
+- `POST /api/webhook/bitbucket` - Bitbucket 专用 webhook（自动匹配项目）
+- `POST /api/webhook/bitbucket/:project_id` - 指定项目 ID 的 Bitbucket webhook
+
+**Bitbucket API 调用**:
+| 功能 | API 端点 |
+|------|----------|
+| 获取提交 Diff | `GET /2.0/repositories/{workspace}/{repo}/diff/{commit}` |
+| 获取 PR Diff | `GET /2.0/repositories/{workspace}/{repo}/pullrequests/{id}/diff` |
+| 设置构建状态 | `POST /2.0/repositories/{workspace}/{repo}/commit/{commit}/statuses/build` |
+| 发布提交评论 | `POST /2.0/repositories/{workspace}/{repo}/commit/{commit}/comments` |
+| 发布 PR 评论 | `POST /2.0/repositories/{workspace}/{repo}/pullrequests/{id}/comments` |
+
+**构建状态**:
+- `INPROGRESS` - AI 审查进行中
+- `SUCCESSFUL` - 审查通过（分数 >= 最低分）
+- `FAILED` - 审查失败或分数低于阈值
+
+**注意事项**:
+- Bitbucket Cloud 使用 `https://api.bitbucket.org/2.0/` 作为 API 基础 URL
+- Access Token 需要有仓库读取和写入权限（用于获取 diff 和发布评论）
+- 签名验证使用 HMAC-SHA256 算法
 
 ### 错误日志 IM 通知
 系统错误可以通过 IM 机器人实时通知，便于及时发现和处理问题。

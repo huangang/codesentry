@@ -4,7 +4,7 @@
   <img src="https://raw.githubusercontent.com/huangang/codesentry/main/frontend/public/codesentry-icon.png" alt="CodeSentry Logo" width="120" height="120">
 </div>
 
-基于 AI 的代码审查平台，支持 GitHub 和 GitLab。
+基于 AI 的代码审查平台，支持 GitHub、GitLab 和 Bitbucket。
 
 [English](./README.md)
 
@@ -18,7 +18,7 @@
 - **Commit 状态**: 设置 commit 状态，分数低于阈值时阻止合并（支持 GitLab/GitHub）
 - **同步审查 API**: 为 Git pre-receive hook 提供同步审查接口，可阻止不合格的 push
 - **防重复审查**: 跳过已审查的 commit，避免重复处理
-- **多平台支持**: GitHub 和 GitLab Webhook 集成，支持多级项目路径
+- **多平台支持**: GitHub、GitLab 和 Bitbucket Webhook 集成，支持多级项目路径
 - **可视化看板**: 代码审查活动的统计指标和图表
 - **可视化看板**: 代码审查活动的统计指标和图表
 - **审查历史**: 详细的审查记录追踪，支持直接跳转到 commit/MR 页面
@@ -155,7 +155,7 @@ jwt:
 
 ### 推荐：统一 Webhook（自动识别）
 
-使用单一 Webhook 地址同时支持 GitLab 和 GitHub：
+使用单一 Webhook 地址同时支持 GitLab、GitHub 和 Bitbucket：
 
 ```
 https://你的域名/webhook
@@ -179,6 +179,13 @@ https://你的域名/review/webhook
 2. URL: `https://你的域名/webhook`
 3. Secret Token: 您配置的 Webhook 密钥
 4. Trigger: Push events, Merge request events
+
+### Bitbucket
+
+1. 进入仓库设置 > Webhooks > Add webhook
+2. URL: `https://你的域名/webhook`
+3. Secret: 您配置的 Webhook 密钥（用于 HMAC-SHA256 签名验证）
+4. Triggers: 选择 "Repository push" 和 "Pull request created/updated"
 
 ## API 接口
 
@@ -250,7 +257,7 @@ https://你的域名/review/webhook
 
 ### Webhooks
 
-- `POST /webhook` - **统一 Webhook（自动识别 GitLab/GitHub，推荐）**
+- `POST /webhook` - **统一 Webhook（自动识别 GitLab/GitHub/Bitbucket，推荐）**
 - `POST /review/webhook` - 统一 Webhook 别名
 - `POST /api/webhook` - /api 前缀下的统一 Webhook
 - `POST /api/review/webhook` - /api 前缀下的别名
@@ -258,6 +265,8 @@ https://你的域名/review/webhook
 - `POST /api/webhook/github` - GitHub Webhook（自动匹配项目）
 - `POST /api/webhook/gitlab/:project_id` - GitLab Webhook（指定项目ID）
 - `POST /api/webhook/github/:project_id` - GitHub Webhook（指定项目ID）
+- `POST /api/webhook/bitbucket` - Bitbucket Webhook（自动匹配项目）
+- `POST /api/webhook/bitbucket/:project_id` - Bitbucket Webhook（指定项目ID）
 
 ### 同步审查（用于 Git Hooks）
 

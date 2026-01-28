@@ -154,6 +154,7 @@
     "pleaseSelectPlatform": "Please select platform",
     "github": "GitHub",
     "gitlab": "GitLab",
+    "bitbucket": "Bitbucket",
     "promptMode": "Prompt Mode",
     "useSystemDefault": "System Default",
     "useTemplate": "Use Template",

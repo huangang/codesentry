@@ -217,6 +217,151 @@ type GitHubPREvent struct {
 	} `json:"repository"`
 }
 
+// BitbucketPushEvent represents a Bitbucket push webhook event
+type BitbucketPushEvent struct {
+	Push struct {
+		Changes []struct {
+			New struct {
+				Name   string `json:"name"`
+				Type   string `json:"type"`
+				Target struct {
+					Hash    string `json:"hash"`
+					Message string `json:"message"`
+					Date    string `json:"date"`
+					Author  struct {
+						Raw  string `json:"raw"`
+						User struct {
+							DisplayName string `json:"display_name"`
+							UUID        string `json:"uuid"`
+							AccountID   string `json:"account_id"`
+							Nickname    string `json:"nickname"`
+							Links       struct {
+								Avatar struct {
+									Href string `json:"href"`
+								} `json:"avatar"`
+								HTML struct {
+									Href string `json:"href"`
+								} `json:"html"`
+							} `json:"links"`
+						} `json:"user"`
+					} `json:"author"`
+					Links struct {
+						HTML struct {
+							Href string `json:"href"`
+						} `json:"html"`
+					} `json:"links"`
+				} `json:"target"`
+			} `json:"new"`
+			Old struct {
+				Name   string `json:"name"`
+				Target struct {
+					Hash string `json:"hash"`
+				} `json:"target"`
+			} `json:"old"`
+			Commits []struct {
+				Hash    string `json:"hash"`
+				Message string `json:"message"`
+				Author  struct {
+					Raw  string `json:"raw"`
+					User struct {
+						DisplayName string `json:"display_name"`
+					} `json:"user"`
+				} `json:"author"`
+				Links struct {
+					HTML struct {
+						Href string `json:"href"`
+					} `json:"html"`
+				} `json:"links"`
+			} `json:"commits"`
+		} `json:"changes"`
+	} `json:"push"`
+	Repository struct {
+		UUID     string `json:"uuid"`
+		Name     string `json:"name"`
+		FullName string `json:"full_name"`
+		Links    struct {
+			HTML struct {
+				Href string `json:"href"`
+			} `json:"html"`
+		} `json:"links"`
+	} `json:"repository"`
+	Actor struct {
+		DisplayName string `json:"display_name"`
+		UUID        string `json:"uuid"`
+		AccountID   string `json:"account_id"`
+		Nickname    string `json:"nickname"`
+		Links       struct {
+			Avatar struct {
+				Href string `json:"href"`
+			} `json:"avatar"`
+			HTML struct {
+				Href string `json:"href"`
+			} `json:"html"`
+		} `json:"links"`
+	} `json:"actor"`
+}
+
+// BitbucketPREvent represents a Bitbucket pull request webhook event
+type BitbucketPREvent struct {
+	PullRequest struct {
+		ID          int    `json:"id"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		State       string `json:"state"`
+		Source      struct {
+			Branch struct {
+				Name string `json:"name"`
+			} `json:"branch"`
+			Commit struct {
+				Hash string `json:"hash"`
+			} `json:"commit"`
+		} `json:"source"`
+		Destination struct {
+			Branch struct {
+				Name string `json:"name"`
+			} `json:"branch"`
+		} `json:"destination"`
+		Author struct {
+			DisplayName string `json:"display_name"`
+			UUID        string `json:"uuid"`
+			AccountID   string `json:"account_id"`
+			Nickname    string `json:"nickname"`
+			Links       struct {
+				Avatar struct {
+					Href string `json:"href"`
+				} `json:"avatar"`
+				HTML struct {
+					Href string `json:"href"`
+				} `json:"html"`
+			} `json:"links"`
+		} `json:"author"`
+		Links struct {
+			HTML struct {
+				Href string `json:"href"`
+			} `json:"html"`
+		} `json:"links"`
+	} `json:"pullrequest"`
+	Repository struct {
+		UUID     string `json:"uuid"`
+		Name     string `json:"name"`
+		FullName string `json:"full_name"`
+		Links    struct {
+			HTML struct {
+				Href string `json:"href"`
+			} `json:"html"`
+		} `json:"links"`
+	} `json:"repository"`
+	Actor struct {
+		DisplayName string `json:"display_name"`
+		UUID        string `json:"uuid"`
+		Links       struct {
+			Avatar struct {
+				Href string `json:"href"`
+			} `json:"avatar"`
+		} `json:"links"`
+	} `json:"actor"`
+}
+
 // HandleGitLabWebhook processes GitLab webhook events
 func (s *WebhookService) HandleGitLabWebhook(ctx context.Context, projectID uint, eventType string, body []byte) error {
 	log.Printf("[Webhook] Received GitLab webhook: projectID=%d, eventType=%s", projectID, eventType)
@@ -536,6 +681,294 @@ func (s *WebhookService) processGitLabMR(ctx context.Context, project *models.Pr
 	}
 
 	return nil
+}
+
+// HandleBitbucketWebhook processes Bitbucket webhook events
+func (s *WebhookService) HandleBitbucketWebhook(ctx context.Context, projectID uint, eventType string, body []byte) error {
+	log.Printf("[Webhook] Received Bitbucket webhook: projectID=%d, eventType=%s", projectID, eventType)
+
+	project, err := s.projectService.GetByID(projectID)
+	if err != nil {
+		log.Printf("[Webhook] Project not found: %d, error: %v", projectID, err)
+		return fmt.Errorf("project not found: %w", err)
+	}
+
+	if !project.AIEnabled {
+		log.Printf("[Webhook] AI disabled for project %d, skipping", projectID)
+		return nil
+	}
+
+	switch eventType {
+	case "repo:push":
+		if !strings.Contains(project.ReviewEvents, "push") {
+			log.Printf("[Webhook] Push events not enabled for project %d, skipping", projectID)
+			return nil
+		}
+		var event BitbucketPushEvent
+		if err := json.Unmarshal(body, &event); err != nil {
+			log.Printf("[Webhook] Failed to parse Bitbucket push event: %v", err)
+			return err
+		}
+		return s.processBitbucketPush(ctx, project, &event)
+
+	case "pullrequest:created", "pullrequest:updated":
+		if !strings.Contains(project.ReviewEvents, "merge_request") {
+			log.Printf("[Webhook] PR events not enabled for project %d, skipping", projectID)
+			return nil
+		}
+		var event BitbucketPREvent
+		if err := json.Unmarshal(body, &event); err != nil {
+			log.Printf("[Webhook] Failed to parse Bitbucket PR event: %v", err)
+			return err
+		}
+		return s.processBitbucketPR(ctx, project, &event)
+	default:
+		log.Printf("[Webhook] Unknown Bitbucket event type: %s, skipping", eventType)
+	}
+
+	return nil
+}
+
+func (s *WebhookService) processBitbucketPush(ctx context.Context, project *models.Project, event *BitbucketPushEvent) error {
+	if len(event.Push.Changes) == 0 {
+		return nil
+	}
+
+	for _, change := range event.Push.Changes {
+		if change.New.Type != "branch" || len(change.Commits) == 0 {
+			continue
+		}
+
+		branch := change.New.Name
+		if s.isBranchIgnored(branch, project.BranchFilter) {
+			log.Printf("[Webhook] Branch %s is in ignore list, skipping review", branch)
+			continue
+		}
+
+		commitSHA := change.New.Target.Hash
+		if s.isCommitAlreadyReviewed(project.ID, commitSHA) {
+			log.Printf("[Webhook] Commit %s already reviewed, skipping", commitSHA[:8])
+			continue
+		}
+
+		var commits []string
+		for _, c := range change.Commits {
+			commits = append(commits, fmt.Sprintf("%s: %s", c.Hash[:8], c.Message))
+		}
+
+		log.Printf("[Webhook] Processing Bitbucket push: %d commits, branch=%s, commit=%s",
+			len(change.Commits), branch, commitSHA[:8])
+
+		LogInfo("Webhook", "BitbucketPush", fmt.Sprintf("Processing push from %s: %d commits", event.Actor.DisplayName, len(change.Commits)), nil, "", "", map[string]interface{}{
+			"project_id": project.ID,
+			"branch":     branch,
+			"commit":     commitSHA,
+		})
+
+		s.setBitbucketCommitStatus(project, commitSHA, "INPROGRESS", "AI Review in progress...")
+
+		var allDiffs strings.Builder
+		for _, c := range change.Commits {
+			diff, err := s.getBitbucketDiff(project, c.Hash)
+			if err != nil {
+				log.Printf("[Webhook] Failed to get diff for commit %s: %v", c.Hash[:8], err)
+				continue
+			}
+			allDiffs.WriteString(fmt.Sprintf("\n### Commit: %s\n%s\n", c.Hash[:8], diff))
+		}
+
+		diff := allDiffs.String()
+		if diff == "" {
+			diff = "Failed to get diff for all commits"
+			log.Printf("[Webhook] No diffs retrieved for any commits")
+		} else {
+			log.Printf("[Webhook] Got combined diffs, total length: %d bytes", len(diff))
+		}
+
+		additions, deletions, filesChanged := parseDiffStats(diff)
+
+		var commitURL string
+		if change.New.Target.Links.HTML.Href != "" {
+			commitURL = change.New.Target.Links.HTML.Href
+		}
+
+		authorName := event.Actor.DisplayName
+		authorAvatar := event.Actor.Links.Avatar.Href
+		authorURL := event.Actor.Links.HTML.Href
+		if change.New.Target.Author.User.DisplayName != "" {
+			authorName = change.New.Target.Author.User.DisplayName
+			authorAvatar = change.New.Target.Author.User.Links.Avatar.Href
+			authorURL = change.New.Target.Author.User.Links.HTML.Href
+		}
+
+		reviewLog := &models.ReviewLog{
+			ProjectID:     project.ID,
+			EventType:     "push",
+			CommitHash:    commitSHA,
+			CommitURL:     commitURL,
+			Branch:        branch,
+			Author:        authorName,
+			AuthorAvatar:  authorAvatar,
+			AuthorURL:     authorURL,
+			CommitMessage: strings.Join(commits, "\n"),
+			FilesChanged:  filesChanged,
+			Additions:     additions,
+			Deletions:     deletions,
+			ReviewStatus:  "pending",
+		}
+		s.reviewService.Create(reviewLog)
+
+		log.Printf("[Webhook] Starting AI review for project %d, commit %s", project.ID, commitSHA[:8])
+
+		filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
+		if filteredDiff != diff {
+			log.Printf("[Webhook] Filtered diff by extensions (%s) and ignore patterns (%s): %d -> %d bytes",
+				project.FileExtensions, project.IgnorePatterns, len(diff), len(filteredDiff))
+		}
+
+		result, err := s.aiService.ReviewChunked(ctx, &ReviewRequest{
+			ProjectID: project.ID,
+			Diffs:     filteredDiff,
+			Commits:   strings.Join(commits, "\n"),
+		})
+
+		if err != nil {
+			log.Printf("[Webhook] AI review failed: %v", err)
+			LogError("AIReview", "ReviewFailed", err.Error(), nil, "", "", map[string]interface{}{
+				"project_id": project.ID,
+				"commit":     commitSHA,
+			})
+			reviewLog.ReviewStatus = "failed"
+			reviewLog.ErrorMessage = err.Error()
+			s.setBitbucketCommitStatus(project, commitSHA, "FAILED", "AI Review Failed")
+		} else {
+			log.Printf("[Webhook] AI review completed, score: %.1f, result length: %d", result.Score, len(result.Content))
+			LogInfo("AIReview", "ReviewCompleted", fmt.Sprintf("Review completed with score %.0f", result.Score), nil, "", "", map[string]interface{}{
+				"project_id": project.ID,
+				"commit":     commitSHA,
+				"score":      result.Score,
+			})
+			reviewLog.ReviewStatus = "completed"
+			reviewLog.ReviewResult = result.Content
+			reviewLog.Score = &result.Score
+
+			s.notificationService.SendReviewNotification(project, &ReviewNotification{
+				ProjectName:   project.Name,
+				Branch:        branch,
+				Author:        authorName,
+				CommitMessage: strings.Join(commits, "\n"),
+				Score:         result.Score,
+				ReviewResult:  result.Content,
+				EventType:     "push",
+			})
+
+			if project.CommentEnabled {
+				comment := s.formatReviewComment(result.Score, result.Content)
+				if err := s.postBitbucketCommitComment(project, commitSHA, comment); err != nil {
+					log.Printf("[Webhook] Failed to post Bitbucket commit comment: %v", err)
+				} else {
+					reviewLog.CommentPosted = true
+				}
+			}
+
+			minScore := s.getEffectiveMinScore(project)
+			if result.Score >= minScore {
+				s.setBitbucketCommitStatus(project, commitSHA, "SUCCESSFUL", fmt.Sprintf("AI Review Passed: %.0f/%.0f", result.Score, minScore))
+			} else {
+				s.setBitbucketCommitStatus(project, commitSHA, "FAILED", fmt.Sprintf("AI Review Failed: %.0f (Min: %.0f)", result.Score, minScore))
+			}
+		}
+
+		if err := s.reviewService.Update(reviewLog); err != nil {
+			log.Printf("[Webhook] Failed to update review log: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func (s *WebhookService) processBitbucketPR(ctx context.Context, project *models.Project, event *BitbucketPREvent) error {
+	branch := event.PullRequest.Source.Branch.Name
+	if s.isBranchIgnored(branch, project.BranchFilter) {
+		log.Printf("[Webhook] Branch %s is in ignore list, skipping review", branch)
+		return nil
+	}
+
+	prNumber := event.PullRequest.ID
+	commitSHA := event.PullRequest.Source.Commit.Hash
+
+	s.setBitbucketCommitStatus(project, commitSHA, "INPROGRESS", "AI Review in progress...")
+
+	diff, err := s.getBitbucketPRDiff(project, prNumber)
+	if err != nil {
+		diff = "Failed to get diff: " + err.Error()
+	}
+
+	additions, deletions, filesChanged := parseDiffStats(diff)
+
+	reviewLog := &models.ReviewLog{
+		ProjectID:     project.ID,
+		EventType:     "merge_request",
+		CommitHash:    commitSHA,
+		Branch:        branch,
+		Author:        event.PullRequest.Author.DisplayName,
+		AuthorAvatar:  event.PullRequest.Author.Links.Avatar.Href,
+		AuthorURL:     event.PullRequest.Author.Links.HTML.Href,
+		CommitMessage: event.PullRequest.Title,
+		FilesChanged:  filesChanged,
+		Additions:     additions,
+		Deletions:     deletions,
+		MRNumber:      &prNumber,
+		MRURL:         event.PullRequest.Links.HTML.Href,
+		ReviewStatus:  "pending",
+	}
+	s.reviewService.Create(reviewLog)
+
+	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
+	result, err := s.aiService.ReviewChunked(ctx, &ReviewRequest{
+		ProjectID: project.ID,
+		Diffs:     filteredDiff,
+		Commits:   event.PullRequest.Title + "\n" + event.PullRequest.Description,
+	})
+
+	if err != nil {
+		reviewLog.ReviewStatus = "failed"
+		reviewLog.ErrorMessage = err.Error()
+		s.setBitbucketCommitStatus(project, commitSHA, "FAILED", "AI Review Failed")
+	} else {
+		reviewLog.ReviewStatus = "completed"
+		reviewLog.ReviewResult = result.Content
+		reviewLog.Score = &result.Score
+
+		s.notificationService.SendReviewNotification(project, &ReviewNotification{
+			ProjectName:   project.Name,
+			Branch:        branch,
+			Author:        event.PullRequest.Author.DisplayName,
+			CommitMessage: event.PullRequest.Title,
+			Score:         result.Score,
+			ReviewResult:  result.Content,
+			EventType:     "merge_request",
+			MRURL:         event.PullRequest.Links.HTML.Href,
+		})
+
+		if project.CommentEnabled {
+			comment := s.formatReviewComment(result.Score, result.Content)
+			if err := s.postBitbucketPRComment(project, prNumber, comment); err != nil {
+				log.Printf("[Webhook] Failed to post Bitbucket PR comment: %v", err)
+			} else {
+				reviewLog.CommentPosted = true
+			}
+		}
+
+		minScore := s.getEffectiveMinScore(project)
+		if result.Score >= minScore {
+			s.setBitbucketCommitStatus(project, commitSHA, "SUCCESSFUL", fmt.Sprintf("AI Review Passed: %.0f/%.0f", result.Score, minScore))
+		} else {
+			s.setBitbucketCommitStatus(project, commitSHA, "FAILED", fmt.Sprintf("AI Review Failed: %.0f (Min: %.0f)", result.Score, minScore))
+		}
+	}
+
+	return s.reviewService.Update(reviewLog)
 }
 
 func (s *WebhookService) processGitHubPush(ctx context.Context, project *models.Project, event *GitHubPushEvent) error {
@@ -1288,6 +1721,210 @@ func (s *WebhookService) postGitHubCommitComment(project *models.Project, commit
 
 	log.Printf("[Webhook] Posted comment to GitHub commit %s", commitSHA[:8])
 	return nil
+}
+
+func (s *WebhookService) getBitbucketDiff(project *models.Project, commitSHA string) (string, error) {
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		return "", err
+	}
+
+	apiURL := fmt.Sprintf("https://api.bitbucket.org/2.0/repositories/%s/diff/%s",
+		info.projectPath, commitSHA)
+
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return "", err
+	}
+	if project.AccessToken != "" {
+		req.Header.Set("Authorization", "Bearer "+project.AccessToken)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Bitbucket API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return string(body), nil
+}
+
+func (s *WebhookService) getBitbucketPRDiff(project *models.Project, prNumber int) (string, error) {
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		return "", err
+	}
+
+	apiURL := fmt.Sprintf("https://api.bitbucket.org/2.0/repositories/%s/pullrequests/%d/diff",
+		info.projectPath, prNumber)
+
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return "", err
+	}
+	if project.AccessToken != "" {
+		req.Header.Set("Authorization", "Bearer "+project.AccessToken)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Bitbucket API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return string(body), nil
+}
+
+func (s *WebhookService) setBitbucketCommitStatus(project *models.Project, sha string, state string, description string) {
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		log.Printf("[Webhook] Failed to parse repo info for Bitbucket status update: %v", err)
+		return
+	}
+
+	apiURL := fmt.Sprintf("https://api.bitbucket.org/2.0/repositories/%s/commit/%s/statuses/build",
+		info.projectPath, sha)
+
+	data := map[string]string{
+		"state":       state,
+		"key":         "codesentry-ai-review",
+		"name":        "CodeSentry AI Review",
+		"description": description,
+	}
+
+	payload, _ := json.Marshal(data)
+	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(payload))
+	if err != nil {
+		log.Printf("[Webhook] Failed to create Bitbucket status request: %v", err)
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if project.AccessToken != "" {
+		req.Header.Set("Authorization", "Bearer "+project.AccessToken)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		log.Printf("[Webhook] Failed to send Bitbucket commit status: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("[Webhook] Failed to set Bitbucket commit status (code %d): %s", resp.StatusCode, string(body))
+	} else {
+		log.Printf("[Webhook] Set Bitbucket commit status for %s to %s", sha[:8], state)
+	}
+}
+
+func (s *WebhookService) postBitbucketCommitComment(project *models.Project, commitSHA string, comment string) error {
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		return err
+	}
+
+	apiURL := fmt.Sprintf("https://api.bitbucket.org/2.0/repositories/%s/commit/%s/comments",
+		info.projectPath, commitSHA)
+
+	data := map[string]interface{}{
+		"content": map[string]string{
+			"raw": comment,
+		},
+	}
+
+	payload, _ := json.Marshal(data)
+	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if project.AccessToken != "" {
+		req.Header.Set("Authorization", "Bearer "+project.AccessToken)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("Bitbucket API returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	log.Printf("[Webhook] Posted comment to Bitbucket commit %s", commitSHA[:8])
+	return nil
+}
+
+func (s *WebhookService) postBitbucketPRComment(project *models.Project, prNumber int, comment string) error {
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		return err
+	}
+
+	apiURL := fmt.Sprintf("https://api.bitbucket.org/2.0/repositories/%s/pullrequests/%d/comments",
+		info.projectPath, prNumber)
+
+	data := map[string]interface{}{
+		"content": map[string]string{
+			"raw": comment,
+		},
+	}
+
+	payload, _ := json.Marshal(data)
+	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if project.AccessToken != "" {
+		req.Header.Set("Authorization", "Bearer "+project.AccessToken)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("Bitbucket API returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	log.Printf("[Webhook] Posted comment to Bitbucket PR %d", prNumber)
+	return nil
+}
+
+func VerifyBitbucketSignature(secret string, body []byte, signature string) bool {
+	if secret == "" {
+		return true
+	}
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(body)
+	expectedMAC := hex.EncodeToString(mac.Sum(nil))
+	return hmac.Equal([]byte(signature), []byte(expectedMAC))
 }
 
 func (s *WebhookService) formatReviewComment(score float64, reviewResult string) string {

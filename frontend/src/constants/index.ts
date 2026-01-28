@@ -10,6 +10,7 @@ export type ReviewStatus = typeof REVIEW_STATUS[keyof typeof REVIEW_STATUS];
 export const PLATFORMS = {
   GITHUB: 'github',
   GITLAB: 'gitlab',
+  BITBUCKET: 'bitbucket',
 } as const;
 
 export type Platform = typeof PLATFORMS[keyof typeof PLATFORMS];

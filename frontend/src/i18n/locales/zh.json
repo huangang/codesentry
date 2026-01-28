@@ -154,6 +154,7 @@
     "pleaseSelectPlatform": "请选择平台",
     "github": "GitHub",
     "gitlab": "GitLab",
+    "bitbucket": "Bitbucket",
     "promptMode": "提示词模式",
     "useSystemDefault": "系统默认",
     "useTemplate": "使用模板",

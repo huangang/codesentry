@@ -151,7 +151,7 @@ const GitCredentials: React.FC = () => {
       key: 'platform',
       width: 100,
       render: (platform: string) => (
-        <Tag color={platform === PLATFORMS.GITHUB ? 'geekblue' : 'orange'}>
+        <Tag color={platform === PLATFORMS.GITHUB ? 'geekblue' : platform === PLATFORMS.BITBUCKET ? 'cyan' : 'orange'}>
           {platform.toUpperCase()}
         </Tag>
       ),
@@ -231,6 +231,7 @@ const GitCredentials: React.FC = () => {
             options={[
               { value: PLATFORMS.GITHUB, label: 'GitHub' },
               { value: PLATFORMS.GITLAB, label: 'GitLab' },
+              { value: PLATFORMS.BITBUCKET, label: 'Bitbucket' },
             ]}
           />
           <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
@@ -276,12 +277,13 @@ const GitCredentials: React.FC = () => {
             <Select options={[
               { value: PLATFORMS.GITHUB, label: 'GitHub' },
               { value: PLATFORMS.GITLAB, label: 'GitLab' },
+              { value: PLATFORMS.BITBUCKET, label: 'Bitbucket' },
             ]} />
           </Form.Item>
           <Form.Item
             name="base_url"
             label={t('gitCredentials.baseUrl')}
-            extra={i18n.language?.startsWith('zh') ? '用于自托管 GitLab/GitHub 企业版，如 https://gitlab.example.com' : 'For self-hosted GitLab/GitHub Enterprise, e.g., https://gitlab.example.com'}
+            extra={i18n.language?.startsWith('zh') ? '用于自托管 GitLab/GitHub/Bitbucket 企业版，如 https://gitlab.example.com' : 'For self-hosted GitLab/GitHub/Bitbucket Server, e.g., https://gitlab.example.com'}
           >
             <Input placeholder="https://gitlab.example.com" />
           </Form.Item>

@@ -4,7 +4,7 @@
   <img src="https://raw.githubusercontent.com/huangang/codesentry/main/frontend/public/codesentry-icon.png" alt="CodeSentry Logo" width="120" height="120">
 </div>
 
-AI-powered Code Review Platform for GitHub and GitLab.
+AI-powered Code Review Platform for GitHub, GitLab, and Bitbucket.
 
 [中文文档](./README_zh.md)
 
@@ -18,7 +18,7 @@ AI-powered Code Review Platform for GitHub and GitLab.
 - **Commit Status**: Set commit status to block merges when score is below threshold (GitLab/GitHub)
 - **Sync Review API**: Synchronous review endpoint for Git pre-receive hooks to block pushes
 - **Duplicate Prevention**: Skip already reviewed commits to avoid redundant processing
-- **Multi-Platform Support**: GitHub and GitLab webhook integration with multi-level project path support
+- **Multi-Platform Support**: GitHub, GitLab, and Bitbucket webhook integration with multi-level project path support
 - **Dashboard**: Visual statistics and metrics for code review activities
 - **Review History**: Track all code reviews with detailed logs and direct links to commits/MRs
 - **Project Management**: Manage multiple repositories
@@ -154,7 +154,7 @@ jwt:
 
 ### Recommended: Unified Webhook (Auto-detect)
 
-Use a single webhook URL for both GitLab and GitHub:
+Use a single webhook URL for GitLab, GitHub, and Bitbucket:
 
 ```
 https://your-domain/webhook
@@ -178,6 +178,13 @@ The system automatically detects the platform via request headers.
 2. URL: `https://your-domain/webhook`
 3. Secret Token: Your configured webhook secret
 4. Trigger: Push events, Merge request events
+
+### Bitbucket
+
+1. Go to Repository Settings > Webhooks > Add webhook
+2. URL: `https://your-domain/webhook`
+3. Secret: Your configured webhook secret (for HMAC-SHA256 signature)
+4. Triggers: Select "Repository push" and "Pull request created/updated"
 
 ## API Endpoints
 
@@ -249,7 +256,7 @@ The system automatically detects the platform via request headers.
 
 ### Webhooks
 
-- `POST /webhook` - **Unified webhook (auto-detect GitLab/GitHub, recommended)**
+- `POST /webhook` - **Unified webhook (auto-detect GitLab/GitHub/Bitbucket, recommended)**
 - `POST /review/webhook` - Alias for unified webhook
 - `POST /api/webhook` - Unified webhook under /api prefix
 - `POST /api/review/webhook` - Alias under /api prefix
@@ -257,6 +264,8 @@ The system automatically detects the platform via request headers.
 - `POST /api/webhook/github` - GitHub webhook (auto-detect project by URL)
 - `POST /api/webhook/gitlab/:project_id` - GitLab webhook (with project ID)
 - `POST /api/webhook/github/:project_id` - GitHub webhook (with project ID)
+- `POST /api/webhook/bitbucket` - Bitbucket webhook (auto-detect project by URL)
+- `POST /api/webhook/bitbucket/:project_id` - Bitbucket webhook (with project ID)
 
 ### Sync Review (for Git Hooks)
 

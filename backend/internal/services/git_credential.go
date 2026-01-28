@@ -96,6 +96,8 @@ func (s *GitCredentialService) FindMatchingCredential(projectURL string, platfor
 				baseURL = "https://github.com"
 			case "gitlab":
 				baseURL = "https://gitlab.com"
+			case "bitbucket":
+				baseURL = "https://bitbucket.org"
 			}
 		}
 

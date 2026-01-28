@@ -254,7 +254,7 @@ const Projects: React.FC = () => {
       key: 'platform',
       width: 100,
       render: (platform: string) => (
-        <Tag color={platform === PLATFORMS.GITHUB ? 'geekblue' : 'orange'}>
+        <Tag color={platform === PLATFORMS.GITHUB ? 'geekblue' : platform === PLATFORMS.BITBUCKET ? 'cyan' : 'orange'}>
           {platform.toUpperCase()}
         </Tag>
       ),
@@ -375,6 +375,7 @@ const Projects: React.FC = () => {
             <Select options={[
               { value: PLATFORMS.GITHUB, label: 'GitHub' },
               { value: PLATFORMS.GITLAB, label: 'GitLab' },
+              { value: PLATFORMS.BITBUCKET, label: 'Bitbucket' },
             ]} />
           </Form.Item>
           <Form.Item
