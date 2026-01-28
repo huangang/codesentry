@@ -133,6 +133,8 @@
     "fileExtensionsPlaceholder": "e.g., .js,.ts,.go,.py",
     "ignorePatterns": "Ignore Patterns",
     "ignorePatternsPlaceholder": "e.g., vendor/,node_modules/,*.min.js",
+    "branchFilter": "Branch Filter",
+    "branchFilterPlaceholder": "e.g., main,master,release/*",
     "reviewEvents": "Review Events",
     "aiEnabled": "AI Review Enabled",
     "commentEnabled": "MR/PR Comment",

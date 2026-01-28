@@ -21,6 +21,7 @@ export interface Project {
   platform: 'github' | 'gitlab';
   file_extensions: string;
   ignore_patterns: string;
+  branch_filter: string;
   review_events: string;
   ai_enabled: boolean;
   ai_prompt: string;

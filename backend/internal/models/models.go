@@ -33,6 +33,7 @@ type Project struct {
 	WebhookSecret  string         `gorm:"size:255" json:"-"`
 	FileExtensions string         `gorm:"size:1000" json:"file_extensions"` // .js,.ts,.go,...
 	ReviewEvents   string         `gorm:"size:200" json:"review_events"`    // push,merge_request
+	BranchFilter   string         `gorm:"size:1000" json:"branch_filter"`   // Branches to ignore: main,master,release/*
 	AIEnabled      bool           `gorm:"column:ai_enabled;default:true" json:"ai_enabled"`
 	AIPromptID     *uint          `gorm:"column:a_iprompt_id" json:"ai_prompt_id"`     // Reference to PromptTemplate
 	AIPrompt       string         `gorm:"column:a_iprompt;type:text" json:"ai_prompt"` // Custom prompt override

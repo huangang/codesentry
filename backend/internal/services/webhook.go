@@ -304,6 +304,12 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 		return nil
 	}
 
+	branch := strings.TrimPrefix(event.Ref, "refs/heads/")
+	if s.isBranchIgnored(branch, project.BranchFilter) {
+		log.Printf("[Webhook] Branch %s is in ignore list, skipping review", branch)
+		return nil
+	}
+
 	var commits []string
 	for _, c := range event.Commits {
 		commits = append(commits, fmt.Sprintf("%s: %s", c.ID[:8], c.Message))
@@ -350,8 +356,6 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 	}
 
 	additions, deletions, filesChanged := parseDiffStats(diff)
-
-	branch := strings.TrimPrefix(event.Ref, "refs/heads/")
 
 	var commitURL string
 	if len(event.Commits) > 0 && event.Commits[len(event.Commits)-1].URL != "" {
@@ -441,6 +445,11 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 
 func (s *WebhookService) processGitLabMR(ctx context.Context, project *models.Project, event *GitLabMREvent) error {
 	if event.ObjectAttributes.Action != "open" && event.ObjectAttributes.Action != "update" {
+		return nil
+	}
+
+	if s.isBranchIgnored(event.ObjectAttributes.SourceBranch, project.BranchFilter) {
+		log.Printf("[Webhook] Branch %s is in ignore list, skipping review", event.ObjectAttributes.SourceBranch)
 		return nil
 	}
 
@@ -534,6 +543,12 @@ func (s *WebhookService) processGitHubPush(ctx context.Context, project *models.
 		return nil
 	}
 
+	branch := strings.TrimPrefix(event.Ref, "refs/heads/")
+	if s.isBranchIgnored(branch, project.BranchFilter) {
+		log.Printf("[Webhook] Branch %s is in ignore list, skipping review", branch)
+		return nil
+	}
+
 	if s.isCommitAlreadyReviewed(project.ID, event.After) {
 		log.Printf("[Webhook] Commit %s already reviewed, skipping", event.After[:8])
 		return nil
@@ -555,7 +570,6 @@ func (s *WebhookService) processGitHubPush(ctx context.Context, project *models.
 
 	additions, deletions, filesChanged := parseDiffStats(diff)
 
-	branch := strings.TrimPrefix(event.Ref, "refs/heads/")
 	reviewLog := &models.ReviewLog{
 		ProjectID:     project.ID,
 		EventType:     "push",
@@ -621,6 +635,11 @@ func (s *WebhookService) processGitHubPush(ctx context.Context, project *models.
 
 func (s *WebhookService) processGitHubPR(ctx context.Context, project *models.Project, event *GitHubPREvent) error {
 	if event.Action != "opened" && event.Action != "synchronize" {
+		return nil
+	}
+
+	if s.isBranchIgnored(event.PullRequest.Head.Ref, project.BranchFilter) {
+		log.Printf("[Webhook] Branch %s is in ignore list, skipping review", event.PullRequest.Head.Ref)
 		return nil
 	}
 
@@ -818,6 +837,29 @@ func (s *WebhookService) fetchDiff(apiURL, token, tokenHeader string) (string, e
 	}
 
 	return result.String(), nil
+}
+
+func (s *WebhookService) isBranchIgnored(branch string, branchFilter string) bool {
+	if branchFilter == "" {
+		return false
+	}
+
+	for _, pattern := range strings.Split(branchFilter, ",") {
+		pattern = strings.TrimSpace(pattern)
+		if pattern == "" {
+			continue
+		}
+
+		if strings.HasSuffix(pattern, "*") {
+			prefix := strings.TrimSuffix(pattern, "*")
+			if strings.HasPrefix(branch, prefix) {
+				return true
+			}
+		} else if pattern == branch {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *WebhookService) filterDiff(diff string, extensions string, ignorePatterns string) string {
@@ -1348,6 +1390,16 @@ type SyncReviewResponse struct {
 func (s *WebhookService) SyncReview(ctx context.Context, project *models.Project, req *SyncReviewRequest) (*SyncReviewResponse, error) {
 	minScore := s.getEffectiveMinScore(project)
 
+	branch := strings.TrimPrefix(req.Ref, "refs/heads/")
+	if s.isBranchIgnored(branch, project.BranchFilter) {
+		return &SyncReviewResponse{
+			Passed:   true,
+			Score:    100,
+			MinScore: minScore,
+			Message:  "Branch is in ignore list, skipping review",
+		}, nil
+	}
+
 	if s.isCommitAlreadyReviewed(project.ID, req.CommitSHA) {
 		return &SyncReviewResponse{
 			Passed:   true,
@@ -1357,7 +1409,6 @@ func (s *WebhookService) SyncReview(ctx context.Context, project *models.Project
 		}, nil
 	}
 
-	branch := strings.TrimPrefix(req.Ref, "refs/heads/")
 	additions, deletions, filesChanged := parseDiffStats(req.Diffs)
 
 	reviewLog := &models.ReviewLog{

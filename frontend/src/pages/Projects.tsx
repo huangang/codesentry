@@ -404,6 +404,13 @@ const Projects: React.FC = () => {
           <Form.Item name="review_events" label={t('projects.reviewEvents')}>
             <Input placeholder="push,merge_request" />
           </Form.Item>
+          <Form.Item
+            name="branch_filter"
+            label={t('projects.branchFilter')}
+            extra={i18n.language?.startsWith('zh') ? '忽略的分支，逗号分隔。支持通配符（如：main,master,release/*）' : 'Branches to ignore, comma-separated. Supports wildcards (e.g., main,master,release/*)'}
+          >
+            <Input placeholder="main,master,release/*" />
+          </Form.Item>
           <Form.Item name="ai_enabled" label={t('projects.aiEnabled')} valuePropName="checked">
             <Switch />
           </Form.Item>

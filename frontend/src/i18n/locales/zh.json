@@ -133,6 +133,8 @@
     "fileExtensionsPlaceholder": "例如: .js,.ts,.go,.py",
     "ignorePatterns": "忽略路径",
     "ignorePatternsPlaceholder": "例如: vendor/,node_modules/,*.min.js",
+    "branchFilter": "忽略分支",
+    "branchFilterPlaceholder": "例如: main,master,release/*",
     "reviewEvents": "审查事件",
     "aiEnabled": "启用 AI 审查",
     "commentEnabled": "MR/PR 评论",
