@@ -39,6 +39,7 @@ AI-powered Code Review Platform for GitHub, GitLab, and Bitbucket.
 - **Multi-Database**: SQLite for development, MySQL/PostgreSQL for production
 - **Internationalization**: Support for English and Chinese (including DatePicker localization)
 - **Responsive Design**: Mobile-friendly interface with adaptive layouts for phones and tablets
+- **Dark Mode**: Toggle between light and dark themes, with preference persistence
 
 ## Quick Start
 

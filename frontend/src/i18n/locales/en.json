@@ -46,7 +46,9 @@
     "previous": "Previous",
     "finish": "Finish",
     "submit": "Submit",
-    "close": "Close"
+    "close": "Close",
+    "darkMode": "Dark Mode",
+    "lightMode": "Light Mode"
   },
   "auth": {
     "login": "Login",

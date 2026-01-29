@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import { dailyReportApi, type DailyReport } from '../services';
 import { getResponsiveWidth } from '../hooks';
+import { useThemeStore } from '../stores/themeStore';
 
 const { Paragraph, Title } = Typography;
 
@@ -32,6 +33,7 @@ const DailyReports: React.FC = () => {
   const [generating, setGenerating] = useState(false);
   const [resending, setResending] = useState<number | null>(null);
   const { t } = useTranslation();
+  const { isDark } = useThemeStore();
 
   const fetchData = async () => {
     setLoading(true);
@@ -287,16 +289,16 @@ const DailyReports: React.FC = () => {
             {selectedReport.ai_analysis && (
               <>
                 <Title level={5} style={{ marginTop: 24 }}>{t('dailyReports.aiAnalysis')}</Title>
-                <Card 
-                  size="small" 
-                  style={{ 
+                <Card
+                  size="small"
+                  style={{
                     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                     borderRadius: 8,
                   }}
                 >
-                  <div 
-                    style={{ 
-                      background: '#fff',
+                  <div
+                    style={{
+                      background: isDark ? '#1e293b' : '#fff',
                       borderRadius: 6,
                       padding: '16px 20px',
                     }}
@@ -304,33 +306,33 @@ const DailyReports: React.FC = () => {
                   >
                     <ReactMarkdown
                       components={{
-                        h1: ({ children }) => <h2 style={{ fontSize: 18, marginTop: 0, marginBottom: 12, color: '#1a1a1a' }}>{children}</h2>,
-                        h2: ({ children }) => <h3 style={{ fontSize: 16, marginTop: 16, marginBottom: 10, color: '#1a1a1a', borderBottom: '1px solid #eee', paddingBottom: 6 }}>{children}</h3>,
-                        h3: ({ children }) => <h4 style={{ fontSize: 15, marginTop: 14, marginBottom: 8, color: '#333' }}>{children}</h4>,
-                        h4: ({ children }) => <h5 style={{ fontSize: 14, marginTop: 12, marginBottom: 6, color: '#444' }}>{children}</h5>,
-                        p: ({ children }) => <p style={{ margin: '8px 0', lineHeight: 1.7, color: '#444' }}>{children}</p>,
+                        h1: ({ children }) => <h2 style={{ fontSize: 18, marginTop: 0, marginBottom: 12, color: isDark ? '#f1f5f9' : '#1a1a1a' }}>{children}</h2>,
+                        h2: ({ children }) => <h3 style={{ fontSize: 16, marginTop: 16, marginBottom: 10, color: isDark ? '#f1f5f9' : '#1a1a1a', borderBottom: isDark ? '1px solid #475569' : '1px solid #eee', paddingBottom: 6 }}>{children}</h3>,
+                        h3: ({ children }) => <h4 style={{ fontSize: 15, marginTop: 14, marginBottom: 8, color: isDark ? '#e2e8f0' : '#333' }}>{children}</h4>,
+                        h4: ({ children }) => <h5 style={{ fontSize: 14, marginTop: 12, marginBottom: 6, color: isDark ? '#cbd5e1' : '#444' }}>{children}</h5>,
+                        p: ({ children }) => <p style={{ margin: '8px 0', lineHeight: 1.7, color: isDark ? '#cbd5e1' : '#444' }}>{children}</p>,
                         ul: ({ children }) => <ul style={{ margin: '8px 0', paddingLeft: 20 }}>{children}</ul>,
                         ol: ({ children }) => <ol style={{ margin: '8px 0', paddingLeft: 20 }}>{children}</ol>,
-                        li: ({ children }) => <li style={{ margin: '4px 0', lineHeight: 1.6, color: '#444' }}>{children}</li>,
-                        strong: ({ children }) => <strong style={{ color: '#1a1a1a', fontWeight: 600 }}>{children}</strong>,
+                        li: ({ children }) => <li style={{ margin: '4px 0', lineHeight: 1.6, color: isDark ? '#cbd5e1' : '#444' }}>{children}</li>,
+                        strong: ({ children }) => <strong style={{ color: isDark ? '#f1f5f9' : '#1a1a1a', fontWeight: 600 }}>{children}</strong>,
                         code: ({ children }) => (
-                          <code style={{ 
-                            background: '#f5f5f5', 
-                            padding: '2px 6px', 
-                            borderRadius: 4, 
+                          <code style={{
+                            background: isDark ? '#334155' : '#f5f5f5',
+                            padding: '2px 6px',
+                            borderRadius: 4,
                             fontSize: 13,
-                            color: '#d63384',
+                            color: isDark ? '#f472b6' : '#d63384',
                             fontFamily: 'Monaco, Consolas, monospace'
                           }}>
                             {children}
                           </code>
                         ),
                         blockquote: ({ children }) => (
-                          <blockquote style={{ 
-                            borderLeft: '4px solid #667eea', 
-                            margin: '12px 0', 
+                          <blockquote style={{
+                            borderLeft: '4px solid #667eea',
+                            margin: '12px 0',
                             paddingLeft: 16,
-                            color: '#666',
+                            color: isDark ? '#94a3b8' : '#666',
                             fontStyle: 'italic'
                           }}>
                             {children}

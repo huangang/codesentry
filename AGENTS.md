@@ -32,6 +32,7 @@ codesentry/
 ## 技术栈
 
 ### 后端
+
 - **语言**: Go 1.21+
 - **框架**: Gin
 - **ORM**: GORM
@@ -39,6 +40,7 @@ codesentry/
 - **Module 路径**: `github.com/huangang/codesentry/backend`
 
 ### 前端
+
 - **框架**: React 18 + TypeScript
 - **UI 库**: Ant Design 5 (⚠️ 不要使用 v6)
 - **图表**: Recharts
@@ -79,6 +81,7 @@ db.Where("config_key = ?", key) // 列名不存在
 ```
 
 **system_configs 表结构**:
+
 | 列名 | 类型 | 说明 |
 |------|------|------|
 | `key` | varchar(100) | 配置键（MySQL 保留字，查询需加反引号） |
@@ -102,6 +105,7 @@ db.Where("`key` = ?", "daily_report_timezone").First(&config)
 ```
 
 **Service 依赖注入模式**:
+
 ```go
 type DailyReportService struct {
     db            *gorm.DB
@@ -139,11 +143,13 @@ const { t } = useTranslation();
 项目已适配移动端，开发时需遵循以下规范：
 
 **断点定义**:
+
 - 移动端: `< 768px`
 - 平板: `768px - 1024px`  
 - 桌面: `> 1024px`
 
 **布局规范**:
+
 ```tsx
 // 表格必须添加水平滚动
 <Table scroll={{ x: 800 }} ... />
@@ -164,14 +170,62 @@ import { getResponsiveWidth } from '../hooks';
 ```
 
 **CSS 类**:
+
 - `.hide-on-mobile` - 移动端隐藏
 - `.show-on-mobile` - 仅移动端显示
 - `.filter-area` - 筛选区域（自动换行）
 
 **MainLayout 移动端行为**:
+
 - 侧边栏隐藏，显示汉堡菜单按钮
 - 点击菜单按钮弹出抽屉式菜单
 - Header 高度从 64px 减少到 56px
+
+### 暗黑模式规范
+
+项目支持明暗主题切换，开发时需遵循以下规范：
+
+**主题状态管理**:
+
+```tsx
+// 使用 themeStore 获取当前主题状态
+import { useThemeStore } from '../stores/themeStore';
+
+const MyComponent: React.FC = () => {
+  const { isDark, toggleTheme } = useThemeStore();
+  // isDark: boolean - 是否暗色模式
+  // toggleTheme: () => void - 切换主题
+};
+```
+
+**颜色适配规则**:
+
+```tsx
+// ✅ 正确: 使用动态颜色
+style={{ 
+  background: isDark ? '#1e293b' : '#ffffff',
+  color: isDark ? '#e2e8f0' : '#1a1a1a',
+  borderColor: isDark ? '#334155' : '#f0f0f0'
+}}
+
+// ❌ 错误: 硬编码颜色
+style={{ background: '#fff', color: '#333' }}
+```
+
+**CSS 变量** (定义在 `index.css`):
+
+```css
+:root { --color-bg-primary: #ffffff; }
+[data-theme='dark'] { --color-bg-primary: #1e293b; }
+```
+
+**Ant Design 组件**: 通过 `theme.ts` 的 `darkAlgorithm` 自动适配，无需额外处理。
+
+**需要手动适配的场景**:
+
+- Modal/Drawer 内的自定义内容区域
+- ReactMarkdown 渲染的内容
+- 内联 style 中的硬编码颜色
 
 ## 重要约束
 
@@ -196,18 +250,21 @@ cd frontend && npm run build
 ## 常见任务
 
 ### 添加新页面
+
 1. 创建 `frontend/src/pages/XxxPage.tsx`
 2. 在 `App.tsx` 添加路由
 3. 添加 i18n 翻译 (`locales/en.json`, `locales/zh.json`)
 4. 添加菜单项
 
 ### 添加新 API
+
 1. 在 `backend/internal/handlers/` 创建 handler
 2. 在 `backend/internal/services/` 创建 service
 3. 在 `main.go` 注册路由
 4. 在 `frontend/src/services/index.ts` 添加 API 调用
 
 ### IM 机器人限制
+
 | 平台 | 字符限制 | 说明 |
 |------|----------|------|
 | 企业微信 | 4096 | 使用 markdown_v2 格式 |
@@ -219,20 +276,25 @@ cd frontend && npm run build
 | Telegram | - | 需要配置 chat_id |
 
 ### Git 凭证自动创建项目
+
 Git 凭证功能支持：
+
 1. **自动创建项目**: 当 webhook 回调触发时，如果项目不存在但匹配到凭证，自动创建项目
 2. **补全不完整数据**: 如果项目存在但 access_token 为空，自动从匹配的凭证中补全
 3. **私有服务器支持**: 通过 `base_url` 字段支持自托管 GitLab/GitHub Enterprise
 
 配置流程：
+
 1. 在「Git 凭证」页面创建凭证，填写平台、服务器地址、Access Token、Webhook Secret
 2. 在 GitLab/GitHub/Bitbucket 配置统一 Webhook URL: `https://your-domain/webhook`
 3. 新仓库触发 webhook 时自动创建项目并开始代码审查
 
 ### Bitbucket 支持
+
 系统支持 Bitbucket Cloud 的 webhook 集成，包括推送事件和 Pull Request 事件。
 
 **支持的事件**:
+
 | 事件类型 | Bitbucket Event Key | 说明 |
 |----------|---------------------|------|
 | 推送 | `repo:push` | 代码推送到仓库 |
@@ -240,6 +302,7 @@ Git 凭证功能支持：
 | PR 更新 | `pullrequest:updated` | 更新现有的 Pull Request |
 
 **Webhook 配置** (Bitbucket Cloud):
+
 1. 进入仓库 Settings > Webhooks
 2. 点击 "Add webhook"
 3. URL: `https://your-domain/webhook`
@@ -247,11 +310,13 @@ Git 凭证功能支持：
 5. Triggers: 选择 "Repository push" 和 "Pull request created/updated"
 
 **API 端点**:
+
 - `POST /webhook` - 统一 webhook（自动检测平台，推荐）
 - `POST /api/webhook/bitbucket` - Bitbucket 专用 webhook（自动匹配项目）
 - `POST /api/webhook/bitbucket/:project_id` - 指定项目 ID 的 Bitbucket webhook
 
 **Bitbucket API 调用**:
+
 | 功能 | API 端点 |
 |------|----------|
 | 获取提交 Diff | `GET /2.0/repositories/{workspace}/{repo}/diff/{commit}` |
@@ -261,32 +326,39 @@ Git 凭证功能支持：
 | 发布 PR 评论 | `POST /2.0/repositories/{workspace}/{repo}/pullrequests/{id}/comments` |
 
 **构建状态**:
+
 - `INPROGRESS` - AI 审查进行中
 - `SUCCESSFUL` - 审查通过（分数 >= 最低分）
 - `FAILED` - 审查失败或分数低于阈值
 
 **注意事项**:
+
 - Bitbucket Cloud 使用 `https://api.bitbucket.org/2.0/` 作为 API 基础 URL
 - Access Token 需要有仓库读取和写入权限（用于获取 diff 和发布评论）
 - 签名验证使用 HMAC-SHA256 算法
 
 ### 错误日志 IM 通知
+
 系统错误可以通过 IM 机器人实时通知，便于及时发现和处理问题。
 
 配置流程：
+
 1. 在「IM 机器人」页面创建或编辑机器人
 2. 开启「错误通知」开关
 3. 系统发生错误时会自动发送通知到所有启用错误通知的活跃机器人
 
 技术实现：
+
 - `LogError()` 函数在写入数据库后，异步发送 IM 通知
 - 支持多个机器人同时接收错误通知
 - 通知内容包含：模块、操作、错误信息、时间、额外数据
 
 ### LDAP 配置
+
 系统设置页面支持在线配置 LDAP 认证，无需修改配置文件。
 
 配置项：
+
 - **启用 LDAP**: 开启/关闭 LDAP 认证
 - **LDAP 服务器**: 服务器地址
 - **端口**: 默认 389 (SSL: 636)
@@ -297,6 +369,7 @@ Git 凭证功能支持：
 - **使用 SSL**: 是否使用 LDAPS
 
 ### 权限管理
+
 系统支持两种角色：
 
 | 角色 | 权限 |
@@ -307,6 +380,7 @@ Git 凭证功能支持：
 **LDAP 用户默认角色**: user（只读）
 
 **Admin-only 页面**:
+
 - LLM Models
 - IM Bots
 - Git Credentials
@@ -316,6 +390,7 @@ Git 凭证功能支持：
 - Daily Reports
 
 **Admin-only 操作**:
+
 - 项目的创建、编辑、删除
 - 审查记录的删除和重试
 - 用户的编辑和删除
@@ -323,15 +398,18 @@ Git 凭证功能支持：
 - 日报的生成和发送
 
 ### 日报功能
+
 系统支持自动生成每日代码审查报告，并通过 IM 机器人发送。
 
 **功能特性**:
+
 - 自动统计当日审查数据（提交数、通过率、平均分等）
 - AI 分析生成摘要和建议
 - 定时自动发送或手动触发
 - 同一天多次生成会覆盖更新
 
 **配置项**（系统设置页面）:
+
 | 配置 | 说明 | 默认值 |
 |------|------|--------|
 | 启用日报 | 是否启用定时日报 | false |
@@ -342,12 +420,14 @@ Git 凭证功能支持：
 | 通知机器人 | 接收日报的 IM 机器人（多选） | 启用日报的机器人 |
 
 **API**:
+
 - `GET /api/daily-reports` - 日报列表
 - `GET /api/daily-reports/:id` - 日报详情
 - `POST /api/daily-reports/generate` - 手动生成（不发送通知）
 - `POST /api/daily-reports/:id/resend` - 发送通知
 
 **行为说明**:
+
 | 操作 | 生成数据 | 保存数据库 | 发送通知 |
 |------|---------|-----------|---------|
 | 手动生成 | ✅ | ✅ | ❌ |
@@ -355,20 +435,24 @@ Git 凭证功能支持：
 | 定时器 | ✅ | ✅ | ✅ |
 
 **多 Pod 部署**:
+
 - 定时器使用数据库锁（`scheduler_locks` 表）防止重复执行
 - 同一天的日报任务只会被一个 Pod 执行
 - 锁有效期 10 分钟，超时自动释放
 
 ### 大型 MR/PR 分批审查
+
 当 Merge Request 或 Pull Request 涉及大量文件或改动时，系统会自动分批审查。
 
 **工作原理**:
+
 1. **过滤阶段**: 自动跳过不需要审查的文件（配置文件、锁文件、生成文件等）
 2. **分批阶段**: 按 token 预估将文件分组，每批控制在配置的上限内
 3. **审查阶段**: 并行审查每个批次
 4. **汇总阶段**: 使用加权平均（按代码改动量）计算最终分数，合并所有问题
 
 **默认忽略的文件类型** (`DefaultIgnorePatterns`):
+
 | 类型 | 模式 |
 |------|------|
 | 配置文件 | `*.json, *.yaml, *.yml, *.toml, *.xml, *.ini, *.env, *.config` |
@@ -380,6 +464,7 @@ Git 凭证功能支持：
 **注意**: 项目级别的 `ignore_patterns` 配置会与默认忽略模式合并，不会覆盖。
 
 **系统配置项**（数据库 `system_configs` 表）:
+
 | 配置键 | 默认值 | 说明 |
 |--------|--------|------|
 | `chunked_review_enabled` | `true` | 是否启用分批审查 |
@@ -387,22 +472,26 @@ Git 凭证功能支持：
 | `chunked_review_max_tokens_per_batch` | `30000` | 每批最大 token 数 |
 
 **涉及文件**:
+
 - `/backend/internal/services/chunked_review.go` - 分批逻辑（解析、分组、汇总）
 - `/backend/internal/services/ai.go` - `ReviewChunked()` 方法
 - `/backend/internal/services/webhook.go` - `DefaultIgnorePatterns` 常量、`filterDiff()` 增强
 
 ### 优雅关闭 (Graceful Shutdown)
+
 服务器支持优雅关闭，确保在收到终止信号时正确清理资源。
 
 **触发信号**: SIGINT (Ctrl+C), SIGTERM (Docker/K8s)
 
 **关闭流程**:
+
 1. 停止所有定时器调度器（DailyReport、LogCleanup、Retry）
 2. 等待进行中的 HTTP 请求完成（超时 30 秒）
 3. 关闭数据库连接
 4. 输出日志确认退出
 
 **涉及文件**:
+
 - `/backend/cmd/server/main.go` - 信号监听和关闭协调
 - `/backend/internal/services/daily_report.go` - `StopScheduler()`
 - `/backend/internal/services/system_log.go` - `StopLogCleanupScheduler()`

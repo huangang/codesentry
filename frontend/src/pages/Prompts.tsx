@@ -36,6 +36,7 @@ import remarkGfm from 'remark-gfm';
 import { promptApi } from '../services';
 import type { PromptTemplate } from '../types';
 import { usePaginatedList, useModal, usePermission } from '../hooks';
+import { useThemeStore } from '../stores/themeStore';
 
 const { TextArea } = Input;
 const { Paragraph } = Typography;
@@ -47,6 +48,7 @@ interface PromptFilters {
 
 const Prompts: React.FC = () => {
   const { t, i18n } = useTranslation();
+  const { isDark } = useThemeStore();
   const [form] = Form.useForm();
   const [searchName, setSearchName] = React.useState('');
   const [filterType, setFilterType] = React.useState<string>('');
@@ -408,9 +410,9 @@ const Prompts: React.FC = () => {
               style={{
                 flex: 1,
                 minHeight: 0,
-                backgroundColor: '#fafafa',
+                backgroundColor: isDark ? '#1e293b' : '#fafafa',
                 borderRadius: 8,
-                border: '1px solid #f0f0f0',
+                border: isDark ? '1px solid #334155' : '1px solid #f0f0f0',
               }}
             >
               {viewMode === 'rendered' ? (
@@ -441,6 +443,7 @@ const Prompts: React.FC = () => {
                       margin: 0,
                       fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
                       fontSize: 13,
+                      color: isDark ? '#e2e8f0' : undefined,
                     }}
                   >
                     {viewingPrompt.content}

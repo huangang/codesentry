@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Layout, Menu, Dropdown, Avatar, Space, Typography, Select, Modal, Form, Input, message, Drawer, Button } from 'antd';
+import { Layout, Menu, Dropdown, Avatar, Space, Typography, Select, Modal, Form, Input, message, Drawer, Button, Tooltip } from 'antd';
 import {
   DashboardOutlined,
   FileSearchOutlined,
@@ -18,10 +18,13 @@ import {
   ScheduleOutlined,
   MenuOutlined,
   CloseOutlined,
+  SunOutlined,
+  MoonOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../stores/authStore';
+import { useThemeStore } from '../stores/themeStore';
 import { usePermission } from '../hooks';
 import { authApi } from '../services';
 
@@ -34,6 +37,7 @@ const MainLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
+  const { isDark, toggleTheme } = useThemeStore();
   const { t, i18n } = useTranslation();
   const { canAccess } = usePermission();
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
@@ -286,19 +290,19 @@ const MainLayout: React.FC = () => {
         className="main-layout"
         style={{
           marginLeft: isMobile ? 0 : 240,
-          background: '#f8fafc'
+          background: isDark ? '#0f172a' : '#f8fafc'
         }}
       >
         <Header
           className="main-header"
           style={{
             padding: isMobile ? '0 12px' : '0 32px',
-            background: 'rgba(255, 255, 255, 0.8)',
+            background: isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.8)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             backdropFilter: 'blur(8px)',
-            borderBottom: '1px solid #f1f5f9',
+            borderBottom: isDark ? '1px solid #334155' : '1px solid #f1f5f9',
             position: 'sticky',
             top: 0,
             zIndex: 10,
@@ -309,7 +313,7 @@ const MainLayout: React.FC = () => {
             {isMobile && (
               <Button
                 type="text"
-                icon={<MenuOutlined style={{ fontSize: 20 }} />}
+                icon={<MenuOutlined style={{ fontSize: 20, color: isDark ? '#f1f5f9' : undefined }} />}
                 onClick={() => setMobileMenuVisible(true)}
                 style={{ marginRight: 8 }}
               />
@@ -317,19 +321,27 @@ const MainLayout: React.FC = () => {
             <Text
               strong
               className="header-title"
-              style={{ fontSize: isMobile ? 16 : 20, color: '#0f172a' }}
+              style={{ fontSize: isMobile ? 16 : 20, color: isDark ? '#f1f5f9' : '#0f172a' }}
             >
               {currentPageTitle}
             </Text>
           </Space>
           <Space size={isMobile ? 'small' : 'large'}>
+            <Tooltip title={isDark ? 'Light Mode' : 'Dark Mode'}>
+              <Button
+                type="text"
+                icon={isDark ? <SunOutlined style={{ fontSize: 18, color: '#fbbf24' }} /> : <MoonOutlined style={{ fontSize: 18, color: '#64748b' }} />}
+                onClick={toggleTheme}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              />
+            </Tooltip>
             <Select
               value={i18n.language?.startsWith('zh') ? 'zh' : 'en'}
               onChange={handleLanguageChange}
               style={{ width: isMobile ? 80 : 110 }}
               bordered={false}
               className="header-language-select"
-              suffixIcon={<GlobalOutlined style={{ color: '#64748b' }} />}
+              suffixIcon={<GlobalOutlined style={{ color: isDark ? '#94a3b8' : '#64748b' }} />}
               options={[
                 { value: 'en', label: isMobile ? 'EN' : 'English' },
                 { value: 'zh', label: isMobile ? '中' : '中文' },
@@ -343,7 +355,7 @@ const MainLayout: React.FC = () => {
                   style={{ backgroundColor: '#06b6d4' }}
                 />
                 {!isMobile && (
-                  <span style={{ color: '#334155', fontWeight: 500 }}>
+                  <span style={{ color: isDark ? '#f1f5f9' : '#334155', fontWeight: 500 }}>
                     {user?.nickname || user?.username}
                   </span>
                 )}

@@ -1,4 +1,4 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider, Spin } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
@@ -7,6 +7,8 @@ import { useTranslation } from 'react-i18next';
 import MainLayout from './layouts/MainLayout';
 import Login from './pages/Login';
 import { useAuthStore } from './stores/authStore';
+import { useThemeStore } from './stores/themeStore';
+import { getTheme } from './theme';
 
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const ReviewLogs = React.lazy(() => import('./pages/ReviewLogs'));
@@ -37,11 +39,16 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
-import { theme } from './theme';
-
 const App: React.FC = () => {
   const { i18n } = useTranslation();
+  const { isDark } = useThemeStore();
   const locale = i18n.language?.startsWith('zh') ? zhCN : enUS;
+  const theme = getTheme(isDark);
+
+  // Update document class for CSS variable switching
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  }, [isDark]);
 
   return (
     <ConfigProvider locale={locale} theme={theme}>

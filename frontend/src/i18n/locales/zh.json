@@ -46,7 +46,9 @@
     "previous": "上一步",
     "finish": "完成",
     "submit": "提交",
-    "close": "关闭"
+    "close": "关闭",
+    "darkMode": "暗黑模式",
+    "lightMode": "浅色模式"
   },
   "auth": {
     "login": "登录",
