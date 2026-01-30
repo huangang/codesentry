@@ -77,3 +77,23 @@ func (h *SystemConfigHandler) UpdateChunkedReviewConfig(c *gin.Context) {
 
 	c.JSON(http.StatusOK, h.configService.GetChunkedReviewConfig())
 }
+
+func (h *SystemConfigHandler) GetFileContextConfig(c *gin.Context) {
+	config := h.configService.GetFileContextConfig()
+	c.JSON(http.StatusOK, config)
+}
+
+func (h *SystemConfigHandler) UpdateFileContextConfig(c *gin.Context) {
+	var req services.UpdateFileContextConfigRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.configService.UpdateFileContextConfig(&req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, h.configService.GetFileContextConfig())
+}

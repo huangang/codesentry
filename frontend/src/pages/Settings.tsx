@@ -17,7 +17,7 @@ import {
 import { SaveOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import dayjs from 'dayjs';
-import { systemConfigApi, llmConfigApi, imBotApi, type DailyReportConfig, type ChunkedReviewConfig } from '../services';
+import { systemConfigApi, llmConfigApi, imBotApi, type DailyReportConfig, type ChunkedReviewConfig, type FileContextConfig } from '../services';
 import type { LDAPConfig, LLMConfig, IMBot } from '../types';
 
 const Settings: React.FC = () => {
@@ -25,23 +25,27 @@ const Settings: React.FC = () => {
   const [ldapForm] = Form.useForm();
   const [dailyReportForm] = Form.useForm();
   const [chunkedReviewForm] = Form.useForm();
+  const [fileContextForm] = Form.useForm();
   const [loading, setLoading] = useState(true);
   const [ldapSaving, setLdapSaving] = useState(false);
   const [dailyReportSaving, setDailyReportSaving] = useState(false);
   const [chunkedReviewSaving, setChunkedReviewSaving] = useState(false);
+  const [fileContextSaving, setFileContextSaving] = useState(false);
   const [ldapEnabled, setLdapEnabled] = useState(false);
   const [dailyReportEnabled, setDailyReportEnabled] = useState(false);
   const [chunkedReviewEnabled, setChunkedReviewEnabled] = useState(false);
+  const [fileContextEnabled, setFileContextEnabled] = useState(false);
   const [llmConfigs, setLlmConfigs] = useState<LLMConfig[]>([]);
   const [imBots, setImBots] = useState<IMBot[]>([]);
 
   const fetchConfig = async () => {
     try {
       setLoading(true);
-      const [ldapRes, dailyReportRes, chunkedReviewRes, llmRes, imBotRes] = await Promise.all([
+      const [ldapRes, dailyReportRes, chunkedReviewRes, fileContextRes, llmRes, imBotRes] = await Promise.all([
         systemConfigApi.getLDAPConfig(),
         systemConfigApi.getDailyReportConfig(),
         systemConfigApi.getChunkedReviewConfig(),
+        systemConfigApi.getFileContextConfig(),
         llmConfigApi.getActive(),
         imBotApi.getActive(),
       ]);
@@ -74,6 +78,14 @@ const Settings: React.FC = () => {
       });
       setChunkedReviewEnabled(chunkedReviewConfig.enabled);
 
+      const fileContextConfig = fileContextRes.data;
+      fileContextForm.setFieldsValue({
+        enabled: fileContextConfig.enabled,
+        max_file_size: fileContextConfig.max_file_size || 102400,
+        max_files: fileContextConfig.max_files || 10,
+      });
+      setFileContextEnabled(fileContextConfig.enabled);
+
       setLlmConfigs(llmRes.data || []);
       setImBots(imBotRes.data || []);
     } catch {
@@ -92,6 +104,11 @@ const Settings: React.FC = () => {
         enabled: true,
         threshold: 50000,
         max_tokens_per_batch: 30000,
+      });
+      fileContextForm.setFieldsValue({
+        enabled: false,
+        max_file_size: 102400,
+        max_files: 10,
       });
       message.error(t('common.error'));
     } finally {
@@ -181,6 +198,32 @@ const Settings: React.FC = () => {
 
   const handleChunkedReviewEnabledChange = (checked: boolean) => {
     setChunkedReviewEnabled(checked);
+  };
+
+  const handleFileContextSave = async () => {
+    try {
+      const values = await fileContextForm.validateFields();
+      setFileContextSaving(true);
+
+      const payload: Partial<FileContextConfig> = {
+        enabled: values.enabled,
+        max_file_size: values.max_file_size || 102400,
+        max_files: values.max_files || 10,
+      };
+
+      await systemConfigApi.updateFileContextConfig(payload);
+      message.success(t('settings.fileContext.saveSuccess'));
+      setFileContextEnabled(values.enabled);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: string } } };
+      message.error(err.response?.data?.error || t('common.error'));
+    } finally {
+      setFileContextSaving(false);
+    }
+  };
+
+  const handleFileContextEnabledChange = (checked: boolean) => {
+    setFileContextEnabled(checked);
   };
 
   if (loading) {
@@ -323,6 +366,47 @@ const Settings: React.FC = () => {
                 extra={t('settings.chunkedReview.maxTokensPerBatchHint')}
               >
                 <InputNumber min={1000} max={200000} step={1000} style={{ width: '100%' }} disabled={!chunkedReviewEnabled} />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Card>
+
+      <Card
+        title={t('settings.fileContext.title')}
+        extra={
+          <Button type="primary" icon={<SaveOutlined />} loading={fileContextSaving} onClick={handleFileContextSave}>
+            {t('common.save')}
+          </Button>
+        }
+      >
+        <Form form={fileContextForm} layout="vertical" style={{ maxWidth: 600 }}>
+          <Form.Item
+            name="enabled"
+            label={t('settings.fileContext.enabled')}
+            valuePropName="checked"
+            extra={t('settings.fileContext.enabledHint')}
+          >
+            <Switch onChange={handleFileContextEnabledChange} />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="max_file_size"
+                label={t('settings.fileContext.maxFileSize')}
+                extra={t('settings.fileContext.maxFileSizeHint')}
+              >
+                <InputNumber min={1024} max={1048576} step={1024} style={{ width: '100%' }} disabled={!fileContextEnabled} addonAfter="bytes" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="max_files"
+                label={t('settings.fileContext.maxFiles')}
+                extra={t('settings.fileContext.maxFilesHint')}
+              >
+                <InputNumber min={1} max={50} style={{ width: '100%' }} disabled={!fileContextEnabled} />
               </Form.Item>
             </Col>
           </Row>

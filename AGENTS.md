@@ -477,6 +477,44 @@ Git 凭证功能支持：
 - `/backend/internal/services/ai.go` - `ReviewChunked()` 方法
 - `/backend/internal/services/webhook.go` - `DefaultIgnorePatterns` 常量、`filterDiff()` 增强
 
+### 文件上下文 (File Context)
+
+为了解决只基于 diff 片段进行 code review 导致的误判问题（缺乏完整文件上下文），系统支持获取完整文件内容。
+
+**功能特性**:
+
+- 自动获取修改文件的完整源代码
+- 在文件中标记变更行范围（使用 `»` 标记）
+- 按改动量排序，优先获取改动最大的文件
+- 支持 GitLab、GitHub、Bitbucket 三个平台
+
+**Prompt 变量**:
+
+- `{{file_context}}` - 完整文件内容（带行号和变更标记）
+- `{{diffs}}` - 代码变更 diff
+- `{{commits}}` - 提交信息
+
+**系统配置项**（系统设置页面 → 文件上下文设置）:
+
+| 配置键 | 默认值 | 说明 |
+|--------|--------|------|
+| `file_context_enabled` | `false` | 是否启用文件上下文（默认关闭，需手动开启） |
+| `file_context_max_file_size` | `102400` | 每个文件获取的最大字节数（默认 100KB） |
+| `file_context_max_files` | `10` | 获取上下文的最大文件数量 |
+
+**注意事项**:
+
+- 启用此功能会增加 token 消耗（每个文件的完整内容会发送给 LLM）
+- 建议在 prompt 中添加说明，指导 AI 结合上下文进行审查
+- 对于非常大的文件（超过 max_file_size）会被跳过
+
+**涉及文件**:
+
+- `/backend/internal/services/file_context.go` - 文件上下文服务（获取、解析、格式化）
+- `/backend/internal/services/system_config.go` - `FileContextConfig` 配置
+- `/backend/internal/services/webhook.go` - 集成到审查流程
+- `/backend/internal/services/ai.go` - `{{file_context}}` 变量替换
+
 ### 优雅关闭 (Graceful Shutdown)
 
 服务器支持优雅关闭，确保在收到终止信号时正确清理资源。

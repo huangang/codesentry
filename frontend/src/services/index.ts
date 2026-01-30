@@ -213,6 +213,11 @@ export const systemConfigApi = {
 
   updateChunkedReviewConfig: (data: Partial<ChunkedReviewConfig>) =>
     api.put<ChunkedReviewConfig>('/system-config/chunked-review', data),
+
+  getFileContextConfig: () => api.get<FileContextConfig>('/system-config/file-context'),
+
+  updateFileContextConfig: (data: Partial<FileContextConfig>) =>
+    api.put<FileContextConfig>('/system-config/file-context', data),
 };
 
 export interface DailyReportConfig {
@@ -228,6 +233,12 @@ export interface ChunkedReviewConfig {
   enabled: boolean;
   threshold: number;
   max_tokens_per_batch: number;
+}
+
+export interface FileContextConfig {
+  enabled: boolean;
+  max_file_size: number;
+  max_files: number;
 }
 
 export const userApi = {

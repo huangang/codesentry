@@ -391,6 +391,16 @@
       "maxTokensPerBatch": "Max Tokens Per Batch",
       "maxTokensPerBatchHint": "Maximum tokens for each review batch",
       "saveSuccess": "Chunked review settings saved successfully"
+    },
+    "fileContext": {
+      "title": "File Context Settings",
+      "enabled": "Enable File Context",
+      "enabledHint": "Fetch full file content to provide better context for AI review (reduces false positives)",
+      "maxFileSize": "Max File Size",
+      "maxFileSizeHint": "Maximum size of each file to fetch (in bytes, default 100KB)",
+      "maxFiles": "Max Files",
+      "maxFilesHint": "Maximum number of files to fetch context for (default 10)",
+      "saveSuccess": "File context settings saved successfully"
     }
   },
   "users": {

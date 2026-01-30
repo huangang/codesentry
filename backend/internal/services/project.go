@@ -328,6 +328,7 @@ func (s *ProjectService) GetDefaultPromptByLang(lang string) string {
 ## Important Rules (Must Follow Strictly)
 - **Only focus on and output the top 3 most important issues**. No more than 3.
 - If fewer than 3 issues exist, output only the actual number found.
+- **When file context is provided, use it to understand the full picture before judging the code changes.**
 
 ## Output Format (Markdown)
 Please strictly follow this structure:
@@ -344,6 +345,7 @@ Please strictly follow this structure:
 - Must be parseable by regex pattern: r"[Tt]otal\s*[Ss]core[:：]?\s*(\d+)"
 
 ---
+{{file_context}}
 **Code Changes**:
 {{diffs}}
 
@@ -363,6 +365,7 @@ Please strictly follow this structure:
 ## 重要规则（必须严格遵守）
 - 请**仅关注并输出最重要的前三个问题（Top 3）**，不得多于 3 个。
 - 若问题不足 3 个，则按实际数量输出。
+- **当提供了完整文件上下文时，请结合上下文理解代码变更的完整背景，避免仅根据 diff 片段做出片面判断。**
 
 ## 输出格式（Markdown）
 请严格按照以下结构输出：
@@ -379,6 +382,7 @@ Please strictly follow this structure:
 - 必须确保可通过正则表达式 r"总分[:：]\s*(\d+)分?" 正确解析出总分值。
 
 ---
+{{file_context}}
 **代码变更内容**：
 {{diffs}}
 

@@ -220,6 +220,8 @@ func main() {
 			admin.PUT("/system-config/daily-report", systemConfigHandler.UpdateDailyReportConfig)
 			admin.GET("/system-config/chunked-review", systemConfigHandler.GetChunkedReviewConfig)
 			admin.PUT("/system-config/chunked-review", systemConfigHandler.UpdateChunkedReviewConfig)
+			admin.GET("/system-config/file-context", systemConfigHandler.GetFileContextConfig)
+			admin.PUT("/system-config/file-context", systemConfigHandler.UpdateFileContextConfig)
 
 			// Daily Reports
 			dailyReportHandler := handlers.NewDailyReportHandler(dailyReportService)

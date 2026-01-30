@@ -34,17 +34,20 @@ type WebhookService struct {
 	aiService           *AIService
 	notificationService *NotificationService
 	configService       *SystemConfigService
+	fileContextService  *FileContextService
 	httpClient          *http.Client
 }
 
 func NewWebhookService(db *gorm.DB, aiCfg *config.OpenAIConfig) *WebhookService {
+	configService := NewSystemConfigService(db)
 	return &WebhookService{
 		db:                  db,
 		projectService:      NewProjectService(db),
 		reviewService:       NewReviewLogService(db),
 		aiService:           NewAIService(db, aiCfg),
 		notificationService: NewNotificationService(db),
-		configService:       NewSystemConfigService(db),
+		configService:       configService,
+		fileContextService:  NewFileContextService(configService),
 		httpClient:          &http.Client{Timeout: 30 * time.Second},
 	}
 }
@@ -532,10 +535,19 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 			project.FileExtensions, project.IgnorePatterns, len(diff), len(filteredDiff))
 	}
 
+	var fileContext string
+	if s.fileContextService.IsEnabled() {
+		fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, commitSHA)
+		if fileContext != "" {
+			log.Printf("[Webhook] Built file context: %d chars", len(fileContext))
+		}
+	}
+
 	result, err := s.aiService.ReviewChunked(ctx, &ReviewRequest{
-		ProjectID: project.ID,
-		Diffs:     filteredDiff,
-		Commits:   strings.Join(commits, "\n"),
+		ProjectID:   project.ID,
+		Diffs:       filteredDiff,
+		Commits:     strings.Join(commits, "\n"),
+		FileContext: fileContext,
 	})
 
 	if err != nil {
@@ -630,10 +642,22 @@ func (s *WebhookService) processGitLabMR(ctx context.Context, project *models.Pr
 	s.reviewService.Create(reviewLog)
 
 	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
+
+	var fileContext string
+	if s.fileContextService.IsEnabled() {
+		if mrSHA != "" {
+			fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, mrSHA)
+		}
+		if fileContext != "" {
+			log.Printf("[Webhook] Built file context for MR: %d chars", len(fileContext))
+		}
+	}
+
 	result, err := s.aiService.ReviewChunked(ctx, &ReviewRequest{
-		ProjectID: project.ID,
-		Diffs:     filteredDiff,
-		Commits:   event.ObjectAttributes.Title + "\n" + event.ObjectAttributes.Description,
+		ProjectID:   project.ID,
+		Diffs:       filteredDiff,
+		Commits:     event.ObjectAttributes.Title + "\n" + event.ObjectAttributes.Description,
+		FileContext: fileContext,
 	})
 
 	if err != nil {
@@ -826,10 +850,19 @@ func (s *WebhookService) processBitbucketPush(ctx context.Context, project *mode
 				project.FileExtensions, project.IgnorePatterns, len(diff), len(filteredDiff))
 		}
 
+		var fileContext string
+		if s.fileContextService.IsEnabled() {
+			fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, commitSHA)
+			if fileContext != "" {
+				log.Printf("[Webhook] Built file context: %d chars", len(fileContext))
+			}
+		}
+
 		result, err := s.aiService.ReviewChunked(ctx, &ReviewRequest{
-			ProjectID: project.ID,
-			Diffs:     filteredDiff,
-			Commits:   strings.Join(commits, "\n"),
+			ProjectID:   project.ID,
+			Diffs:       filteredDiff,
+			Commits:     strings.Join(commits, "\n"),
+			FileContext: fileContext,
 		})
 
 		if err != nil {
@@ -925,10 +958,20 @@ func (s *WebhookService) processBitbucketPR(ctx context.Context, project *models
 	s.reviewService.Create(reviewLog)
 
 	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
+
+	var fileContext string
+	if s.fileContextService.IsEnabled() {
+		fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, commitSHA)
+		if fileContext != "" {
+			log.Printf("[Webhook] Built file context for Bitbucket PR: %d chars", len(fileContext))
+		}
+	}
+
 	result, err := s.aiService.ReviewChunked(ctx, &ReviewRequest{
-		ProjectID: project.ID,
-		Diffs:     filteredDiff,
-		Commits:   event.PullRequest.Title + "\n" + event.PullRequest.Description,
+		ProjectID:   project.ID,
+		Diffs:       filteredDiff,
+		Commits:     event.PullRequest.Title + "\n" + event.PullRequest.Description,
+		FileContext: fileContext,
 	})
 
 	if err != nil {
@@ -1022,10 +1065,20 @@ func (s *WebhookService) processGitHubPush(ctx context.Context, project *models.
 	s.reviewService.Create(reviewLog)
 
 	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
+
+	var fileContext string
+	if s.fileContextService.IsEnabled() {
+		fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, event.After)
+		if fileContext != "" {
+			log.Printf("[Webhook] Built file context for GitHub push: %d chars", len(fileContext))
+		}
+	}
+
 	result, err := s.aiService.ReviewChunked(ctx, &ReviewRequest{
-		ProjectID: project.ID,
-		Diffs:     filteredDiff,
-		Commits:   strings.Join(commits, "\n"),
+		ProjectID:   project.ID,
+		Diffs:       filteredDiff,
+		Commits:     strings.Join(commits, "\n"),
+		FileContext: fileContext,
 	})
 
 	if err != nil {
@@ -1104,10 +1157,20 @@ func (s *WebhookService) processGitHubPR(ctx context.Context, project *models.Pr
 	s.reviewService.Create(reviewLog)
 
 	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
+
+	var fileContext string
+	if s.fileContextService.IsEnabled() {
+		fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, event.PullRequest.Head.SHA)
+		if fileContext != "" {
+			log.Printf("[Webhook] Built file context for GitHub PR: %d chars", len(fileContext))
+		}
+	}
+
 	result, err := s.aiService.ReviewChunked(ctx, &ReviewRequest{
-		ProjectID: project.ID,
-		Diffs:     filteredDiff,
-		Commits:   event.PullRequest.Title + "\n" + event.PullRequest.Body,
+		ProjectID:   project.ID,
+		Diffs:       filteredDiff,
+		Commits:     event.PullRequest.Title + "\n" + event.PullRequest.Body,
+		FileContext: fileContext,
 	})
 
 	if err != nil {
@@ -2068,10 +2131,19 @@ func (s *WebhookService) SyncReview(ctx context.Context, project *models.Project
 	reviewLog.ReviewStatus = "processing"
 	s.reviewService.Update(reviewLog)
 
+	var fileContext string
+	if s.fileContextService.IsEnabled() {
+		fileContext, _ = s.fileContextService.BuildFileContext(project, req.Diffs, req.CommitSHA)
+		if fileContext != "" {
+			log.Printf("[Webhook] Built file context for sync review: %d chars", len(fileContext))
+		}
+	}
+
 	result, err := s.aiService.ReviewChunked(ctx, &ReviewRequest{
-		ProjectID: project.ID,
-		Diffs:     req.Diffs,
-		Commits:   req.Message,
+		ProjectID:   project.ID,
+		Diffs:       req.Diffs,
+		Commits:     req.Message,
+		FileContext: fileContext,
 	})
 
 	if err != nil {

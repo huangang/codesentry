@@ -270,3 +270,45 @@ func (s *SystemConfigService) UpdateChunkedReviewConfig(req *UpdateChunkedReview
 	}
 	return nil
 }
+
+// File Context Config - for enhanced code review with full file context
+type FileContextConfigResponse struct {
+	Enabled     bool `json:"enabled"`
+	MaxFileSize int  `json:"max_file_size"` // Max file size in bytes to fetch (default 100KB)
+	MaxFiles    int  `json:"max_files"`     // Max number of files to fetch context for (default 10)
+}
+
+func (s *SystemConfigService) GetFileContextConfig() *FileContextConfigResponse {
+	maxFileSize, _ := strconv.Atoi(s.GetWithDefault("file_context_max_file_size", "102400"))
+	maxFiles, _ := strconv.Atoi(s.GetWithDefault("file_context_max_files", "10"))
+	return &FileContextConfigResponse{
+		Enabled:     s.GetWithDefault("file_context_enabled", "false") == "true",
+		MaxFileSize: maxFileSize,
+		MaxFiles:    maxFiles,
+	}
+}
+
+type UpdateFileContextConfigRequest struct {
+	Enabled     *bool `json:"enabled"`
+	MaxFileSize *int  `json:"max_file_size"`
+	MaxFiles    *int  `json:"max_files"`
+}
+
+func (s *SystemConfigService) UpdateFileContextConfig(req *UpdateFileContextConfigRequest) error {
+	if req.Enabled != nil {
+		if err := s.Set("file_context_enabled", strconv.FormatBool(*req.Enabled)); err != nil {
+			return err
+		}
+	}
+	if req.MaxFileSize != nil {
+		if err := s.Set("file_context_max_file_size", strconv.Itoa(*req.MaxFileSize)); err != nil {
+			return err
+		}
+	}
+	if req.MaxFiles != nil {
+		if err := s.Set("file_context_max_files", strconv.Itoa(*req.MaxFiles)); err != nil {
+			return err
+		}
+	}
+	return nil
+}

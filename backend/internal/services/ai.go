@@ -39,6 +39,7 @@ type ReviewRequest struct {
 	ProjectID    uint
 	Diffs        string
 	Commits      string
+	FileContext  string
 	CustomPrompt string
 }
 
@@ -57,9 +58,10 @@ func (s *AIService) Review(ctx context.Context, req *ReviewRequest) (*ReviewResu
 
 	prompt = strings.ReplaceAll(prompt, "{{diffs}}", req.Diffs)
 	prompt = strings.ReplaceAll(prompt, "{{commits}}", req.Commits)
+	prompt = strings.ReplaceAll(prompt, "{{file_context}}", req.FileContext)
 
-	log.Printf("[AI] Prompt length: %d chars, Diffs length: %d chars, Commits length: %d chars",
-		len(prompt), len(req.Diffs), len(req.Commits))
+	log.Printf("[AI] Prompt length: %d chars, Diffs length: %d chars, Commits length: %d chars, FileContext length: %d chars",
+		len(prompt), len(req.Diffs), len(req.Commits), len(req.FileContext))
 
 	if len(prompt) > 500 {
 		log.Printf("[AI] Prompt preview (first 500 chars): %s...", prompt[:500])
