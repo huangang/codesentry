@@ -20,6 +20,7 @@ import {
   CloseOutlined,
   SunOutlined,
   MoonOutlined,
+  GithubOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -327,6 +328,14 @@ const MainLayout: React.FC = () => {
             </Text>
           </Space>
           <Space size={isMobile ? 'small' : 'large'}>
+            <Tooltip title="GitHub">
+              <Button
+                type="text"
+                icon={<GithubOutlined style={{ fontSize: 18, color: isDark ? '#e2e8f0' : '#64748b' }} />}
+                onClick={() => window.open('https://github.com/huangang/codesentry', '_blank')}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              />
+            </Tooltip>
             <Tooltip title={isDark ? 'Light Mode' : 'Dark Mode'}>
               <Button
                 type="text"
