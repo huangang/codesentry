@@ -58,7 +58,8 @@ func (s *AIService) Review(ctx context.Context, req *ReviewRequest) (*ReviewResu
 
 	prompt = strings.ReplaceAll(prompt, "{{diffs}}", req.Diffs)
 	prompt = strings.ReplaceAll(prompt, "{{commits}}", req.Commits)
-	prompt = strings.ReplaceAll(prompt, "{{file_context}}", req.FileContext)
+
+	prompt = s.processFileContextBlock(prompt, req.FileContext)
 
 	log.Printf("[AI] Prompt length: %d chars, Diffs length: %d chars, Commits length: %d chars, FileContext length: %d chars",
 		len(prompt), len(req.Diffs), len(req.Commits), len(req.FileContext))
@@ -419,6 +420,20 @@ Score breakdown (adjust based on your review focus):
 - Other: X/10
 `
 	return prompt + scoringInstruction
+}
+
+func (s *AIService) processFileContextBlock(prompt string, fileContext string) string {
+	ifBlockRegex := regexp.MustCompile(`(?s)\{\{#if_file_context\}\}(.*?)\{\{/if_file_context\}\}`)
+
+	if strings.TrimSpace(fileContext) != "" {
+		prompt = ifBlockRegex.ReplaceAllString(prompt, "$1")
+		prompt = strings.ReplaceAll(prompt, "{{file_context}}", fileContext)
+	} else {
+		prompt = ifBlockRegex.ReplaceAllString(prompt, "")
+		prompt = strings.ReplaceAll(prompt, "{{file_context}}", "")
+	}
+
+	return prompt
 }
 
 // extractScore extracts the score from review content
