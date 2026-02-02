@@ -53,6 +53,8 @@ func AutoMigrate() error {
 		&GitCredential{},
 		&DailyReport{},
 		&SchedulerLock{},
+		&ReviewTemplate{},
+		&ReviewFeedback{},
 	)
 }
 

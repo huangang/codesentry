@@ -8,3 +8,5 @@ export * from './useUsers';
 export * from './useGitCredentials';
 export * from './useOthers';
 export * from './useSettings';
+export * from './useReviewTemplates';
+export * from './useReviewFeedback';

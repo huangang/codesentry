@@ -396,6 +396,8 @@
       "title": "文件上下文设置",
       "enabled": "启用文件上下文",
       "enabledHint": "获取完整文件内容为 AI 审查提供更好的上下文（减少误判）",
+      "extractFunctions": "提取函数定义",
+      "extractFunctionsHint": "启用后，仅将修改的函数/方法定义发送给 AI，而不是完整文件",
       "maxFileSize": "最大文件大小",
       "maxFileSizeHint": "每个文件获取的最大字节数（默认 100KB）",
       "maxFiles": "最大文件数",

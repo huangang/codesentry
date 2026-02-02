@@ -1,7 +1,7 @@
 import api from './api';
-import type { 
-  LoginResponse, 
-  AuthConfig, 
+import type {
+  LoginResponse,
+  AuthConfig,
   User,
   Project,
   ReviewLog,
@@ -18,11 +18,11 @@ import type {
 export const authApi = {
   login: (username: string, password: string, authType: string = 'local') =>
     api.post<LoginResponse>('/auth/login', { username, password, auth_type: authType }),
-  
+
   getConfig: () => api.get<AuthConfig>('/auth/config'),
-  
+
   getCurrentUser: () => api.get<User>('/auth/me'),
-  
+
   logout: () => api.post('/auth/logout'),
 
   changePassword: (oldPassword: string, newPassword: string) =>
@@ -39,17 +39,17 @@ export const dashboardApi = {
 export const projectApi = {
   list: (params?: { page?: number; page_size?: number; name?: string; platform?: string }) =>
     api.get<PaginatedResponse<Project>>('/projects', { params }),
-  
+
   getById: (id: number) => api.get<Project>(`/projects/${id}`),
-  
+
   create: (data: Partial<Project> & { access_token?: string; webhook_secret?: string }) =>
     api.post<Project>('/projects', data),
-  
+
   update: (id: number, data: Partial<Project> & { access_token?: string; webhook_secret?: string }) =>
     api.put<Project>(`/projects/${id}`, data),
-  
+
   delete: (id: number) => api.delete(`/projects/${id}`),
-  
+
   getDefaultPrompt: () => api.get<{ prompt: string }>('/projects/default-prompt'),
 };
 
@@ -65,7 +65,7 @@ export const reviewLogApi = {
     end_date?: string;
     search_text?: string;
   }) => api.get<PaginatedResponse<ReviewLog>>('/review-logs', { params }),
-  
+
   getById: (id: number) => api.get<ReviewLog>(`/review-logs/${id}`),
 
   retry: (id: number) => api.post<{ message: string }>(`/review-logs/${id}/retry`),
@@ -75,17 +75,17 @@ export const reviewLogApi = {
 export const llmConfigApi = {
   list: (params?: { page?: number; page_size?: number; name?: string; provider?: string; is_active?: boolean }) =>
     api.get<PaginatedResponse<LLMConfig>>('/llm-configs', { params }),
-  
+
   getById: (id: number) => api.get<LLMConfig>(`/llm-configs/${id}`),
-  
+
   getActive: () => api.get<LLMConfig[]>('/llm-configs/active'),
-  
+
   create: (data: Partial<LLMConfig> & { api_key: string }) =>
     api.post<LLMConfig>('/llm-configs', data),
-  
+
   update: (id: number, data: Partial<LLMConfig> & { api_key?: string }) =>
     api.put<LLMConfig>(`/llm-configs/${id}`, data),
-  
+
   delete: (id: number) => api.delete(`/llm-configs/${id}`),
 };
 
@@ -93,17 +93,17 @@ export const llmConfigApi = {
 export const imBotApi = {
   list: (params?: { page?: number; page_size?: number; name?: string; type?: string; is_active?: boolean }) =>
     api.get<PaginatedResponse<IMBot>>('/im-bots', { params }),
-  
+
   getById: (id: number) => api.get<IMBot>(`/im-bots/${id}`),
-  
+
   getActive: () => api.get<IMBot[]>('/im-bots/active'),
-  
+
   create: (data: Partial<IMBot> & { secret?: string }) =>
     api.post<IMBot>('/im-bots', data),
-  
+
   update: (id: number, data: Partial<IMBot> & { secret?: string }) =>
     api.put<IMBot>(`/im-bots/${id}`, data),
-  
+
   delete: (id: number) => api.delete(`/im-bots/${id}`),
 };
 
@@ -111,21 +111,21 @@ export const imBotApi = {
 export const promptApi = {
   list: (params?: { page?: number; page_size?: number; name?: string; is_system?: boolean }) =>
     api.get<PaginatedResponse<PromptTemplate>>('/prompts', { params }),
-  
+
   getById: (id: number) => api.get<PromptTemplate>(`/prompts/${id}`),
-  
+
   getDefault: () => api.get<PromptTemplate>('/prompts/default'),
-  
+
   getActive: () => api.get<PromptTemplate[]>('/prompts/active'),
-  
+
   create: (data: Partial<PromptTemplate>) =>
     api.post<PromptTemplate>('/prompts', data),
-  
+
   update: (id: number, data: Partial<PromptTemplate>) =>
     api.put<PromptTemplate>(`/prompts/${id}`, data),
-  
+
   delete: (id: number) => api.delete(`/prompts/${id}`),
-  
+
   setDefault: (id: number) => api.post(`/prompts/${id}/set-default`),
 };
 
@@ -184,23 +184,23 @@ export const systemLogApi = {
 export const gitCredentialApi = {
   list: (params?: { page?: number; page_size?: number; name?: string; platform?: string; is_active?: boolean }) =>
     api.get<PaginatedResponse<GitCredential>>('/git-credentials', { params }),
-  
+
   getById: (id: number) => api.get<GitCredential>(`/git-credentials/${id}`),
-  
+
   getActive: () => api.get<GitCredential[]>('/git-credentials/active'),
-  
+
   create: (data: Partial<GitCredential> & { access_token?: string; webhook_secret?: string }) =>
     api.post<GitCredential>('/git-credentials', data),
-  
+
   update: (id: number, data: Partial<GitCredential> & { access_token?: string; webhook_secret?: string }) =>
     api.put<GitCredential>(`/git-credentials/${id}`, data),
-  
+
   delete: (id: number) => api.delete(`/git-credentials/${id}`),
 };
 
 export const systemConfigApi = {
   getLDAPConfig: () => api.get<LDAPConfig>('/system-config/ldap'),
-  
+
   updateLDAPConfig: (data: Partial<LDAPConfig>) =>
     api.put<LDAPConfig>('/system-config/ldap', data),
 
@@ -239,15 +239,16 @@ export interface FileContextConfig {
   enabled: boolean;
   max_file_size: number;
   max_files: number;
+  extract_functions: boolean;
 }
 
 export const userApi = {
   list: (params?: { page?: number; page_size?: number; username?: string; role?: string; auth_type?: string }) =>
     api.get<{ items: User[]; total: number; page: number; page_size: number }>('/users', { params }),
-  
+
   update: (id: number, data: { role?: string; is_active?: boolean; nickname?: string }) =>
     api.put<User>(`/users/${id}`, data),
-  
+
   delete: (id: number) => api.delete(`/users/${id}`),
 };
 
@@ -288,4 +289,61 @@ export const dailyReportApi = {
   generate: () => api.post<{ message: string }>('/daily-reports/generate'),
 
   resend: (id: number) => api.post<{ message: string }>(`/daily-reports/${id}/resend`),
+};
+
+// Review Templates
+export interface ReviewTemplate {
+  id: number;
+  name: string;
+  type: 'general' | 'frontend' | 'backend' | 'security' | 'custom';
+  description: string;
+  content: string;
+  is_built_in: boolean;
+  is_active: boolean;
+  created_by: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export const reviewTemplateApi = {
+  list: (params?: { type?: string }) =>
+    api.get<ReviewTemplate[]>('/review-templates', { params }),
+
+  getById: (id: number) => api.get<ReviewTemplate>(`/review-templates/${id}`),
+
+  create: (data: Partial<ReviewTemplate>) =>
+    api.post<ReviewTemplate>('/review-templates', data),
+
+  update: (id: number, data: Partial<ReviewTemplate>) =>
+    api.put<ReviewTemplate>(`/review-templates/${id}`, data),
+
+  delete: (id: number) => api.delete(`/review-templates/${id}`),
+};
+
+// Review Feedback
+export interface ReviewFeedback {
+  id: number;
+  review_log_id: number;
+  user_id: number;
+  user?: { id: number; username: string; nickname?: string };
+  feedback_type: 'agree' | 'disagree' | 'question' | 'clarification';
+  user_message: string;
+  ai_response: string;
+  previous_score: number | null;
+  updated_score: number | null;
+  score_changed: boolean;
+  process_status: 'pending' | 'processing' | 'completed' | 'failed';
+  error_message: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export const reviewFeedbackApi = {
+  listByReview: (reviewLogId: number) =>
+    api.get<ReviewFeedback[]>(`/review-logs/${reviewLogId}/feedbacks`),
+
+  getById: (id: number) => api.get<ReviewFeedback>(`/review-feedbacks/${id}`),
+
+  create: (data: { review_log_id: number; feedback_type: string; user_message: string }) =>
+    api.post<ReviewFeedback>('/review-feedbacks', data),
 };

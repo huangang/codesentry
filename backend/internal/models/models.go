@@ -214,6 +214,40 @@ type SchedulerLock struct {
 	ExpiresAt time.Time `gorm:"index" json:"expires_at"`
 }
 
+// ReviewTemplate represents a predefined review template
+type ReviewTemplate struct {
+	ID          uint           `gorm:"primaryKey" json:"id"`
+	Name        string         `gorm:"size:100;not null" json:"name"`
+	Type        string         `gorm:"size:50;not null;index" json:"type"` // frontend, backend, security, general, custom
+	Description string         `gorm:"size:500" json:"description"`
+	Content     string         `gorm:"type:text;not null" json:"content"` // The actual prompt content
+	IsBuiltIn   bool           `gorm:"default:false" json:"is_built_in"`  // System built-in templates cannot be deleted
+	IsActive    bool           `gorm:"default:true" json:"is_active"`
+	CreatedBy   uint           `json:"created_by"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// ReviewFeedback represents user feedback on AI review and AI's response
+type ReviewFeedback struct {
+	ID            uint       `gorm:"primaryKey" json:"id"`
+	ReviewLogID   uint       `gorm:"index;not null" json:"review_log_id"`
+	ReviewLog     *ReviewLog `gorm:"foreignKey:ReviewLogID" json:"review_log,omitempty"`
+	UserID        uint       `gorm:"index" json:"user_id"`
+	User          *User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	FeedbackType  string     `gorm:"size:50;not null" json:"feedback_type"`         // agree, disagree, question, clarification
+	UserMessage   string     `gorm:"type:text;not null" json:"user_message"`        // User's feedback/question
+	AIResponse    string     `gorm:"type:text" json:"ai_response"`                  // AI's response to feedback
+	PreviousScore *float64   `json:"previous_score"`                                // Score before re-evaluation
+	UpdatedScore  *float64   `json:"updated_score"`                                 // Score after re-evaluation (if changed)
+	ScoreChanged  bool       `gorm:"default:false" json:"score_changed"`            // Whether score was updated
+	ProcessStatus string     `gorm:"size:50;default:pending" json:"process_status"` // pending, processing, completed, failed
+	ErrorMessage  string     `gorm:"type:text" json:"error_message"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+}
+
 // TableName overrides
 func (User) TableName() string           { return "users" }
 func (Project) TableName() string        { return "projects" }
@@ -226,6 +260,8 @@ func (SystemLog) TableName() string      { return "system_logs" }
 func (GitCredential) TableName() string  { return "git_credentials" }
 func (DailyReport) TableName() string    { return "daily_reports" }
 func (SchedulerLock) TableName() string  { return "scheduler_locks" }
+func (ReviewTemplate) TableName() string { return "review_templates" }
+func (ReviewFeedback) TableName() string { return "review_feedbacks" }
 
 // MaskAPIKey returns masked API key for display
 func (l *LLMConfig) MaskAPIKey() string {

@@ -254,11 +254,12 @@ func (h *WebhookHandler) HandleGitLabWebhookGeneric(c *gin.Context) {
 	token := c.GetHeader("X-Gitlab-Token")
 	project, resolveErr, statusCode := h.resolveProject(ctx, token, gitlabVerifier)
 	if resolveErr != nil {
-		if statusCode == http.StatusUnauthorized {
+		switch statusCode {
+		case http.StatusUnauthorized:
 			c.JSON(statusCode, gin.H{"error": "invalid webhook token"})
-		} else if statusCode == http.StatusNotFound {
+		case http.StatusNotFound:
 			c.JSON(statusCode, gin.H{"error": "project not found for URL: " + projectURL})
-		} else {
+		default:
 			c.JSON(statusCode, gin.H{"error": "failed to auto-create project"})
 		}
 		return
@@ -328,11 +329,12 @@ func (h *WebhookHandler) HandleGitHubWebhookGeneric(c *gin.Context) {
 	signature := c.GetHeader("X-Hub-Signature-256")
 	project, resolveErr, statusCode := h.resolveProject(ctx, signature, githubVerifier)
 	if resolveErr != nil {
-		if statusCode == http.StatusUnauthorized {
+		switch statusCode {
+		case http.StatusUnauthorized:
 			c.JSON(statusCode, gin.H{"error": "invalid webhook signature"})
-		} else if statusCode == http.StatusNotFound {
+		case http.StatusNotFound:
 			c.JSON(statusCode, gin.H{"error": "project not found for URL: " + projectURL})
-		} else {
+		default:
 			c.JSON(statusCode, gin.H{"error": "failed to auto-create project"})
 		}
 		return
@@ -442,11 +444,12 @@ func (h *WebhookHandler) HandleBitbucketWebhookGeneric(c *gin.Context) {
 	signature := c.GetHeader("X-Hub-Signature")
 	project, resolveErr, statusCode := h.resolveProject(ctx, signature, bitbucketVerifier)
 	if resolveErr != nil {
-		if statusCode == http.StatusUnauthorized {
+		switch statusCode {
+		case http.StatusUnauthorized:
 			c.JSON(statusCode, gin.H{"error": "invalid webhook signature"})
-		} else if statusCode == http.StatusNotFound {
+		case http.StatusNotFound:
 			c.JSON(statusCode, gin.H{"error": "project not found for URL: " + projectURL})
-		} else {
+		default:
 			c.JSON(statusCode, gin.H{"error": "failed to auto-create project"})
 		}
 		return

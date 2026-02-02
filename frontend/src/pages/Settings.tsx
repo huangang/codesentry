@@ -90,7 +90,7 @@ const Settings: React.FC = () => {
 
   useEffect(() => {
     if (fileContextConfig) {
-      fileContextForm.setFieldsValue({ enabled: fileContextConfig.enabled, max_file_size: fileContextConfig.max_file_size || 102400, max_files: fileContextConfig.max_files || 10 });
+      fileContextForm.setFieldsValue({ enabled: fileContextConfig.enabled, extract_functions: fileContextConfig.extract_functions, max_file_size: fileContextConfig.max_file_size || 102400, max_files: fileContextConfig.max_files || 10 });
       setFileContextEnabled(fileContextConfig.enabled);
     }
   }, [fileContextConfig, fileContextForm]);
@@ -145,7 +145,12 @@ const Settings: React.FC = () => {
   const handleFileContextSave = async () => {
     try {
       const values = await fileContextForm.validateFields();
-      const payload: Partial<FileContextConfig> = { enabled: values.enabled, max_file_size: values.max_file_size || 102400, max_files: values.max_files || 10 };
+      const payload: Partial<FileContextConfig> = {
+        enabled: values.enabled,
+        max_file_size: values.max_file_size || 102400,
+        max_files: values.max_files || 10,
+        extract_functions: values.extract_functions ?? true,
+      };
       await updateFileContext.mutateAsync(payload);
       message.success(t('settings.fileContext.saveSuccess'));
       setFileContextEnabled(values.enabled);
@@ -198,6 +203,7 @@ const Settings: React.FC = () => {
       <Card title={t('settings.fileContext.title')} extra={<Button type="primary" icon={<SaveOutlined />} loading={updateFileContext.isPending} onClick={handleFileContextSave}>{t('common.save')}</Button>}>
         <Form form={fileContextForm} layout="vertical" style={{ maxWidth: 600 }}>
           <Form.Item name="enabled" label={t('settings.fileContext.enabled')} valuePropName="checked" extra={t('settings.fileContext.enabledHint')}><Switch onChange={setFileContextEnabled} /></Form.Item>
+          <Form.Item name="extract_functions" label={t('settings.fileContext.extractFunctions')} valuePropName="checked" extra={t('settings.fileContext.extractFunctionsHint')}><Switch disabled={!fileContextEnabled} /></Form.Item>
           <Row gutter={16}>
             <Col xs={24} sm={12}><Form.Item name="max_file_size" label={t('settings.fileContext.maxFileSize')} extra={t('settings.fileContext.maxFileSizeHint')}><InputNumber min={1024} max={1048576} step={1024} style={{ width: '100%' }} disabled={!fileContextEnabled} addonAfter="bytes" /></Form.Item></Col>
             <Col xs={24} sm={12}><Form.Item name="max_files" label={t('settings.fileContext.maxFiles')} extra={t('settings.fileContext.maxFilesHint')}><InputNumber min={1} max={50} style={{ width: '100%' }} disabled={!fileContextEnabled} /></Form.Item></Col>

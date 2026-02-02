@@ -396,6 +396,8 @@
       "title": "File Context Settings",
       "enabled": "Enable File Context",
       "enabledHint": "Fetch full file content to provide better context for AI review (reduces false positives)",
+      "extractFunctions": "Extract Functions",
+      "extractFunctionsHint": "When enabled, only modified function/method definitions are sent to AI instead of full files",
       "maxFileSize": "Max File Size",
       "maxFileSizeHint": "Maximum size of each file to fetch (in bytes, default 100KB)",
       "maxFiles": "Max Files",

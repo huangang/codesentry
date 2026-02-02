@@ -56,6 +56,12 @@ func main() {
 		log.Printf("Warning: Failed to seed default data: %v", err)
 	}
 
+	// Seed default review templates
+	reviewTemplateHandler := handlers.NewReviewTemplateHandler(models.GetDB())
+	if err := reviewTemplateHandler.SeedTemplates(); err != nil {
+		log.Printf("Warning: Failed to seed review templates: %v", err)
+	}
+
 	// Initialize system logger
 	services.InitSystemLogger(models.GetDB())
 
@@ -129,6 +135,10 @@ func main() {
 			auth.GET("/config", authHandler.GetAuthConfig)
 		}
 
+		// SSE Events (public route with internal token validation)
+		sseHandler := handlers.NewSSEHandler(services.GetSSEHub())
+		api.GET("/events/reviews", sseHandler.StreamReviewEvents)
+
 		// Protected routes
 		protected := api.Group("")
 		protected.Use(middleware.AuthRequired())
@@ -158,16 +168,23 @@ func main() {
 			protected.GET("/members", memberHandler.List)
 			protected.GET("/members/detail", memberHandler.GetDetail)
 
-			// SSE Events (all users)
-			sseHandler := handlers.NewSSEHandler(services.GetSSEHub())
-			protected.GET("/events/reviews", sseHandler.StreamReviewEvents)
-
 			// Prompts (read for all users)
 			promptHandler := handlers.NewPromptHandler(models.GetDB())
 			protected.GET("/prompts", promptHandler.List)
 			protected.GET("/prompts/default", promptHandler.GetDefault)
 			protected.GET("/prompts/active", promptHandler.GetAllActive)
 			protected.GET("/prompts/:id", promptHandler.GetByID)
+
+			// Review Templates (read for all users)
+			reviewTemplateHandler := handlers.NewReviewTemplateHandler(models.GetDB())
+			protected.GET("/review-templates", reviewTemplateHandler.List)
+			protected.GET("/review-templates/:id", reviewTemplateHandler.Get)
+
+			// Review Feedbacks (interactive AI feedback)
+			reviewFeedbackHandler := handlers.NewReviewFeedbackHandler(models.GetDB(), &cfg.OpenAI)
+			protected.GET("/review-logs/:id/feedbacks", reviewFeedbackHandler.ListByReview)
+			protected.GET("/review-feedbacks/:id", reviewFeedbackHandler.Get)
+			protected.POST("/review-feedbacks", reviewFeedbackHandler.Create)
 		}
 
 		// Admin only routes
@@ -215,6 +232,12 @@ func main() {
 			admin.PUT("/prompts/:id", promptHandler.Update)
 			admin.DELETE("/prompts/:id", promptHandler.Delete)
 			admin.POST("/prompts/:id/set-default", promptHandler.SetDefault)
+
+			// Review Templates (admin only for write operations)
+			reviewTemplateHandler := handlers.NewReviewTemplateHandler(models.GetDB())
+			admin.POST("/review-templates", reviewTemplateHandler.Create)
+			admin.PUT("/review-templates/:id", reviewTemplateHandler.Update)
+			admin.DELETE("/review-templates/:id", reviewTemplateHandler.Delete)
 
 			// System Logs
 			systemLogHandler := handlers.NewSystemLogHandler(models.GetDB())

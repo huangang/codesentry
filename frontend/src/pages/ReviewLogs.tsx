@@ -14,8 +14,12 @@ import {
   message,
   Typography,
   Popconfirm,
+  Divider,
+  List,
+  Avatar,
+  Spin,
 } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined, LinkOutlined, DeleteOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, EyeOutlined, LinkOutlined, DeleteOutlined, SendOutlined, CommentOutlined, CheckCircleOutlined, CloseCircleOutlined, QuestionCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
@@ -27,13 +31,131 @@ import {
   useRetryReview,
   useDeleteReviewLog,
   useProjects,
+  useReviewFeedbacks,
+  useCreateReviewFeedback,
   type ReviewLogFilters,
 } from '../hooks/queries';
 import { MarkdownContent } from '../components';
 import { REVIEW_STATUS, EVENT_TYPES, getScoreColor, getStatusColor } from '../constants';
 
 const { RangePicker } = DatePicker;
-const { Paragraph } = Typography;
+const { Paragraph, Text } = Typography;
+const { TextArea } = Input;
+
+// Feedback Section Component
+const FeedbackSection: React.FC<{ reviewLogId: number }> = ({ reviewLogId }) => {
+  const { t } = useTranslation();
+  const [feedbackType, setFeedbackType] = useState<string>('question');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+
+  const { data: feedbacks, isLoading } = useReviewFeedbacks(reviewLogId);
+  const createFeedback = useCreateReviewFeedback();
+
+  const feedbackTypeOptions = [
+    { value: 'agree', label: t('feedback.types.agree', '同意'), icon: <CheckCircleOutlined style={{ color: '#52c41a' }} /> },
+    { value: 'disagree', label: t('feedback.types.disagree', '不同意'), icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} /> },
+    { value: 'question', label: t('feedback.types.question', '提问'), icon: <QuestionCircleOutlined style={{ color: '#1890ff' }} /> },
+    { value: 'clarification', label: t('feedback.types.clarification', '需要说明'), icon: <InfoCircleOutlined style={{ color: '#faad14' }} /> },
+  ];
+
+  const handleSubmit = async () => {
+    if (!feedbackMessage.trim()) return;
+    try {
+      await createFeedback.mutateAsync({
+        review_log_id: reviewLogId,
+        feedback_type: feedbackType,
+        user_message: feedbackMessage,
+      });
+      setFeedbackMessage('');
+      message.success(t('feedback.submitSuccess', '反馈已提交'));
+    } catch {
+      message.error(t('feedback.submitError', '提交失败'));
+    }
+  };
+
+  const getStatusTag = (status: string) => {
+    switch (status) {
+      case 'completed': return <Tag color="success">{t('feedback.status.completed', '已回复')}</Tag>;
+      case 'processing': return <Tag color="processing">{t('feedback.status.processing', '处理中')}</Tag>;
+      case 'failed': return <Tag color="error">{t('feedback.status.failed', '失败')}</Tag>;
+      default: return <Tag>{t('feedback.status.pending', '等待中')}</Tag>;
+    }
+  };
+
+  return (
+    <Card
+      title={<><CommentOutlined /> {t('feedback.title', 'AI 反馈对话')}</>}
+      size="small"
+      style={{ marginTop: 16 }}
+    >
+      {/* Feedback Form */}
+      <Space direction="vertical" style={{ width: '100%' }} size="small">
+        <Space>
+          <Text strong>{t('feedback.type', '反馈类型')}:</Text>
+          <Select
+            value={feedbackType}
+            onChange={setFeedbackType}
+            style={{ width: 140 }}
+            options={feedbackTypeOptions}
+          />
+        </Space>
+        <TextArea
+          value={feedbackMessage}
+          onChange={(e) => setFeedbackMessage(e.target.value)}
+          placeholder={t('feedback.placeholder', '输入您的反馈或问题，AI将重新评估...')}
+          rows={3}
+        />
+        <Button
+          type="primary"
+          icon={<SendOutlined />}
+          onClick={handleSubmit}
+          loading={createFeedback.isPending}
+          disabled={!feedbackMessage.trim()}
+        >
+          {t('feedback.submit', '提交反馈')}
+        </Button>
+      </Space>
+
+      {/* Feedback History */}
+      {isLoading ? (
+        <Spin style={{ display: 'block', marginTop: 16 }} />
+      ) : feedbacks && feedbacks.length > 0 ? (
+        <>
+          <Divider>{t('feedback.history', '历史反馈')}</Divider>
+          <List
+            itemLayout="vertical"
+            dataSource={feedbacks}
+            renderItem={(item) => (
+              <List.Item>
+                <List.Item.Meta
+                  avatar={<Avatar icon={<CommentOutlined />} />}
+                  title={
+                    <Space>
+                      <Tag>{feedbackTypeOptions.find(o => o.value === item.feedback_type)?.label || item.feedback_type}</Tag>
+                      {getStatusTag(item.process_status)}
+                      {item.score_changed && (
+                        <Tag color="orange">
+                          {t('feedback.scoreChanged', '评分已更新')}: {item.previous_score?.toFixed(0)} → {item.updated_score?.toFixed(0)}
+                        </Tag>
+                      )}
+                    </Space>
+                  }
+                  description={dayjs(item.created_at).format('YYYY-MM-DD HH:mm')}
+                />
+                <Paragraph style={{ marginBottom: 8 }}><strong>{t('feedback.yourMessage', '您的反馈')}:</strong> {item.user_message}</Paragraph>
+                {item.ai_response && (
+                  <Card size="small" style={{ background: 'var(--ant-color-bg-container-alt, #fafafa)' }}>
+                    <MarkdownContent content={item.ai_response} />
+                  </Card>
+                )}
+              </List.Item>
+            )}
+          />
+        </>
+      ) : null}
+    </Card>
+  );
+};
 
 const ReviewLogs: React.FC = () => {
   const { t } = useTranslation();
@@ -400,6 +522,9 @@ const ReviewLogs: React.FC = () => {
                 <Paragraph type="danger">{selectedLog.error_message}</Paragraph>
               </Card>
             )}
+
+            {/* AI Feedback Section */}
+            <FeedbackSection reviewLogId={selectedLog.id} />
           </>
         )}
       </Drawer>
