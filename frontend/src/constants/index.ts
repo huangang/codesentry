@@ -1,6 +1,7 @@
 export const REVIEW_STATUS = {
   PENDING: 'pending',
   PROCESSING: 'processing',
+  ANALYZING: 'analyzing',
   COMPLETED: 'completed',
   FAILED: 'failed',
 } as const;
@@ -63,6 +64,7 @@ export function getStatusColor(status: string): 'success' | 'error' | 'processin
     case REVIEW_STATUS.FAILED:
       return 'error';
     case REVIEW_STATUS.PROCESSING:
+    case REVIEW_STATUS.ANALYZING:
     case REVIEW_STATUS.PENDING:
       return 'processing';
     default:

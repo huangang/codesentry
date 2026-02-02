@@ -141,6 +141,10 @@ func main() {
 			protected.GET("/members", memberHandler.List)
 			protected.GET("/members/detail", memberHandler.GetDetail)
 
+			// SSE Events (all users)
+			sseHandler := handlers.NewSSEHandler(services.GetSSEHub())
+			protected.GET("/events/reviews", sseHandler.StreamReviewEvents)
+
 			// Prompts (read for all users)
 			promptHandler := handlers.NewPromptHandler(models.GetDB())
 			protected.GET("/prompts", promptHandler.List)

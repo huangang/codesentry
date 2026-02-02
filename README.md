@@ -21,6 +21,7 @@ AI-powered Code Review Platform for GitHub, GitLab, and Bitbucket.
 - **Duplicate Prevention**: Skip already reviewed commits to avoid redundant processing
 - **Multi-Platform Support**: GitHub, GitLab, and Bitbucket webhook integration with multi-level project path support
 - **Dashboard**: Visual statistics and metrics for code review activities
+- **Real-time Updates**: SSE-powered live status updates (pending → analyzing → completed) without page refresh
 - **Review History**: Track all code reviews with detailed logs and direct links to commits/MRs
 - **Project Management**: Manage multiple repositories
 
@@ -212,6 +213,10 @@ The system automatically detects the platform via request headers.
 - `GET /api/review-logs/:id` - Get review detail
 - `POST /api/review-logs/:id/retry` - Retry failed review (admin only)
 - `DELETE /api/review-logs/:id` - Delete review log (admin only)
+
+### Real-time Events (SSE)
+
+- `GET /api/events/reviews` - Stream review status updates (requires `token` query param)
 
 ### Users
 

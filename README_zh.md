@@ -21,7 +21,7 @@
 - **防重复审查**: 跳过已审查的 commit，避免重复处理
 - **多平台支持**: GitHub、GitLab 和 Bitbucket Webhook 集成，支持多级项目路径
 - **可视化看板**: 代码审查活动的统计指标和图表
-- **可视化看板**: 代码审查活动的统计指标和图表
+- **实时更新**: SSE 驱动的状态实时推送（pending → analyzing → completed），无需刷新页面
 - **审查历史**: 详细的审查记录追踪，支持直接跳转到 commit/MR 页面
 - **项目管理**: 管理多个代码仓库
 
@@ -213,6 +213,10 @@ https://你的域名/review/webhook
 - `GET /api/review-logs/:id` - 审查详情
 - `POST /api/review-logs/:id/retry` - 重试失败的审查（仅管理员）
 - `DELETE /api/review-logs/:id` - 删除审查记录（仅管理员）
+
+### 实时事件 (SSE)
+
+- `GET /api/events/reviews` - 订阅审查状态更新（需要 `token` 查询参数）
 
 ### 用户管理
 

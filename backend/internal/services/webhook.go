@@ -527,6 +527,9 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 	}
 	s.reviewService.Create(reviewLog)
 
+	// Publish SSE event: pending
+	PublishReviewEvent(reviewLog.ID, reviewLog.ProjectID, reviewLog.CommitHash, "pending", nil, "")
+
 	log.Printf("[Webhook] Starting AI review for project %d, commit %s", project.ID, commitSHA)
 
 	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
@@ -543,6 +546,9 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 		}
 	}
 
+	// Publish SSE event: analyzing
+	PublishReviewEvent(reviewLog.ID, reviewLog.ProjectID, reviewLog.CommitHash, "analyzing", nil, "")
+
 	result, err := s.aiService.ReviewChunked(ctx, &ReviewRequest{
 		ProjectID:   project.ID,
 		Diffs:       filteredDiff,
@@ -558,6 +564,8 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 		})
 		reviewLog.ReviewStatus = "failed"
 		reviewLog.ErrorMessage = err.Error()
+		// Publish SSE event: failed
+		PublishReviewEvent(reviewLog.ID, reviewLog.ProjectID, reviewLog.CommitHash, "failed", nil, err.Error())
 	} else {
 		log.Printf("[Webhook] AI review completed, score: %.1f, result length: %d", result.Score, len(result.Content))
 		LogInfo("AIReview", "ReviewCompleted", fmt.Sprintf("Review completed with score %.0f", result.Score), nil, "", "", map[string]interface{}{
@@ -568,6 +576,8 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 		reviewLog.ReviewStatus = "completed"
 		reviewLog.ReviewResult = result.Content
 		reviewLog.Score = &result.Score
+		// Publish SSE event: completed
+		PublishReviewEvent(reviewLog.ID, reviewLog.ProjectID, reviewLog.CommitHash, "completed", &result.Score, "")
 
 		s.notificationService.SendReviewNotification(project, &ReviewNotification{
 			ProjectName:   project.Name,

@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Card,
   Table,
@@ -20,6 +21,7 @@ import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import type { ReviewLog } from '../types';
 import { usePermission, getResponsiveWidth } from '../hooks';
+import { useReviewSSE, type ReviewEvent } from '../hooks/useSSE';
 import {
   useReviewLogs,
   useRetryReview,
@@ -50,6 +52,30 @@ const ReviewLogs: React.FC = () => {
   const { data: projectsData } = useProjects({ page_size: 100 });
   const retryReview = useRetryReview();
   const deleteReviewLog = useDeleteReviewLog();
+  const queryClient = useQueryClient();
+
+  // SSE real-time updates
+  const handleSSEEvent = useCallback((event: ReviewEvent) => {
+    // Update the specific review log in cache
+    queryClient.setQueryData(['reviewLogs', filters], (old: { items: ReviewLog[]; total: number } | undefined) => {
+      if (!old) return old;
+      return {
+        ...old,
+        items: old.items.map((item: ReviewLog) =>
+          item.id === event.id
+            ? {
+              ...item,
+              review_status: event.status,
+              score: event.score ?? item.score,
+              error_message: event.error ?? item.error_message,
+            }
+            : item
+        ),
+      };
+    });
+  }, [queryClient, filters]);
+
+  useReviewSSE({ onEvent: handleSSEEvent });
 
   const buildFilters = useCallback((): ReviewLogFilters => {
     const newFilters: ReviewLogFilters = { page: 1, page_size: filters.page_size };
@@ -110,6 +136,7 @@ const ReviewLogs: React.FC = () => {
     switch (status) {
       case REVIEW_STATUS.PENDING: return t('reviewLogs.pending');
       case REVIEW_STATUS.PROCESSING: return t('reviewLogs.processing');
+      case REVIEW_STATUS.ANALYZING: return t('reviewLogs.analyzing', 'Analyzing');
       case REVIEW_STATUS.COMPLETED: return t('reviewLogs.completed');
       case REVIEW_STATUS.FAILED: return t('reviewLogs.failed');
       default: return status;
