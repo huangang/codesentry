@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   Table,
@@ -19,60 +19,47 @@ import { PlusOutlined, SearchOutlined, ReloadOutlined, EditOutlined, DeleteOutli
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
-import { llmConfigApi } from '../services';
 import type { LLMConfig } from '../types';
-import { usePaginatedList, useModal } from '../hooks';
+import { useModal } from '../hooks';
+import {
+  useLLMConfigs,
+  useCreateLLMConfig,
+  useUpdateLLMConfig,
+  useDeleteLLMConfig,
+  type LLMConfigFilters,
+} from '../hooks/queries';
 import { LLM_PROVIDERS } from '../constants';
-
-interface LLMConfigFilters {
-  name?: string;
-  provider?: string;
-}
 
 const LLMModels: React.FC = () => {
   const { t } = useTranslation();
   const [form] = Form.useForm();
-  const [searchName, setSearchName] = React.useState('');
-  const [provider, setProvider] = React.useState<string>('');
-  const [selectedProvider, setSelectedProvider] = React.useState<string>('');
+  const [searchName, setSearchName] = useState('');
+  const [provider, setProvider] = useState<string>('');
+  const [selectedProvider, setSelectedProvider] = useState<string>('');
+  const [filters, setFilters] = useState<LLMConfigFilters>({ page: 1, page_size: 10 });
 
   const modal = useModal<LLMConfig>();
 
-  const {
-    loading,
-    data,
-    total,
-    page,
-    pageSize,
-    setPage,
-    fetchData,
-    handlePageChange,
-  } = usePaginatedList<LLMConfig, LLMConfigFilters>({
-    fetchApi: llmConfigApi.list,
-    onError: () => message.error(t('common.error')),
-  });
-
-  const buildFilters = (): LLMConfigFilters => {
-    const filters: LLMConfigFilters = {};
-    if (searchName) filters.name = searchName;
-    if (provider) filters.provider = provider;
-    return filters;
-  };
-
-  useEffect(() => {
-    fetchData(buildFilters());
-  }, [page, pageSize]);
+  const { data: configsData, isLoading } = useLLMConfigs(filters);
+  const createConfig = useCreateLLMConfig();
+  const updateConfig = useUpdateLLMConfig();
+  const deleteConfig = useDeleteLLMConfig();
 
   const handleSearch = () => {
-    setPage(1);
-    fetchData(buildFilters());
+    const newFilters: LLMConfigFilters = { page: 1, page_size: filters.page_size };
+    if (searchName) newFilters.name = searchName;
+    if (provider) newFilters.provider = provider;
+    setFilters(newFilters);
   };
 
   const handleReset = () => {
     setSearchName('');
     setProvider('');
-    setPage(1);
-    fetchData({});
+    setFilters({ page: 1, page_size: 10 });
+  };
+
+  const handlePageChange = (page: number, pageSize: number) => {
+    setFilters(prev => ({ ...prev, page, page_size: pageSize }));
   };
 
   const showCreateModal = () => {
@@ -103,14 +90,13 @@ const LLMModels: React.FC = () => {
       }
 
       if (modal.current) {
-        await llmConfigApi.update(modal.current.id, values);
+        await updateConfig.mutateAsync({ id: modal.current.id, data: values });
         message.success(t('llmModels.updateSuccess'));
       } else {
-        await llmConfigApi.create(values);
+        await createConfig.mutateAsync(values);
         message.success(t('llmModels.createSuccess'));
       }
       modal.close();
-      fetchData(buildFilters());
     } catch (error: any) {
       message.error(error.response?.data?.error || t('common.error'));
     }
@@ -118,9 +104,8 @@ const LLMModels: React.FC = () => {
 
   const handleDelete = async (id: number) => {
     try {
-      await llmConfigApi.delete(id);
+      await deleteConfig.mutateAsync(id);
       message.success(t('llmModels.deleteSuccess'));
-      fetchData(buildFilters());
     } catch (error) {
       message.error(t('common.error'));
     }
@@ -136,29 +121,22 @@ const LLMModels: React.FC = () => {
 
   const handleProviderChange = (value: string) => {
     setSelectedProvider(value);
-    // Native API providers handle endpoints internally via SDK
-    // Only set Base URL for providers that need custom endpoints
     switch (value) {
       case LLM_PROVIDERS.OLLAMA:
-        // Ollama needs server address (no /v1 suffix for native API)
         form.setFieldsValue({ base_url: 'http://localhost:11434' });
         break;
       case LLM_PROVIDERS.AZURE:
-        // Azure needs resource URL
         form.setFieldsValue({ base_url: 'https://your-resource.openai.azure.com' });
         break;
       case LLM_PROVIDERS.OPENAI:
-        // OpenAI default endpoint
         form.setFieldsValue({ base_url: 'https://api.openai.com/v1' });
         break;
       default:
-        // Anthropic and Gemini use native SDKs, no Base URL needed
         form.setFieldsValue({ base_url: '' });
         break;
     }
   };
 
-  // Get dynamic placeholder and hint for base_url based on provider
   const getBaseUrlConfig = () => {
     switch (selectedProvider) {
       case LLM_PROVIDERS.ANTHROPIC:
@@ -276,14 +254,14 @@ const LLMModels: React.FC = () => {
 
         <Table
           columns={columns}
-          dataSource={data}
+          dataSource={configsData?.items ?? []}
           rowKey="id"
-          loading={loading}
+          loading={isLoading}
           scroll={{ x: 900 }}
           pagination={{
-            current: page,
-            pageSize,
-            total,
+            current: filters.page,
+            pageSize: filters.page_size,
+            total: configsData?.total ?? 0,
             showSizeChanger: true,
             showTotal: (total) => `${t('common.total')} ${total}`,
             onChange: handlePageChange,
@@ -296,6 +274,7 @@ const LLMModels: React.FC = () => {
         open={modal.visible}
         onOk={handleSubmit}
         onCancel={modal.close}
+        confirmLoading={createConfig.isPending || updateConfig.isPending}
         width={560}
       >
         <Form form={form} layout="vertical">

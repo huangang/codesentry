@@ -360,6 +360,7 @@ codesentry/
 - React 19
 - TypeScript 5.9
 - Ant Design 5
+- TanStack Query (data fetching & caching)
 - Recharts
 - Zustand (state management)
 - React Router 7

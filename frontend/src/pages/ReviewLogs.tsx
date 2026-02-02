@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Card,
   Table,
@@ -18,84 +18,54 @@ import { SearchOutlined, ReloadOutlined, EyeOutlined, LinkOutlined, DeleteOutlin
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
-import { reviewLogApi, projectApi, reviewLogApiExtra } from '../services';
-import type { ReviewLog, Project } from '../types';
-import { usePaginatedList, usePermission, getResponsiveWidth } from '../hooks';
+import type { ReviewLog } from '../types';
+import { usePermission, getResponsiveWidth } from '../hooks';
+import {
+  useReviewLogs,
+  useRetryReview,
+  useDeleteReviewLog,
+  useProjects,
+  type ReviewLogFilters,
+} from '../hooks/queries';
 import { MarkdownContent } from '../components';
 import { REVIEW_STATUS, EVENT_TYPES, getScoreColor, getStatusColor } from '../constants';
 
 const { RangePicker } = DatePicker;
 const { Paragraph } = Typography;
 
-interface ReviewLogFilters {
-  event_type?: string;
-  project_id?: number;
-  author?: string;
-  start_date?: string;
-  end_date?: string;
-  search_text?: string;
-}
-
 const ReviewLogs: React.FC = () => {
   const { t } = useTranslation();
   const { isAdmin } = usePermission();
-  const [projects, setProjects] = useState<Project[]>([]);
   const [selectedLog, setSelectedLog] = useState<ReviewLog | null>(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
-  
+
   const [eventType, setEventType] = useState<string>('');
   const [projectId, setProjectId] = useState<number | undefined>();
   const [author, setAuthor] = useState('');
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
   const [searchText, setSearchText] = useState('');
+  const [filters, setFilters] = useState<ReviewLogFilters>({ page: 1, page_size: 10 });
 
-  const {
-    loading,
-    data,
-    total,
-    page,
-    pageSize,
-    setPage,
-    fetchData,
-    handlePageChange,
-  } = usePaginatedList<ReviewLog, ReviewLogFilters>({
-    fetchApi: reviewLogApi.list,
-    onError: () => message.error(t('common.error')),
-  });
+  const { data: logsData, isLoading } = useReviewLogs(filters);
+  const { data: projectsData } = useProjects({ page_size: 100 });
+  const retryReview = useRetryReview();
+  const deleteReviewLog = useDeleteReviewLog();
 
   const buildFilters = useCallback((): ReviewLogFilters => {
-    const filters: ReviewLogFilters = {};
-    if (eventType) filters.event_type = eventType;
-    if (projectId) filters.project_id = projectId;
-    if (author) filters.author = author;
-    if (searchText) filters.search_text = searchText;
+    const newFilters: ReviewLogFilters = { page: 1, page_size: filters.page_size };
+    if (eventType) newFilters.event_type = eventType;
+    if (projectId) newFilters.project_id = projectId;
+    if (author) newFilters.author = author;
+    if (searchText) newFilters.search_text = searchText;
     if (dateRange) {
-      filters.start_date = dateRange[0].format('YYYY-MM-DD');
-      filters.end_date = dateRange[1].format('YYYY-MM-DD');
+      newFilters.start_date = dateRange[0].format('YYYY-MM-DD');
+      newFilters.end_date = dateRange[1].format('YYYY-MM-DD');
     }
-    return filters;
-  }, [eventType, projectId, author, searchText, dateRange]);
-
-  const fetchProjects = useCallback(async () => {
-    try {
-      const res = await projectApi.list({ page_size: 100 });
-      setProjects(res.data.items);
-    } catch (error) {
-      console.error('Failed to fetch projects:', error);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData(buildFilters());
-  }, [page, pageSize]);
-
-  useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
+    return newFilters;
+  }, [eventType, projectId, author, searchText, dateRange, filters.page_size]);
 
   const handleSearch = () => {
-    setPage(1);
-    fetchData(buildFilters());
+    setFilters(buildFilters());
   };
 
   const handleReset = () => {
@@ -104,8 +74,11 @@ const ReviewLogs: React.FC = () => {
     setAuthor('');
     setDateRange(null);
     setSearchText('');
-    setPage(1);
-    fetchData({});
+    setFilters({ page: 1, page_size: 10 });
+  };
+
+  const handlePageChange = (page: number, pageSize: number) => {
+    setFilters(prev => ({ ...prev, page, page_size: pageSize }));
   };
 
   const showDetail = (record: ReviewLog) => {
@@ -115,9 +88,8 @@ const ReviewLogs: React.FC = () => {
 
   const handleRetry = async (id: number) => {
     try {
-      await reviewLogApi.retry(id);
+      await retryReview.mutateAsync(id);
       message.success(t('reviewLogs.retryInitiated', 'Retry initiated'));
-      fetchData(buildFilters());
       setDrawerVisible(false);
     } catch (error) {
       message.error(t('common.error'));
@@ -126,9 +98,8 @@ const ReviewLogs: React.FC = () => {
 
   const handleDelete = async (id: number) => {
     try {
-      await reviewLogApiExtra.delete(id);
+      await deleteReviewLog.mutateAsync(id);
       message.success(t('reviewLogs.deleteSuccess', 'Review log deleted successfully'));
-      fetchData(buildFilters());
       setDrawerVisible(false);
     } catch (error) {
       message.error(t('common.error'));
@@ -262,7 +233,7 @@ const ReviewLogs: React.FC = () => {
             style={{ minWidth: 140 }}
             value={projectId}
             onChange={setProjectId}
-            options={projects.map(p => ({ value: p.id, label: p.name }))}
+            options={projectsData?.items?.map(p => ({ value: p.id, label: p.name })) ?? []}
           />
           <Input
             placeholder={t('reviewLogs.author')}
@@ -286,15 +257,15 @@ const ReviewLogs: React.FC = () => {
 
         <Table
           columns={columns}
-          dataSource={data}
+          dataSource={logsData?.items ?? []}
           rowKey="id"
-          loading={loading}
+          loading={isLoading}
           scroll={{ x: 900 }}
           size="middle"
           pagination={{
-            current: page,
-            pageSize,
-            total,
+            current: filters.page,
+            pageSize: filters.page_size,
+            total: logsData?.total ?? 0,
             showSizeChanger: true,
             showTotal: (total) => `${t('common.total')} ${total}`,
             onChange: handlePageChange,
@@ -348,11 +319,12 @@ const ReviewLogs: React.FC = () => {
                   </Tag>
                 )}
                 {selectedLog.review_status === REVIEW_STATUS.FAILED && (
-                  <Button 
-                    type="link" 
-                    size="small" 
+                  <Button
+                    type="link"
+                    size="small"
                     icon={<ReloadOutlined />}
                     onClick={() => handleRetry(selectedLog.id)}
+                    loading={retryReview.isPending}
                     style={{ marginLeft: 8 }}
                   >
                     {t('reviewLogs.retry', 'Retry')}

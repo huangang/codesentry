@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   Table,
@@ -33,68 +33,57 @@ import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { promptApi } from '../services';
 import type { PromptTemplate } from '../types';
-import { usePaginatedList, useModal, usePermission } from '../hooks';
+import { useModal, usePermission } from '../hooks';
 import { useThemeStore } from '../stores/themeStore';
+import {
+  usePrompts,
+  useCreatePrompt,
+  useUpdatePrompt,
+  useDeletePrompt,
+  useSetDefaultPrompt,
+  type PromptFilters,
+} from '../hooks/queries';
 
 const { TextArea } = Input;
 const { Paragraph } = Typography;
-
-interface PromptFilters {
-  name?: string;
-  is_system?: boolean;
-}
 
 const Prompts: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { isDark } = useThemeStore();
   const [form] = Form.useForm();
-  const [searchName, setSearchName] = React.useState('');
-  const [filterType, setFilterType] = React.useState<string>('');
-  const [drawerVisible, setDrawerVisible] = React.useState(false);
-  const [viewingPrompt, setViewingPrompt] = React.useState<PromptTemplate | null>(null);
-  const [viewMode, setViewMode] = React.useState<'rendered' | 'source'>('rendered');
+  const [searchName, setSearchName] = useState('');
+  const [filterType, setFilterType] = useState<string>('');
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [viewingPrompt, setViewingPrompt] = useState<PromptTemplate | null>(null);
+  const [viewMode, setViewMode] = useState<'rendered' | 'source'>('rendered');
+  const [filters, setFilters] = useState<PromptFilters>({ page: 1, page_size: 10 });
   const { canWrite } = usePermission();
 
   const modal = useModal<PromptTemplate>();
 
-  const {
-    loading,
-    data,
-    total,
-    page,
-    pageSize,
-    setPage,
-    fetchData,
-    handlePageChange,
-  } = usePaginatedList<PromptTemplate, PromptFilters>({
-    fetchApi: promptApi.list,
-    onError: () => message.error(t('common.error')),
-  });
-
-  const buildFilters = (): PromptFilters => {
-    const filters: PromptFilters = {};
-    if (searchName) filters.name = searchName;
-    if (filterType === 'system') filters.is_system = true;
-    if (filterType === 'custom') filters.is_system = false;
-    return filters;
-  };
-
-  useEffect(() => {
-    fetchData(buildFilters());
-  }, [page, pageSize]);
+  const { data: promptsData, isLoading } = usePrompts(filters);
+  const createPrompt = useCreatePrompt();
+  const updatePrompt = useUpdatePrompt();
+  const deletePrompt = useDeletePrompt();
+  const setDefaultPrompt = useSetDefaultPrompt();
 
   const handleSearch = () => {
-    setPage(1);
-    fetchData(buildFilters());
+    const newFilters: PromptFilters = { page: 1, page_size: filters.page_size };
+    if (searchName) newFilters.name = searchName;
+    if (filterType === 'system') newFilters.is_system = true;
+    if (filterType === 'custom') newFilters.is_system = false;
+    setFilters(newFilters);
   };
 
   const handleReset = () => {
     setSearchName('');
     setFilterType('');
-    setPage(1);
-    fetchData({});
+    setFilters({ page: 1, page_size: 10 });
+  };
+
+  const handlePageChange = (page: number, pageSize: number) => {
+    setFilters(prev => ({ ...prev, page, page_size: pageSize }));
   };
 
   const showCreateModal = () => {
@@ -131,14 +120,13 @@ const Prompts: React.FC = () => {
     try {
       const values = await form.validateFields();
       if (modal.current) {
-        await promptApi.update(modal.current.id, values);
+        await updatePrompt.mutateAsync({ id: modal.current.id, data: values });
         message.success(t('prompts.updateSuccess'));
       } else {
-        await promptApi.create(values);
+        await createPrompt.mutateAsync(values);
         message.success(t('prompts.createSuccess'));
       }
       modal.close();
-      fetchData(buildFilters());
     } catch (error: any) {
       message.error(error.response?.data?.error || t('common.error'));
     }
@@ -146,9 +134,8 @@ const Prompts: React.FC = () => {
 
   const handleDelete = async (id: number) => {
     try {
-      await promptApi.delete(id);
+      await deletePrompt.mutateAsync(id);
       message.success(t('prompts.deleteSuccess'));
-      fetchData(buildFilters());
     } catch (error: any) {
       message.error(error.response?.data?.error || t('common.error'));
     }
@@ -156,34 +143,17 @@ const Prompts: React.FC = () => {
 
   const handleSetDefault = async (id: number) => {
     try {
-      await promptApi.setDefault(id);
+      await setDefaultPrompt.mutateAsync(id);
       message.success(t('prompts.setDefaultSuccess'));
-      fetchData(buildFilters());
     } catch (error: any) {
       message.error(error.response?.data?.error || t('common.error'));
     }
   };
 
   const columns: ColumnsType<PromptTemplate> = [
-    {
-      title: 'ID',
-      dataIndex: 'id',
-      key: 'id',
-      width: 60,
-    },
-    {
-      title: t('prompts.name'),
-      dataIndex: 'name',
-      key: 'name',
-      width: 200,
-      ellipsis: true,
-    },
-    {
-      title: t('prompts.description'),
-      dataIndex: 'description',
-      key: 'description',
-      ellipsis: true,
-    },
+    { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
+    { title: t('prompts.name'), dataIndex: 'name', key: 'name', width: 200, ellipsis: true },
+    { title: t('prompts.description'), dataIndex: 'description', key: 'description', ellipsis: true },
     {
       title: t('prompts.type'),
       key: 'is_system',
@@ -198,10 +168,7 @@ const Prompts: React.FC = () => {
       title: t('prompts.isDefault'),
       key: 'is_default',
       width: 80,
-      render: (_, record) =>
-        record.is_default ? (
-          <StarFilled style={{ color: '#faad14', fontSize: 16 }} />
-        ) : null,
+      render: (_, record) => record.is_default ? <StarFilled style={{ color: '#faad14', fontSize: 16 }} /> : null,
     },
     {
       title: t('common.updatedAt'),
@@ -217,59 +184,29 @@ const Prompts: React.FC = () => {
       render: (_, record) => (
         <Space>
           <Tooltip title={t('common.view')}>
-            <Button
-              type="link"
-              size="small"
-              icon={<EyeOutlined />}
-              onClick={() => showViewDrawer(record)}
-            />
+            <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => showViewDrawer(record)} />
           </Tooltip>
           {canWrite && (
             <>
               <Tooltip title={t('prompts.duplicate')}>
-                <Button
-                  type="link"
-                  size="small"
-                  icon={<CopyOutlined />}
-                  onClick={() => handleDuplicate(record)}
-                />
+                <Button type="link" size="small" icon={<CopyOutlined />} onClick={() => handleDuplicate(record)} />
               </Tooltip>
               {!record.is_system && (
                 <>
                   <Tooltip title={t('common.edit')}>
-                    <Button
-                      type="link"
-                      size="small"
-                      icon={<EditOutlined />}
-                      onClick={() => showEditModal(record)}
-                    />
+                    <Button type="link" size="small" icon={<EditOutlined />} onClick={() => showEditModal(record)} />
                   </Tooltip>
                   <Tooltip title={t('prompts.setAsDefault')}>
-                    <Button
-                      type="link"
-                      size="small"
-                      icon={<StarOutlined />}
-                      onClick={() => handleSetDefault(record.id)}
-                      disabled={record.is_default}
-                    />
+                    <Button type="link" size="small" icon={<StarOutlined />} onClick={() => handleSetDefault(record.id)} disabled={record.is_default} />
                   </Tooltip>
-                  <Popconfirm
-                    title={t('prompts.deleteConfirm')}
-                    onConfirm={() => handleDelete(record.id)}
-                  >
+                  <Popconfirm title={t('prompts.deleteConfirm')} onConfirm={() => handleDelete(record.id)}>
                     <Button type="link" size="small" danger icon={<DeleteOutlined />} />
                   </Popconfirm>
                 </>
               )}
               {record.is_system && (
                 <Tooltip title={t('prompts.setAsDefault')}>
-                  <Button
-                    type="link"
-                    size="small"
-                    icon={<StarOutlined />}
-                    onClick={() => handleSetDefault(record.id)}
-                    disabled={record.is_default}
-                  />
+                  <Button type="link" size="small" icon={<StarOutlined />} onClick={() => handleSetDefault(record.id)} disabled={record.is_default} />
                 </Tooltip>
               )}
             </>
@@ -283,47 +220,23 @@ const Prompts: React.FC = () => {
     <>
       <Card>
         <Space style={{ marginBottom: 16 }} wrap>
-          <Input
-            placeholder={t('prompts.name')}
-            style={{ width: 180 }}
-            value={searchName}
-            onChange={(e) => setSearchName(e.target.value)}
-            onPressEnter={handleSearch}
-          />
-          <Select
-            placeholder={t('prompts.type')}
-            allowClear
-            style={{ width: 120 }}
-            value={filterType || undefined}
-            onChange={setFilterType}
-            options={[
-              { value: 'system', label: t('prompts.system') },
-              { value: 'custom', label: t('prompts.custom') },
-            ]}
-          />
-          <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
-            {t('common.search')}
-          </Button>
-          <Button icon={<ReloadOutlined />} onClick={handleReset}>
-            {t('common.reset')}
-          </Button>
-          {canWrite && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={showCreateModal}>
-              {t('prompts.createPrompt')}
-            </Button>
-          )}
+          <Input placeholder={t('prompts.name')} style={{ width: 180 }} value={searchName} onChange={(e) => setSearchName(e.target.value)} onPressEnter={handleSearch} />
+          <Select placeholder={t('prompts.type')} allowClear style={{ width: 120 }} value={filterType || undefined} onChange={setFilterType} options={[{ value: 'system', label: t('prompts.system') }, { value: 'custom', label: t('prompts.custom') }]} />
+          <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
+          <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
+          {canWrite && <Button type="primary" icon={<PlusOutlined />} onClick={showCreateModal}>{t('prompts.createPrompt')}</Button>}
         </Space>
 
         <Table
           columns={columns}
-          dataSource={data}
+          dataSource={promptsData?.items ?? []}
           rowKey="id"
-          loading={loading}
+          loading={isLoading}
           scroll={{ x: 800 }}
           pagination={{
-            current: page,
-            pageSize,
-            total,
+            current: filters.page,
+            pageSize: filters.page_size,
+            total: promptsData?.total ?? 0,
             showSizeChanger: true,
             showTotal: (total) => `${t('common.total')} ${total}`,
             onChange: handlePageChange,
@@ -336,32 +249,20 @@ const Prompts: React.FC = () => {
         open={modal.visible}
         onOk={handleSubmit}
         onCancel={modal.close}
+        confirmLoading={createPrompt.isPending || updatePrompt.isPending}
         width={720}
       >
         <Form form={form} layout="vertical">
-          <Form.Item
-            name="name"
-            label={t('prompts.name')}
-            rules={[{ required: true, message: t('prompts.pleaseInputName') }]}
-          >
+          <Form.Item name="name" label={t('prompts.name')} rules={[{ required: true, message: t('prompts.pleaseInputName') }]}>
             <Input placeholder={t('prompts.pleaseInputName')} />
           </Form.Item>
           <Form.Item name="description" label={t('prompts.description')}>
             <Input placeholder={t('prompts.descriptionPlaceholder')} />
           </Form.Item>
-          <Form.Item
-            name="content"
-            label={t('prompts.content')}
-            rules={[{ required: true, message: t('prompts.pleaseInputContent') }]}
-            extra={t('prompts.contentHint')}
-          >
+          <Form.Item name="content" label={t('prompts.content')} rules={[{ required: true, message: t('prompts.pleaseInputContent') }]} extra={t('prompts.contentHint')}>
             <TextArea rows={15} placeholder={t('prompts.contentPlaceholder')} />
           </Form.Item>
-          <Form.Item
-            name="is_default"
-            label={t('prompts.setAsDefault')}
-            valuePropName="checked"
-          >
+          <Form.Item name="is_default" label={t('prompts.setAsDefault')} valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>
@@ -378,74 +279,22 @@ const Prompts: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minHeight: 0 }}>
             <div>
               <strong>{t('prompts.name')}:</strong> {viewingPrompt.name}
-              {viewingPrompt.is_system && (
-                <Tag color="blue" style={{ marginLeft: 8 }}>
-                  {t('prompts.system')}
-                </Tag>
-              )}
-              {viewingPrompt.is_default && (
-                <Tag color="gold" style={{ marginLeft: 8 }}>
-                  {t('prompts.isDefault')}
-                </Tag>
-              )}
+              {viewingPrompt.is_system && <Tag color="blue" style={{ marginLeft: 8 }}>{t('prompts.system')}</Tag>}
+              {viewingPrompt.is_default && <Tag color="gold" style={{ marginLeft: 8 }}>{t('prompts.isDefault')}</Tag>}
             </div>
-            {viewingPrompt.description && (
-              <div>
-                <strong>{t('prompts.description')}:</strong> {viewingPrompt.description}
-              </div>
-            )}
+            {viewingPrompt.description && <div><strong>{t('prompts.description')}:</strong> {viewingPrompt.description}</div>}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <strong style={{ fontSize: 14 }}>{t('prompts.content')}:</strong>
-              <Segmented
-                size="small"
-                value={viewMode}
-                onChange={(val) => setViewMode(val as 'rendered' | 'source')}
-                options={[
-                  { label: i18n.language?.startsWith('zh') ? '渲染' : 'Rendered', value: 'rendered' },
-                  { label: i18n.language?.startsWith('zh') ? '源码' : 'Source', value: 'source' },
-                ]}
-              />
+              <Segmented size="small" value={viewMode} onChange={(val) => setViewMode(val as 'rendered' | 'source')} options={[{ label: i18n.language?.startsWith('zh') ? '渲染' : 'Rendered', value: 'rendered' }, { label: i18n.language?.startsWith('zh') ? '源码' : 'Source', value: 'source' }]} />
             </div>
-            <div
-              style={{
-                flex: 1,
-                minHeight: 0,
-                backgroundColor: isDark ? '#1e293b' : '#fafafa',
-                borderRadius: 8,
-                border: isDark ? '1px solid #334155' : '1px solid #f0f0f0',
-              }}
-            >
+            <div style={{ flex: 1, minHeight: 0, backgroundColor: isDark ? '#1e293b' : '#fafafa', borderRadius: 8, border: isDark ? '1px solid #334155' : '1px solid #f0f0f0' }}>
               {viewMode === 'rendered' ? (
-                <div
-                  style={{
-                    padding: 18,
-                    height: '100%',
-                    overflow: 'auto',
-                  }}
-                  className="markdown-body"
-                >
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {viewingPrompt.content}
-                  </ReactMarkdown>
+                <div style={{ padding: 18, height: '100%', overflow: 'auto' }} className="markdown-body">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{viewingPrompt.content}</ReactMarkdown>
                 </div>
               ) : (
-                <div
-                  style={{
-                    padding: 18,
-                    height: '100%',
-                    overflow: 'auto',
-                  }}
-                >
-                  <Paragraph
-                    copyable
-                    style={{
-                      whiteSpace: 'pre-wrap',
-                      margin: 0,
-                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                      fontSize: 13,
-                      color: isDark ? '#e2e8f0' : undefined,
-                    }}
-                  >
+                <div style={{ padding: 18, height: '100%', overflow: 'auto' }}>
+                  <Paragraph copyable style={{ whiteSpace: 'pre-wrap', margin: 0, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: 13, color: isDark ? '#e2e8f0' : undefined }}>
                     {viewingPrompt.content}
                   </Paragraph>
                 </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Card, Row, Col, Statistic, Radio, DatePicker, Spin, Space, Button, Modal } from 'antd';
 import {
   ProjectOutlined,
@@ -19,7 +19,7 @@ import {
 } from 'recharts';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
-import { dashboardApi } from '../services';
+import { useDashboardStats, type DashboardFilters } from '../hooks/queries';
 import type { DashboardResponse } from '../types';
 
 const { RangePicker } = DatePicker;
@@ -37,91 +37,61 @@ interface ChartConfig {
 }
 
 const Dashboard: React.FC = () => {
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<DashboardResponse | null>(null);
   const [dateRange, setDateRange] = useState<string>('week');
   const [customRange, setCustomRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
   const [expandedChart, setExpandedChart] = useState<ChartType | null>(null);
-  const [expandedData, setExpandedData] = useState<DashboardResponse | null>(null);
-  const [expandedLoading, setExpandedLoading] = useState(false);
   const { t } = useTranslation();
 
-  const getDateParams = useCallback(() => {
-    let startDate: string | undefined;
-    let endDate: string | undefined;
+  const getDateParams = useCallback((): DashboardFilters => {
+    let start_date: string | undefined;
+    let end_date: string | undefined;
 
     const now = dayjs();
     switch (dateRange) {
       case 'week':
-        startDate = now.subtract(7, 'day').format('YYYY-MM-DD');
+        start_date = now.subtract(7, 'day').format('YYYY-MM-DD');
         break;
       case 'twoWeeks':
-        startDate = now.subtract(14, 'day').format('YYYY-MM-DD');
+        start_date = now.subtract(14, 'day').format('YYYY-MM-DD');
         break;
       case 'month':
-        startDate = now.subtract(30, 'day').format('YYYY-MM-DD');
+        start_date = now.subtract(30, 'day').format('YYYY-MM-DD');
         break;
       case 'custom':
         if (customRange) {
-          startDate = customRange[0].format('YYYY-MM-DD');
-          endDate = customRange[1].format('YYYY-MM-DD');
+          start_date = customRange[0].format('YYYY-MM-DD');
+          end_date = customRange[1].format('YYYY-MM-DD');
         }
         break;
     }
-    endDate = endDate || now.format('YYYY-MM-DD');
-    return { startDate, endDate };
+    end_date = end_date || now.format('YYYY-MM-DD');
+    return { start_date, end_date, project_limit: 10, author_limit: 10 };
   }, [dateRange, customRange]);
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const { startDate, endDate } = getDateParams();
-      const res = await dashboardApi.getStats({
-        start_date: startDate,
-        end_date: endDate,
-        project_limit: 10,
-        author_limit: 10,
-      });
-      setData(res.data);
-    } catch (error) {
-      console.error('Failed to fetch dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const filters = useMemo(() => getDateParams(), [getDateParams]);
+  const { data, isLoading } = useDashboardStats(filters);
 
-  const fetchExpandedData = async (chartType: ChartType) => {
-    setExpandedLoading(true);
-    try {
-      const { startDate, endDate } = getDateParams();
-      const isProjectChart = chartType.startsWith('project');
-      const res = await dashboardApi.getStats({
-        start_date: startDate,
-        end_date: endDate,
-        project_limit: isProjectChart ? 50 : 10,
-        author_limit: isProjectChart ? 10 : 50,
-      });
-      setExpandedData(res.data);
-    } catch (error) {
-      console.error('Failed to fetch expanded data:', error);
-    } finally {
-      setExpandedLoading(false);
-    }
-  };
+  const expandedFilters = useMemo((): DashboardFilters => {
+    if (!expandedChart) return {};
+    const isProjectChart = expandedChart.startsWith('project');
+    return {
+      ...filters,
+      project_limit: isProjectChart ? 50 : 10,
+      author_limit: isProjectChart ? 10 : 50,
+    };
+  }, [expandedChart, filters]);
+
+  const { data: expandedData, isLoading: expandedLoading } = useDashboardStats(
+    expandedFilters,
+  );
 
   const handleExpand = (chartType: ChartType) => {
     setExpandedChart(chartType);
-    fetchExpandedData(chartType);
   };
 
   const handleCloseModal = () => {
     setExpandedChart(null);
-    setExpandedData(null);
   };
-
-  useEffect(() => {
-    fetchData();
-  }, [dateRange, customRange]);
 
   const statsCards = [
     { title: t('dashboard.totalProjects'), value: data?.stats.active_projects || 0, icon: <ProjectOutlined />, color: '#06b6d4', bg: 'rgba(6,182,212,0.1)' },
@@ -192,14 +162,14 @@ const Dashboard: React.FC = () => {
     },
   ];
 
-  const renderChart = (config: ChartConfig, chartData: DashboardResponse | null, height: number) => (
+  const renderChart = (config: ChartConfig, chartData: DashboardResponse | null | undefined, height: number) => (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={chartData?.[config.dataKey] || []} margin={{ top: 5, right: 5, left: -15, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-        <XAxis 
-          dataKey={config.xKey} 
-          tick={{ fontSize: 10, fill: '#64748b' }} 
-          axisLine={false} 
+        <XAxis
+          dataKey={config.xKey}
+          tick={{ fontSize: 10, fill: '#64748b' }}
+          axisLine={false}
           tickLine={false}
           interval={0}
           angle={-45}
@@ -229,7 +199,7 @@ const Dashboard: React.FC = () => {
   const currentExpandedConfig = chartConfigs.find((c) => c.key === expandedChart);
 
   return (
-    <Spin spinning={loading}>
+    <Spin spinning={isLoading}>
       <div style={{ marginBottom: 24 }}>
         <Space wrap>
           <Radio.Group value={dateRange} onChange={(e) => setDateRange(e.target.value)} buttonStyle="solid" size="middle">
@@ -250,9 +220,9 @@ const Dashboard: React.FC = () => {
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         {statsCards.map((card, index) => (
           <Col xs={12} sm={12} lg={6} key={index}>
-            <Card 
-              hoverable 
-              bordered={false} 
+            <Card
+              hoverable
+              bordered={false}
               style={{ height: '100%', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}
               className="dashboard-stats-card"
               styles={{ body: { padding: '16px 12px' } }}

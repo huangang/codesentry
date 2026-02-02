@@ -361,6 +361,7 @@ codesentry/
 - React 19
 - TypeScript 5.9
 - Ant Design 5
+- TanStack Query (数据获取与缓存)
 - Recharts
 - Zustand (状态管理)
 - React Router 7

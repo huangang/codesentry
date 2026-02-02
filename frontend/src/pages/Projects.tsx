@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   Table,
@@ -29,16 +29,22 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useTranslation } from 'react-i18next';
-import { projectApi, imBotApi, promptApi, llmConfigApi } from '../services';
-import type { Project, IMBot, PromptTemplate, LLMConfig } from '../types';
-import { usePaginatedList, useModal, usePermission, getResponsiveWidth } from '../hooks';
+import type { Project } from '../types';
+import { useModal, usePermission, getResponsiveWidth } from '../hooks';
+import {
+  useProjects,
+  useCreateProject,
+  useUpdateProject,
+  useDeleteProject,
+  useDefaultPrompt,
+  useActiveImBots,
+  useActivePromptTemplates,
+  useActiveLLMConfigs,
+  type ProjectFilters,
+} from '../hooks/queries';
 import { PLATFORMS } from '../constants';
 
 const { TextArea } = Input;
-
-interface ProjectFilters {
-  name?: string;
-}
 
 type PromptMode = 'default' | 'template' | 'custom';
 
@@ -48,91 +54,41 @@ const Projects: React.FC = () => {
   const [promptForm] = Form.useForm();
   const { isAdmin } = usePermission();
 
-  const [imBots, setImBots] = useState<IMBot[]>([]);
-  const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>([]);
-  const [llmConfigs, setLLMConfigs] = useState<LLMConfig[]>([]);
-  const [defaultPrompt, setDefaultPrompt] = useState('');
+  // Query hooks for data fetching
+  const [filters, setFilters] = useState<ProjectFilters>({ page: 1, page_size: 10 });
   const [searchName, setSearchName] = useState('');
+
+  const { data: projectsData, isLoading } = useProjects(filters);
+  const { data: imBots = [] } = useActiveImBots();
+  const { data: promptTemplates = [] } = useActivePromptTemplates();
+  const { data: llmConfigs = [] } = useActiveLLMConfigs();
+  const { data: defaultPrompt = '' } = useDefaultPrompt();
+
+  // Mutations
+  const createProject = useCreateProject();
+  const updateProject = useUpdateProject();
+  const deleteProject = useDeleteProject();
 
   const modal = useModal<Project>();
   const [promptDrawerVisible, setPromptDrawerVisible] = useState(false);
   const [currentProjectForPrompt, setCurrentProjectForPrompt] = useState<Project | null>(null);
-
-  const {
-    loading,
-    data,
-    total,
-    page,
-    pageSize,
-    setPage,
-    fetchData,
-    handlePageChange,
-  } = usePaginatedList<Project, ProjectFilters>({
-    fetchApi: projectApi.list,
-    onError: () => message.error(t('common.error')),
-  });
 
   const getWebhookUrl = (record: Project) => {
     const baseUrl = window.location.origin;
     return `${baseUrl}/api/webhook/${record.platform}/${record.id}`;
   };
 
-  const fetchImBots = useCallback(async () => {
-    try {
-      const res = await imBotApi.getActive();
-      setImBots(res.data);
-    } catch (error) {
-      console.error('Failed to fetch IM bots:', error);
-    }
-  }, []);
-
-  const fetchPromptTemplates = useCallback(async () => {
-    try {
-      const res = await promptApi.getActive();
-      setPromptTemplates(res.data);
-    } catch (error) {
-      console.error('Failed to fetch prompt templates:', error);
-    }
-  }, []);
-
-  const fetchLLMConfigs = useCallback(async () => {
-    try {
-      const res = await llmConfigApi.getActive();
-      setLLMConfigs(res.data);
-    } catch (error) {
-      console.error('Failed to fetch LLM configs:', error);
-    }
-  }, []);
-
-  const fetchDefaultPrompt = useCallback(async () => {
-    try {
-      const res = await projectApi.getDefaultPrompt();
-      setDefaultPrompt(res.data.prompt);
-    } catch (error) {
-      console.error('Failed to fetch default prompt:', error);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData({ name: searchName || undefined });
-  }, [page, pageSize]);
-
-  useEffect(() => {
-    fetchImBots();
-    fetchPromptTemplates();
-    fetchLLMConfigs();
-    fetchDefaultPrompt();
-  }, [fetchImBots, fetchPromptTemplates, fetchLLMConfigs, fetchDefaultPrompt]);
-
   const handleSearch = () => {
-    setPage(1);
-    fetchData({ name: searchName || undefined });
+    setFilters(prev => ({ ...prev, page: 1, name: searchName || undefined }));
   };
 
   const handleReset = () => {
     setSearchName('');
-    setPage(1);
-    fetchData({});
+    setFilters({ page: 1, page_size: 10 });
+  };
+
+  const handlePageChange = (page: number, pageSize: number) => {
+    setFilters(prev => ({ ...prev, page, page_size: pageSize }));
   };
 
   const showCreateModal = () => {
@@ -174,14 +130,13 @@ const Projects: React.FC = () => {
     try {
       const values = await form.validateFields();
       if (modal.current) {
-        await projectApi.update(modal.current.id, values);
+        await updateProject.mutateAsync({ id: modal.current.id, data: values });
         message.success(t('projects.updateSuccess'));
       } else {
-        await projectApi.create(values);
+        await createProject.mutateAsync(values);
         message.success(t('projects.createSuccess'));
       }
       modal.close();
-      fetchData({ name: searchName || undefined });
     } catch (error: any) {
       message.error(error.response?.data?.error || t('common.error'));
     }
@@ -208,10 +163,9 @@ const Projects: React.FC = () => {
             break;
         }
 
-        await projectApi.update(currentProjectForPrompt.id, updateData);
+        await updateProject.mutateAsync({ id: currentProjectForPrompt.id, data: updateData });
         message.success(t('common.success'));
         setPromptDrawerVisible(false);
-        fetchData({ name: searchName || undefined });
       }
     } catch (error: any) {
       message.error(error.response?.data?.error || t('common.error'));
@@ -220,9 +174,8 @@ const Projects: React.FC = () => {
 
   const handleDelete = async (id: number) => {
     try {
-      await projectApi.delete(id);
+      await deleteProject.mutateAsync(id);
       message.success(t('projects.deleteSuccess'));
-      fetchData({ name: searchName || undefined });
     } catch (error) {
       message.error(t('common.error'));
     }
@@ -341,14 +294,14 @@ const Projects: React.FC = () => {
 
         <Table
           columns={columns}
-          dataSource={data}
+          dataSource={projectsData?.items ?? []}
           rowKey="id"
-          loading={loading}
+          loading={isLoading}
           scroll={{ x: 1000 }}
           pagination={{
-            current: page,
-            pageSize,
-            total,
+            current: filters.page,
+            pageSize: filters.page_size,
+            total: projectsData?.total ?? 0,
             showSizeChanger: true,
             showTotal: (total) => `${t('common.total')} ${total}`,
             onChange: handlePageChange,
@@ -361,6 +314,7 @@ const Projects: React.FC = () => {
         open={modal.visible}
         onOk={handleSubmit}
         onCancel={modal.close}
+        confirmLoading={createProject.isPending || updateProject.isPending}
         width={getResponsiveWidth(640)}
         styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
       >
@@ -463,7 +417,7 @@ const Projects: React.FC = () => {
         open={promptDrawerVisible}
         onClose={() => setPromptDrawerVisible(false)}
         extra={
-          <Button type="primary" onClick={handlePromptSubmit}>{t('common.save')}</Button>
+          <Button type="primary" onClick={handlePromptSubmit} loading={updateProject.isPending}>{t('common.save')}</Button>
         }
       >
         <Form form={promptForm} layout="vertical">
