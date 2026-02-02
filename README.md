@@ -39,6 +39,7 @@ AI-powered Code Review Platform for GitHub, GitLab, and Bitbucket.
 - **Authentication**: Local authentication and LDAP support (configurable via web UI)
 - **Role-based Access Control**: Admin and User roles with different permission levels
 - **Multi-Database**: SQLite for development, MySQL/PostgreSQL for production
+- **Async Task Queue**: Optional Redis-based async processing for AI reviews (graceful fallback to sync mode)
 - **Internationalization**: Support for English and Chinese (including DatePicker localization)
 - **Responsive Design**: Mobile-friendly interface with adaptive layouts for phones and tablets
 - **Dark Mode**: Toggle between light and dark themes, with preference persistence

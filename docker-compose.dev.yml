@@ -16,6 +16,8 @@ services:
       - DB_DRIVER=sqlite
       - DB_DSN=/app/data/codesentry.db
       - JWT_SECRET=${JWT_SECRET:-codesentry-secret-key-change-in-production}
+      # Optional: Enable async task queue with Redis
+      # - REDIS_URL=redis://:password@redis:6379/0
     restart: unless-stopped
 
 volumes:

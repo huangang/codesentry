@@ -2183,3 +2183,104 @@ func (s *WebhookService) SyncReview(ctx context.Context, project *models.Project
 		FullContent: result.Content,
 	}, nil
 }
+
+// ProcessReviewTask processes a review task from the async queue
+// This method re-runs the AI review for an existing review log
+func (s *WebhookService) ProcessReviewTask(ctx context.Context, task *ReviewTask) error {
+	log.Printf("[TaskQueue] Processing review task: review_log_id=%d, project=%d, commit=%s",
+		task.ReviewLogID, task.ProjectID, task.CommitSHA)
+
+	// Get the review log
+	reviewLog, err := s.reviewService.GetByID(task.ReviewLogID)
+	if err != nil {
+		return fmt.Errorf("review log not found: %w", err)
+	}
+
+	// Get the project
+	project, err := s.projectService.GetByID(task.ProjectID)
+	if err != nil {
+		return fmt.Errorf("project not found: %w", err)
+	}
+
+	// Update status to analyzing
+	reviewLog.ReviewStatus = "analyzing"
+	s.reviewService.Update(reviewLog)
+	PublishReviewEvent(reviewLog.ID, reviewLog.ProjectID, reviewLog.CommitHash, "analyzing", nil, "")
+
+	// Filter diff
+	filteredDiff := s.filterDiff(task.Diff, project.FileExtensions, project.IgnorePatterns)
+
+	// Build file context if enabled
+	var fileContext string
+	if s.fileContextService.IsEnabled() {
+		fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, task.CommitSHA)
+	}
+
+	// Run AI review
+	result, err := s.aiService.ReviewChunked(ctx, &ReviewRequest{
+		ProjectID:   project.ID,
+		Diffs:       filteredDiff,
+		Commits:     task.CommitMessage,
+		FileContext: fileContext,
+	})
+
+	if err != nil {
+		log.Printf("[TaskQueue] AI review failed: %v", err)
+		reviewLog.ReviewStatus = "failed"
+		reviewLog.ErrorMessage = err.Error()
+		s.reviewService.Update(reviewLog)
+		PublishReviewEvent(reviewLog.ID, reviewLog.ProjectID, reviewLog.CommitHash, "failed", nil, err.Error())
+		return err
+	}
+
+	log.Printf("[TaskQueue] AI review completed, score: %.1f", result.Score)
+	reviewLog.ReviewStatus = "completed"
+	reviewLog.ReviewResult = result.Content
+	reviewLog.Score = &result.Score
+	s.reviewService.Update(reviewLog)
+	PublishReviewEvent(reviewLog.ID, reviewLog.ProjectID, reviewLog.CommitHash, "completed", &result.Score, "")
+
+	// Send notification
+	s.notificationService.SendReviewNotification(project, &ReviewNotification{
+		ProjectName:   project.Name,
+		Branch:        task.Branch,
+		Author:        task.Author,
+		CommitMessage: task.CommitMessage,
+		Score:         result.Score,
+		ReviewResult:  result.Content,
+		EventType:     task.EventType,
+	})
+
+	// Post comment if enabled
+	if project.CommentEnabled && task.CommitSHA != "" {
+		comment := s.formatReviewComment(result.Score, result.Content)
+		switch project.Platform {
+		case "gitlab":
+			if err := s.postGitLabCommitComment(project, task.CommitSHA, comment); err != nil {
+				log.Printf("[TaskQueue] Failed to post GitLab comment: %v", err)
+			} else {
+				reviewLog.CommentPosted = true
+				s.reviewService.Update(reviewLog)
+			}
+		case "github":
+			if err := s.postGitHubCommitComment(project, task.CommitSHA, comment); err != nil {
+				log.Printf("[TaskQueue] Failed to post GitHub comment: %v", err)
+			} else {
+				reviewLog.CommentPosted = true
+				s.reviewService.Update(reviewLog)
+			}
+		}
+	}
+
+	// Set commit status
+	minScore := s.getEffectiveMinScore(project)
+	statusState := "success"
+	statusDesc := fmt.Sprintf("AI Review Passed: %.0f/%.0f", result.Score, minScore)
+	if result.Score < minScore {
+		statusState = "failed"
+		statusDesc = fmt.Sprintf("AI Review Failed: %.0f (Min: %.0f)", result.Score, minScore)
+	}
+	s.setCommitStatus(project, task.CommitSHA, statusState, statusDesc, task.GitLabProjectID)
+
+	return nil
+}

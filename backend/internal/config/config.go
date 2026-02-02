@@ -3,6 +3,8 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -13,6 +15,7 @@ type Config struct {
 	JWT      JWTConfig      `yaml:"jwt"`
 	LDAP     LDAPConfig     `yaml:"ldap"`
 	OpenAI   OpenAIConfig   `yaml:"openai"`
+	Redis    RedisConfig    `yaml:"redis"`
 }
 
 type ServerConfig struct {
@@ -46,6 +49,14 @@ type OpenAIConfig struct {
 	BaseURL string `yaml:"base_url"`
 	APIKey  string `yaml:"api_key"`
 	Model   string `yaml:"model"`
+}
+
+// RedisConfig for optional async task queue
+type RedisConfig struct {
+	Enabled  bool   `yaml:"enabled"`
+	Addr     string `yaml:"addr"`
+	Password string `yaml:"password"`
+	DB       int    `yaml:"db"`
 }
 
 var GlobalConfig *Config
@@ -101,6 +112,11 @@ func DefaultConfig() *Config {
 			BaseURL: "https://api.openai.com/v1",
 			Model:   "gpt-4",
 		},
+		Redis: RedisConfig{
+			Enabled: false,
+			Addr:    "localhost:6379",
+			DB:      0,
+		},
 	}
 }
 
@@ -132,6 +148,40 @@ func (c *Config) overrideFromEnv() {
 	if model := os.Getenv("OPENAI_MODEL"); model != "" {
 		c.OpenAI.Model = model
 	}
+	// Redis URL override (format: redis://:password@host:port/db)
+	if redisURL := os.Getenv("REDIS_URL"); redisURL != "" {
+		c.Redis.Enabled = true
+		c.parseRedisURL(redisURL)
+	}
+}
+
+// parseRedisURL parses a Redis URL and sets config values
+// Format: redis://:password@host:port/db
+func (c *Config) parseRedisURL(redisURL string) {
+	// Remove redis:// prefix
+	url := strings.TrimPrefix(redisURL, "redis://")
+
+	// Extract password if present
+	if atIdx := strings.Index(url, "@"); atIdx != -1 {
+		authPart := url[:atIdx]
+		url = url[atIdx+1:]
+		// Password format: :password or user:password
+		if colonIdx := strings.Index(authPart, ":"); colonIdx != -1 {
+			c.Redis.Password = authPart[colonIdx+1:]
+		}
+	}
+
+	// Extract db number if present
+	if slashIdx := strings.LastIndex(url, "/"); slashIdx != -1 {
+		dbStr := url[slashIdx+1:]
+		url = url[:slashIdx]
+		if db, err := strconv.Atoi(dbStr); err == nil {
+			c.Redis.DB = db
+		}
+	}
+
+	// Remaining is host:port
+	c.Redis.Addr = url
 }
 
 func (c *Config) Save(configPath string) error {

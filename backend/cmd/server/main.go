@@ -71,6 +71,23 @@ func main() {
 	dailyReportService := services.NewDailyReportService(models.GetDB(), aiService, notificationService)
 	dailyReportService.StartScheduler()
 
+	// Initialize task queue (uses Redis if enabled, otherwise sync mode)
+	webhookService := services.NewWebhookService(models.GetDB(), &cfg.OpenAI)
+	taskQueue := services.InitTaskQueue(cfg)
+	if syncQueue, ok := taskQueue.(*services.SyncQueue); ok {
+		syncQueue.SetProcessor(webhookService.ProcessReviewTask)
+	}
+
+	// Start async worker if Redis is enabled
+	var worker *services.Worker
+	if cfg.Redis.Enabled {
+		worker = services.InitWorker(&cfg.Redis)
+		if worker != nil {
+			worker.SetProcessor(webhookService.ProcessReviewTask)
+			worker.Start()
+		}
+	}
+
 	// Create default admin user
 	authHandler := handlers.NewAuthHandler(models.GetDB(), cfg)
 	if err := authHandler.CreateAdminIfNotExists(); err != nil {
@@ -325,6 +342,15 @@ func main() {
 	services.StopLogCleanupScheduler()
 	services.StopRetryScheduler()
 	log.Println("All schedulers stopped")
+
+	// Stop async worker if running
+	if worker != nil {
+		worker.Stop()
+	}
+	// Close task queue
+	if taskQueue != nil {
+		taskQueue.Close()
+	}
 
 	// Graceful shutdown with 30 second timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

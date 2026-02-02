@@ -16,6 +16,8 @@ services:
       - DB_DSN=codesentry:${DB_PASSWORD:-codesentry}@tcp(mysql:3306)/codesentry?charset=utf8mb4&parseTime=True&loc=Local
       - JWT_SECRET=${JWT_SECRET:-codesentry-secret-key-change-in-production}
       - JWT_EXPIRE_HOUR=${JWT_EXPIRE_HOUR:-24}
+      # Optional: Enable async task queue with Redis
+      # - REDIS_URL=redis://:password@redis:6379/0
     depends_on:
       mysql:
         condition: service_healthy

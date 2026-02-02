@@ -15,6 +15,8 @@ services:
       - DB_DSN=host=postgres user=codesentry password=${DB_PASSWORD:-codesentry} dbname=codesentry port=5432 sslmode=disable
       - JWT_SECRET=${JWT_SECRET:-codesentry-secret-key-change-in-production}
       - JWT_EXPIRE_HOUR=${JWT_EXPIRE_HOUR:-24}
+      # Optional: Enable async task queue with Redis
+      # - REDIS_URL=redis://:password@redis:6379/0
     depends_on:
       postgres:
         condition: service_healthy

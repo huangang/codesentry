@@ -12,3 +12,12 @@ database:
 jwt:
   secret: "codesentry-secret-key-change-in-production"
   expire_hour: 24
+
+# Redis configuration (optional - for async task queue)
+# When enabled, AI reviews are processed asynchronously via Redis queue
+# When disabled or Redis unavailable, falls back to synchronous processing
+redis:
+  enabled: false  # Set to true to enable async processing
+  addr: "localhost:6379"
+  password: ""
+  db: 0
