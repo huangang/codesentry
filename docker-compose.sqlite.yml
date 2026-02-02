@@ -9,6 +9,7 @@ services:
     volumes:
       - codesentry-data:/app/data
     environment:
+      - TZ=${TZ:-Asia/Shanghai}
       - SERVER_PORT=8080
       - SERVER_MODE=release
       - DB_DRIVER=sqlite
