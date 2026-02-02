@@ -251,3 +251,148 @@ func (s *MemberService) GetDetail(req *MemberDetailRequest) (*MemberDetailRespon
 		Trend:        trend,
 	}, nil
 }
+
+// Team Overview types
+type TeamOverviewRequest struct {
+	StartDate string `form:"start_date"`
+	EndDate   string `form:"end_date"`
+	ProjectID *uint  `form:"project_id"`
+}
+
+type TeamOverviewResponse struct {
+	TotalMembers   int64             `json:"total_members"`
+	TotalCommits   int64             `json:"total_commits"`
+	AvgScore       float64           `json:"avg_score"`
+	TotalAdditions int64             `json:"total_additions"`
+	TotalDeletions int64             `json:"total_deletions"`
+	Trend          []MemberTrendItem `json:"trend"`
+	TopMembers     []MemberStats     `json:"top_members"`
+	ScoreDistrib   ScoreDistribution `json:"score_distribution"`
+}
+
+type ScoreDistribution struct {
+	Excellent int64 `json:"excellent"` // >= 80
+	Good      int64 `json:"good"`      // 60-79
+	NeedWork  int64 `json:"need_work"` // < 60
+}
+
+func (s *MemberService) GetTeamOverview(req *TeamOverviewRequest) (*TeamOverviewResponse, error) {
+	var startDate, endDate time.Time
+	var err error
+
+	if req.StartDate != "" {
+		startDate, err = time.Parse("2006-01-02", req.StartDate)
+		if err != nil {
+			startDate = time.Now().AddDate(0, 0, -30)
+		}
+	} else {
+		startDate = time.Now().AddDate(0, 0, -30)
+	}
+
+	if req.EndDate != "" {
+		endDate, err = time.Parse("2006-01-02", req.EndDate)
+		if err != nil {
+			endDate = time.Now()
+		}
+		endDate = endDate.Add(24*time.Hour - time.Second)
+	} else {
+		endDate = time.Now()
+	}
+
+	baseQuery := s.db.Model(&models.ReviewLog{}).
+		Where("created_at BETWEEN ? AND ?", startDate, endDate).
+		Where("author != ''")
+
+	if req.ProjectID != nil {
+		baseQuery = baseQuery.Where("project_id = ?", *req.ProjectID)
+	}
+
+	// Total stats
+	var totalMembers, totalCommits int64
+	var avgScore float64
+	var totalAdditions, totalDeletions int64
+
+	baseQuery.Distinct("author").Count(&totalMembers)
+
+	s.db.Model(&models.ReviewLog{}).
+		Where("created_at BETWEEN ? AND ?", startDate, endDate).
+		Where("author != ''").
+		Select("COUNT(*) as total_commits, COALESCE(AVG(score), 0) as avg_score, COALESCE(SUM(additions), 0) as total_additions, COALESCE(SUM(deletions), 0) as total_deletions").
+		Row().Scan(&totalCommits, &avgScore, &totalAdditions, &totalDeletions)
+
+	// Team trend
+	var trend []MemberTrendItem
+	trendQuery := s.db.Model(&models.ReviewLog{}).
+		Select(`DATE(created_at) as date, COUNT(*) as commit_count, COALESCE(AVG(score), 0) as avg_score`).
+		Where("created_at BETWEEN ? AND ?", startDate, endDate).
+		Where("author != ''").
+		Group("DATE(created_at)").
+		Order("date ASC")
+
+	if req.ProjectID != nil {
+		trendQuery = trendQuery.Where("project_id = ?", *req.ProjectID)
+	}
+	trendQuery.Scan(&trend)
+
+	// Top 10 members
+	var topMembers []MemberStats
+	topQuery := s.db.Model(&models.ReviewLog{}).
+		Select(`
+			author,
+			MAX(author_email) as author_email,
+			COUNT(*) as commit_count,
+			COALESCE(AVG(score), 0) as avg_score,
+			COALESCE(MAX(score), 0) as max_score,
+			COALESCE(MIN(NULLIF(score, 0)), 0) as min_score,
+			COALESCE(SUM(additions), 0) as additions,
+			COALESCE(SUM(deletions), 0) as deletions,
+			COALESCE(SUM(files_changed), 0) as files_changed,
+			COUNT(DISTINCT project_id) as project_count
+		`).
+		Where("created_at BETWEEN ? AND ?", startDate, endDate).
+		Where("author != ''").
+		Group("author").
+		Order("commit_count DESC").
+		Limit(10)
+
+	if req.ProjectID != nil {
+		topQuery = topQuery.Where("project_id = ?", *req.ProjectID)
+	}
+	topQuery.Scan(&topMembers)
+
+	// Score distribution
+	var excellent, good, needWork int64
+
+	s.db.Model(&models.ReviewLog{}).
+		Where("created_at BETWEEN ? AND ?", startDate, endDate).
+		Where("author != ''").
+		Where("score >= 80").
+		Distinct("author").Count(&excellent)
+
+	s.db.Model(&models.ReviewLog{}).
+		Where("created_at BETWEEN ? AND ?", startDate, endDate).
+		Where("author != ''").
+		Where("score >= 60 AND score < 80").
+		Distinct("author").Count(&good)
+
+	s.db.Model(&models.ReviewLog{}).
+		Where("created_at BETWEEN ? AND ?", startDate, endDate).
+		Where("author != ''").
+		Where("score < 60 AND score > 0").
+		Distinct("author").Count(&needWork)
+
+	return &TeamOverviewResponse{
+		TotalMembers:   totalMembers,
+		TotalCommits:   totalCommits,
+		AvgScore:       avgScore,
+		TotalAdditions: totalAdditions,
+		TotalDeletions: totalDeletions,
+		Trend:          trend,
+		TopMembers:     topMembers,
+		ScoreDistrib: ScoreDistribution{
+			Excellent: excellent,
+			Good:      good,
+			NeedWork:  needWork,
+		},
+	}, nil
+}

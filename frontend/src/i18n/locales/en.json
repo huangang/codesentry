@@ -279,7 +279,17 @@
     "filesChanged": "Files Changed",
     "memberDetail": "Member Detail",
     "commitTrend": "Commit Trend",
-    "projectDistribution": "Project Distribution"
+    "projectDistribution": "Project Distribution",
+    "totalMembers": "Total Members",
+    "totalCommits": "Total Commits",
+    "teamAvgScore": "Team Avg Score",
+    "codeChanges": "Code Changes",
+    "teamTrend": "Team Trend",
+    "scoreDistribution": "Score Distribution",
+    "topMembersComparison": "Top 10 Members Comparison",
+    "excellent": "Excellent (≥80)",
+    "good": "Good (60-79)",
+    "needWork": "Need Work (<60)"
   },
   "systemLogs": {
     "title": "System Logs",

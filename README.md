@@ -229,6 +229,12 @@ The system automatically detects the platform via request headers.
 
 - `GET /api/dashboard/stats` - Get statistics
 
+### Member Analysis
+
+- `GET /api/members` - List member statistics
+- `GET /api/members/detail` - Get member detail with trend and project stats
+- `GET /api/members/overview` - Get team overview (total stats, trend, score distribution, top members)
+
 ### LLM Config
 
 - `GET /api/llm-configs` - List LLM configs

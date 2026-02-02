@@ -167,6 +167,7 @@ func main() {
 			memberHandler := handlers.NewMemberHandler(models.GetDB())
 			protected.GET("/members", memberHandler.List)
 			protected.GET("/members/detail", memberHandler.GetDetail)
+			protected.GET("/members/overview", memberHandler.GetTeamOverview)
 
 			// Prompts (read for all users)
 			promptHandler := handlers.NewPromptHandler(models.GetDB())

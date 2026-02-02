@@ -21,6 +21,9 @@ import {
   CodeOutlined,
   TrophyOutlined,
   FileOutlined,
+  RiseOutlined,
+  FallOutlined,
+  TeamOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -34,11 +37,16 @@ import {
   LineChart,
   Line,
   Legend,
+  PieChart,
+  Pie,
+  Cell,
+  AreaChart,
+  Area,
 } from 'recharts';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
 import { memberApi } from '../services';
-import { useMemberStats, useProjects, type MemberStatsFilters } from '../hooks/queries';
+import { useMemberStats, useProjects, useTeamOverview, type MemberStatsFilters } from '../hooks/queries';
 
 const { RangePicker } = DatePicker;
 
@@ -63,6 +71,8 @@ interface MemberDetail {
   trend: Array<{ date: string; commit_count: number; avg_score: number }>;
 }
 
+
+
 const MemberAnalysis: React.FC = () => {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -80,6 +90,11 @@ const MemberAnalysis: React.FC = () => {
 
   const { data: memberData, isLoading } = useMemberStats(filters);
   const { data: projectsData } = useProjects({ page_size: 100 });
+  const { data: overview, isLoading: overviewLoading } = useTeamOverview({
+    start_date: dateRange[0].format('YYYY-MM-DD'),
+    end_date: dateRange[1].format('YYYY-MM-DD'),
+    project_id: projectId,
+  });
 
   const handleSearch = () => {
     const newFilters: MemberStatsFilters = { page: 1, page_size: filters.page_size, sort_by: sortBy, sort_order: 'desc' };
@@ -148,8 +163,102 @@ const MemberAnalysis: React.FC = () => {
     { title: t('memberAnalysis.filesChanged'), dataIndex: 'files_changed', key: 'files_changed', width: 100 },
   ];
 
+  // Score distribution for pie chart
+  const scoreDistributionData = overview ? [
+    { name: t('memberAnalysis.excellent'), value: overview.score_distribution.excellent, color: '#52c41a' },
+    { name: t('memberAnalysis.good'), value: overview.score_distribution.good, color: '#faad14' },
+    { name: t('memberAnalysis.needWork'), value: overview.score_distribution.need_work, color: '#ff4d4f' },
+  ].filter(d => d.value > 0) : [];
+
   return (
     <>
+      {/* Overview Stats Cards */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={24} sm={12} md={6}>
+          <Card size="small" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+            <Statistic title={<span style={{ color: 'rgba(255,255,255,0.85)' }}>{t('memberAnalysis.totalMembers')}</span>} value={overview?.total_members ?? 0} prefix={<TeamOutlined />} valueStyle={{ color: '#fff' }} loading={overviewLoading} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Card size="small" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
+            <Statistic title={<span style={{ color: 'rgba(255,255,255,0.85)' }}>{t('memberAnalysis.totalCommits')}</span>} value={overview?.total_commits ?? 0} prefix={<CodeOutlined />} valueStyle={{ color: '#fff' }} loading={overviewLoading} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Card size="small" style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }}>
+            <Statistic title={<span style={{ color: 'rgba(255,255,255,0.85)' }}>{t('memberAnalysis.teamAvgScore')}</span>} value={overview?.avg_score ?? 0} precision={1} prefix={<TrophyOutlined />} valueStyle={{ color: '#fff' }} loading={overviewLoading} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Card size="small" style={{ background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' }}>
+            <Statistic title={<span style={{ color: 'rgba(255,255,255,0.85)' }}>{t('memberAnalysis.codeChanges')}</span>} value={`+${overview?.total_additions ?? 0} / -${overview?.total_deletions ?? 0}`} prefix={<FileOutlined />} valueStyle={{ color: '#fff', fontSize: 18 }} loading={overviewLoading} />
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Charts Row */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        {/* Team Trend Chart */}
+        <Col xs={24} lg={16}>
+          <Card title={t('memberAnalysis.teamTrend')} size="small" loading={overviewLoading}>
+            <ResponsiveContainer width="100%" height={250}>
+              <AreaChart data={overview?.trend ?? []}>
+                <defs>
+                  <linearGradient id="colorCommits" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#1890ff" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#1890ff" stopOpacity={0.1} />
+                  </linearGradient>
+                  <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#52c41a" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#52c41a" stopOpacity={0.1} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                <YAxis yAxisId="left" />
+                <YAxis yAxisId="right" orientation="right" domain={[0, 100]} />
+                <Tooltip />
+                <Legend />
+                <Area yAxisId="left" type="monotone" dataKey="commit_count" stroke="#1890ff" fillOpacity={1} fill="url(#colorCommits)" name={t('memberAnalysis.commitCount')} />
+                <Line yAxisId="right" type="monotone" dataKey="avg_score" stroke="#52c41a" strokeWidth={2} dot={false} name={t('memberAnalysis.avgScore')} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </Card>
+        </Col>
+
+        {/* Score Distribution Pie */}
+        <Col xs={24} lg={8}>
+          <Card title={t('memberAnalysis.scoreDistribution')} size="small" loading={overviewLoading}>
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie data={scoreDistributionData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={5} dataKey="value" label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
+                  {scoreDistributionData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Top Members Comparison */}
+      <Card title={t('memberAnalysis.topMembersComparison')} size="small" style={{ marginBottom: 16 }} loading={overviewLoading}>
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={overview?.top_members ?? []} layout="vertical" margin={{ left: 80 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis type="number" />
+            <YAxis dataKey="author" type="category" tick={{ fontSize: 11 }} width={80} />
+            <Tooltip />
+            <Legend />
+            <Bar dataKey="commit_count" fill="#1890ff" name={t('memberAnalysis.commitCount')} />
+            <Bar dataKey="avg_score" fill="#52c41a" name={t('memberAnalysis.avgScore')} />
+          </BarChart>
+        </ResponsiveContainer>
+      </Card>
+
+      {/* Search and Table */}
       <Card>
         <Space style={{ marginBottom: 16 }} wrap>
           <Input placeholder={t('memberAnalysis.searchAuthor')} style={{ width: 150 }} value={searchName} onChange={(e) => setSearchName(e.target.value)} onPressEnter={handleSearch} prefix={<UserOutlined />} />
@@ -169,8 +278,8 @@ const MemberAnalysis: React.FC = () => {
             <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
               <Col span={6}><Card size="small"><Statistic title={t('memberAnalysis.commitCount')} value={memberDetail.total_stats.commit_count} prefix={<CodeOutlined />} /></Card></Col>
               <Col span={6}><Card size="small"><Statistic title={t('memberAnalysis.avgScore')} value={memberDetail.total_stats.avg_score} precision={1} prefix={<TrophyOutlined />} valueStyle={{ color: memberDetail.total_stats.avg_score >= 80 ? '#52c41a' : memberDetail.total_stats.avg_score >= 60 ? '#faad14' : '#ff4d4f' }} /></Card></Col>
-              <Col span={6}><Card size="small"><Statistic title={t('memberAnalysis.additions')} value={memberDetail.total_stats.additions} prefix={<FileOutlined />} valueStyle={{ color: '#52c41a' }} /></Card></Col>
-              <Col span={6}><Card size="small"><Statistic title={t('memberAnalysis.deletions')} value={memberDetail.total_stats.deletions} prefix={<FileOutlined />} valueStyle={{ color: '#ff4d4f' }} /></Card></Col>
+              <Col span={6}><Card size="small"><Statistic title={t('memberAnalysis.additions')} value={memberDetail.total_stats.additions} prefix={<RiseOutlined />} valueStyle={{ color: '#52c41a' }} /></Card></Col>
+              <Col span={6}><Card size="small"><Statistic title={t('memberAnalysis.deletions')} value={memberDetail.total_stats.deletions} prefix={<FallOutlined />} valueStyle={{ color: '#ff4d4f' }} /></Card></Col>
             </Row>
             <Card title={t('memberAnalysis.commitTrend')} size="small" style={{ marginBottom: 16 }}>
               <ResponsiveContainer width="100%" height={200}>

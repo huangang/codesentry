@@ -130,6 +130,17 @@ export const promptApi = {
 };
 
 // Members
+export interface TeamOverview {
+  total_members: number;
+  total_commits: number;
+  avg_score: number;
+  total_additions: number;
+  total_deletions: number;
+  trend: { date: string; commit_count: number; avg_score: number }[];
+  top_members: { author: string; commit_count: number; avg_score: number; additions: number; deletions: number }[];
+  score_distribution: { excellent: number; good: number; need_work: number };
+}
+
 export const memberApi = {
   list: (params?: {
     page?: number;
@@ -144,6 +155,9 @@ export const memberApi = {
 
   getDetail: (params: { author: string; start_date?: string; end_date?: string }) =>
     api.get<any>('/members/detail', { params }),
+
+  getTeamOverview: (params?: { start_date?: string; end_date?: string; project_id?: number }) =>
+    api.get<TeamOverview>('/members/overview', { params }),
 };
 
 // System Logs

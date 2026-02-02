@@ -229,6 +229,12 @@ https://你的域名/review/webhook
 
 - `GET /api/dashboard/stats` - 获取统计数据
 
+### 成员分析
+
+- `GET /api/members` - 成员统计列表
+- `GET /api/members/detail` - 成员详情（趋势和项目统计）
+- `GET /api/members/overview` - 团队概览（总体统计、趋势、分数分布、Top成员）
+
 ### 大模型配置
 
 - `GET /api/llm-configs` - 模型列表

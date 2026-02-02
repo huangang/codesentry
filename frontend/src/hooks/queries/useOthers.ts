@@ -70,6 +70,7 @@ export const memberKeys = {
     lists: () => [...memberKeys.all, 'list'] as const,
     list: (filters: MemberFilters) => [...memberKeys.lists(), filters] as const,
     detail: (params: { author: string; start_date?: string; end_date?: string }) => [...memberKeys.all, 'detail', params] as const,
+    overview: (params: { start_date?: string; end_date?: string; project_id?: number }) => [...memberKeys.all, 'overview', params] as const,
 };
 
 export function useMembers(filters: MemberFilters) {
@@ -90,6 +91,16 @@ export function useMemberDetail(params: { author: string; start_date?: string; e
             return res.data;
         },
         enabled: enabled && !!params.author,
+    });
+}
+
+export function useTeamOverview(params: { start_date?: string; end_date?: string; project_id?: number }) {
+    return useQuery({
+        queryKey: memberKeys.overview(params),
+        queryFn: async () => {
+            const res = await memberApi.getTeamOverview(params);
+            return res.data;
+        },
     });
 }
 

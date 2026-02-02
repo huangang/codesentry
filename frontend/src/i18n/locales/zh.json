@@ -279,7 +279,17 @@
     "filesChanged": "变更文件",
     "memberDetail": "成员详情",
     "commitTrend": "提交趋势",
-    "projectDistribution": "项目分布"
+    "projectDistribution": "项目分布",
+    "totalMembers": "总成员数",
+    "totalCommits": "总提交数",
+    "teamAvgScore": "团队平均分",
+    "codeChanges": "代码变更",
+    "teamTrend": "团队趋势",
+    "scoreDistribution": "分数分布",
+    "topMembersComparison": "成员贡献对比 (Top 10)",
+    "excellent": "优秀 (≥80)",
+    "good": "良好 (60-79)",
+    "needWork": "待改进 (<60)"
   },
   "systemLogs": {
     "title": "系统日志",
