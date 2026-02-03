@@ -14,18 +14,19 @@ import (
 	"github.com/huangang/codesentry/backend/internal/config"
 	"github.com/huangang/codesentry/backend/internal/models"
 	"github.com/huangang/codesentry/backend/internal/services"
+	"github.com/huangang/codesentry/backend/internal/services/webhook"
 	"gorm.io/gorm"
 )
 
 type WebhookHandler struct {
-	webhookService       *services.WebhookService
+	webhookService       *webhook.Service
 	projectService       *services.ProjectService
 	gitCredentialService *services.GitCredentialService
 }
 
 func NewWebhookHandler(db *gorm.DB, aiCfg *config.OpenAIConfig) *WebhookHandler {
 	return &WebhookHandler{
-		webhookService:       services.NewWebhookService(db, aiCfg),
+		webhookService:       webhook.NewService(db, aiCfg),
 		projectService:       services.NewProjectService(db),
 		gitCredentialService: services.NewGitCredentialService(db),
 	}
@@ -122,15 +123,15 @@ func (h *WebhookHandler) tryFillFromCredential(project *models.Project, ctx *web
 }
 
 func gitlabVerifier(secret string, _ []byte, token string) bool {
-	return services.VerifyGitLabSignature(secret, token)
+	return webhook.VerifyGitLabSignature(secret, token)
 }
 
 func githubVerifier(secret string, body []byte, signature string) bool {
-	return services.VerifyGitHubSignature(secret, body, signature)
+	return webhook.VerifyGitHubSignature(secret, body, signature)
 }
 
 func bitbucketVerifier(secret string, body []byte, signature string) bool {
-	return services.VerifyBitbucketSignature(secret, body, signature)
+	return webhook.VerifyBitbucketSignature(secret, body, signature)
 }
 
 func (h *WebhookHandler) HandleGitLabWebhook(c *gin.Context) {
@@ -147,7 +148,7 @@ func (h *WebhookHandler) HandleGitLabWebhook(c *gin.Context) {
 	}
 
 	token := c.GetHeader("X-Gitlab-Token")
-	if project.WebhookSecret != "" && !services.VerifyGitLabSignature(project.WebhookSecret, token) {
+	if project.WebhookSecret != "" && !webhook.VerifyGitLabSignature(project.WebhookSecret, token) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid webhook token"})
 		return
 	}
@@ -189,7 +190,7 @@ func (h *WebhookHandler) HandleGitHubWebhook(c *gin.Context) {
 	}
 
 	signature := c.GetHeader("X-Hub-Signature-256")
-	if project.WebhookSecret != "" && !services.VerifyGitHubSignature(project.WebhookSecret, body, signature) {
+	if project.WebhookSecret != "" && !webhook.VerifyGitHubSignature(project.WebhookSecret, body, signature) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid webhook signature"})
 		return
 	}
@@ -375,7 +376,7 @@ func (h *WebhookHandler) HandleBitbucketWebhook(c *gin.Context) {
 	}
 
 	signature := c.GetHeader("X-Hub-Signature")
-	if project.WebhookSecret != "" && !services.VerifyBitbucketSignature(project.WebhookSecret, body, signature) {
+	if project.WebhookSecret != "" && !webhook.VerifyBitbucketSignature(project.WebhookSecret, body, signature) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid webhook signature"})
 		return
 	}
@@ -531,7 +532,7 @@ func (h *WebhookHandler) HandleSyncReview(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Minute)
 	defer cancel()
 
-	result, err := h.webhookService.SyncReview(ctx, project, &services.SyncReviewRequest{
+	result, err := h.webhookService.SyncReview(ctx, project, &webhook.SyncReviewRequest{
 		ProjectURL: req.ProjectURL,
 		CommitSHA:  req.CommitSHA,
 		Ref:        req.Ref,

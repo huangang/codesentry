@@ -1,0 +1,328 @@
+package webhook
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"strings"
+
+	"github.com/huangang/codesentry/backend/internal/models"
+	"github.com/huangang/codesentry/backend/internal/services"
+)
+
+// HandleGitHubWebhook processes GitHub webhook events
+func (s *Service) HandleGitHubWebhook(ctx context.Context, projectID uint, eventType string, body []byte) error {
+	project, err := s.projectService.GetByID(projectID)
+	if err != nil {
+		return fmt.Errorf("project not found: %w", err)
+	}
+
+	if !project.AIEnabled {
+		return nil
+	}
+
+	switch eventType {
+	case "push":
+		if !strings.Contains(project.ReviewEvents, "push") {
+			return nil
+		}
+		var event GitHubPushEvent
+		if err := json.Unmarshal(body, &event); err != nil {
+			return err
+		}
+		return s.processGitHubPush(ctx, project, &event)
+
+	case "pull_request":
+		if !strings.Contains(project.ReviewEvents, "merge_request") {
+			return nil
+		}
+		var event GitHubPREvent
+		if err := json.Unmarshal(body, &event); err != nil {
+			return err
+		}
+		return s.processGitHubPR(ctx, project, &event)
+	}
+
+	return nil
+}
+
+func (s *Service) processGitHubPush(ctx context.Context, project *models.Project, event *GitHubPushEvent) error {
+	if len(event.Commits) == 0 {
+		return nil
+	}
+
+	branch := strings.TrimPrefix(event.Ref, "refs/heads/")
+	if s.isBranchIgnored(branch, project.BranchFilter) {
+		return nil
+	}
+
+	if s.isCommitAlreadyReviewed(project.ID, event.After) {
+		return nil
+	}
+
+	var commits []string
+	var commitURL string
+	for _, c := range event.Commits {
+		commits = append(commits, fmt.Sprintf("%s: %s", c.ID[:8], c.Message))
+		if commitURL == "" && c.URL != "" {
+			commitURL = c.URL
+		}
+	}
+
+	diff, err := s.getGitHubDiff(project, event.After)
+	if err != nil {
+		diff = "Failed to get diff: " + err.Error()
+	}
+
+	additions, deletions, filesChanged := ParseDiffStats(diff)
+
+	reviewLog := &models.ReviewLog{
+		ProjectID:     project.ID,
+		EventType:     "push",
+		CommitHash:    event.After,
+		CommitURL:     commitURL,
+		Branch:        branch,
+		Author:        event.Sender.Login,
+		AuthorEmail:   event.Pusher.Email,
+		AuthorAvatar:  event.Sender.AvatarURL,
+		AuthorURL:     event.Sender.HTMLURL,
+		CommitMessage: strings.Join(commits, "\n"),
+		FilesChanged:  filesChanged,
+		Additions:     additions,
+		Deletions:     deletions,
+		ReviewStatus:  "pending",
+	}
+	s.reviewService.Create(reviewLog)
+
+	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
+
+	if IsEmptyDiff(filteredDiff) {
+		reviewLog.ReviewStatus = "skipped"
+		reviewLog.ReviewResult = "Empty commit - no code changes to review"
+		s.reviewService.Update(reviewLog)
+		return nil
+	}
+
+	var fileContext string
+	if s.fileContextService.IsEnabled() {
+		fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, event.After)
+	}
+
+	result, err := s.aiService.ReviewChunked(ctx, &services.ReviewRequest{
+		ProjectID:   project.ID,
+		Diffs:       filteredDiff,
+		Commits:     strings.Join(commits, "\n"),
+		FileContext: fileContext,
+	})
+
+	if err != nil {
+		reviewLog.ReviewStatus = "failed"
+		reviewLog.ErrorMessage = err.Error()
+	} else {
+		reviewLog.ReviewStatus = "completed"
+		reviewLog.ReviewResult = result.Content
+		reviewLog.Score = &result.Score
+
+		s.notificationService.SendReviewNotification(project, &services.ReviewNotification{
+			ProjectName:   project.Name,
+			Branch:        branch,
+			Author:        event.Pusher.Name,
+			CommitMessage: strings.Join(commits, "\n"),
+			Score:         result.Score,
+			ReviewResult:  result.Content,
+			EventType:     "push",
+		})
+
+		if project.CommentEnabled {
+			comment := s.formatReviewComment(result.Score, result.Content)
+			if err := s.postGitHubCommitComment(project, event.After, comment); err != nil {
+				log.Printf("[Webhook] Failed to post GitHub commit comment: %v", err)
+			} else {
+				reviewLog.CommentPosted = true
+			}
+		}
+
+		minScore := s.getEffectiveMinScore(project)
+		if result.Score >= minScore {
+			s.setCommitStatus(project, event.After, "success", fmt.Sprintf("AI Review Passed: %.0f/%.0f", result.Score, minScore), 0)
+		} else {
+			s.setCommitStatus(project, event.After, "failed", fmt.Sprintf("AI Review Failed: %.0f (Min: %.0f)", result.Score, minScore), 0)
+		}
+	}
+
+	return s.reviewService.Update(reviewLog)
+}
+
+func (s *Service) processGitHubPR(ctx context.Context, project *models.Project, event *GitHubPREvent) error {
+	if event.Action != "opened" && event.Action != "synchronize" {
+		return nil
+	}
+
+	if s.isBranchIgnored(event.PullRequest.Head.Ref, project.BranchFilter) {
+		return nil
+	}
+
+	mrNumber := event.Number
+
+	diff, err := s.getGitHubPRDiff(project, mrNumber)
+	if err != nil {
+		diff = "Failed to get diff: " + err.Error()
+	}
+
+	additions, deletions, filesChanged := ParseDiffStats(diff)
+
+	reviewLog := &models.ReviewLog{
+		ProjectID:     project.ID,
+		EventType:     "merge_request",
+		CommitHash:    event.PullRequest.Head.SHA,
+		Branch:        event.PullRequest.Head.Ref,
+		Author:        event.PullRequest.User.Login,
+		AuthorAvatar:  event.PullRequest.User.AvatarURL,
+		AuthorURL:     event.PullRequest.User.HTMLURL,
+		CommitMessage: event.PullRequest.Title,
+		FilesChanged:  filesChanged,
+		Additions:     additions,
+		Deletions:     deletions,
+		MRNumber:      &mrNumber,
+		MRURL:         event.PullRequest.HTMLURL,
+		ReviewStatus:  "pending",
+	}
+	s.reviewService.Create(reviewLog)
+
+	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
+
+	if IsEmptyDiff(filteredDiff) {
+		reviewLog.ReviewStatus = "skipped"
+		reviewLog.ReviewResult = "Empty pull request - no code changes to review"
+		s.reviewService.Update(reviewLog)
+		return nil
+	}
+
+	var fileContext string
+	if s.fileContextService.IsEnabled() {
+		fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, event.PullRequest.Head.SHA)
+	}
+
+	result, err := s.aiService.ReviewChunked(ctx, &services.ReviewRequest{
+		ProjectID:   project.ID,
+		Diffs:       filteredDiff,
+		Commits:     event.PullRequest.Title + "\n" + event.PullRequest.Body,
+		FileContext: fileContext,
+	})
+
+	if err != nil {
+		reviewLog.ReviewStatus = "failed"
+		reviewLog.ErrorMessage = err.Error()
+	} else {
+		reviewLog.ReviewStatus = "completed"
+		reviewLog.ReviewResult = result.Content
+		reviewLog.Score = &result.Score
+
+		s.notificationService.SendReviewNotification(project, &services.ReviewNotification{
+			ProjectName:   project.Name,
+			Branch:        event.PullRequest.Head.Ref,
+			Author:        event.PullRequest.User.Login,
+			CommitMessage: event.PullRequest.Title,
+			Score:         result.Score,
+			ReviewResult:  result.Content,
+			EventType:     "merge_request",
+			MRURL:         event.PullRequest.HTMLURL,
+		})
+
+		if project.CommentEnabled {
+			comment := s.formatReviewComment(result.Score, result.Content)
+			s.postGitHubPRComment(project, mrNumber, comment)
+		}
+
+		minScore := s.getEffectiveMinScore(project)
+		if result.Score >= minScore {
+			s.setCommitStatus(project, event.PullRequest.Head.SHA, "success", fmt.Sprintf("AI Review Passed: %.0f/%.0f", result.Score, minScore), 0)
+		} else {
+			s.setCommitStatus(project, event.PullRequest.Head.SHA, "failed", fmt.Sprintf("AI Review Failed: %.0f (Min: %.0f)", result.Score, minScore), 0)
+		}
+	}
+
+	return s.reviewService.Update(reviewLog)
+}
+
+func (s *Service) getGitHubDiff(project *models.Project, commitSHA string) (string, error) {
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		return "", err
+	}
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits/%s", info.owner, info.repo, commitSHA)
+	return s.fetchGitHubDiff(apiURL, project.AccessToken)
+}
+
+func (s *Service) getGitHubPRDiff(project *models.Project, prNumber int) (string, error) {
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		return "", err
+	}
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls/%d", info.owner, info.repo, prNumber)
+	return s.fetchGitHubDiff(apiURL, project.AccessToken)
+}
+
+func (s *Service) fetchGitHubDiff(apiURL, accessToken string) (string, error) {
+	req, _ := http.NewRequest("GET", apiURL, nil)
+	req.Header.Set("Accept", "application/vnd.github.v3.diff")
+	if accessToken != "" {
+		req.Header.Set("Authorization", "token "+accessToken)
+	}
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	return string(body), nil
+}
+
+func (s *Service) setGitHubCommitStatus(project *models.Project, sha, state, description string) {
+	info, _ := parseRepoInfo(project.URL)
+	githubState := state
+	if state == "failed" {
+		githubState = "failure"
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/statuses/%s", info.owner, info.repo, sha)
+	data := map[string]string{"state": githubState, "context": "codesentry/ai-review", "description": description}
+	payload, _ := json.Marshal(data)
+
+	req, _ := http.NewRequest("POST", apiURL, bytes.NewBuffer(payload))
+	req.Header.Set("Content-Type", "application/json")
+	if project.AccessToken != "" {
+		req.Header.Set("Authorization", "token "+project.AccessToken)
+	}
+	s.httpClient.Do(req)
+}
+
+func (s *Service) postGitHubPRComment(project *models.Project, prNumber int, comment string) error {
+	info, _ := parseRepoInfo(project.URL)
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/comments", info.owner, info.repo, prNumber)
+	body := fmt.Sprintf(`{"body": %q}`, comment)
+	req, _ := http.NewRequest("POST", apiURL, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	if project.AccessToken != "" {
+		req.Header.Set("Authorization", "token "+project.AccessToken)
+	}
+	s.httpClient.Do(req)
+	return nil
+}
+
+func (s *Service) postGitHubCommitComment(project *models.Project, commitSHA, comment string) error {
+	info, _ := parseRepoInfo(project.URL)
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits/%s/comments", info.owner, info.repo, commitSHA)
+	body := fmt.Sprintf(`{"body": %q}`, comment)
+	req, _ := http.NewRequest("POST", apiURL, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	if project.AccessToken != "" {
+		req.Header.Set("Authorization", "token "+project.AccessToken)
+	}
+	s.httpClient.Do(req)
+	return nil
+}

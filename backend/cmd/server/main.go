@@ -18,6 +18,7 @@ import (
 	"github.com/huangang/codesentry/backend/internal/middleware"
 	"github.com/huangang/codesentry/backend/internal/models"
 	"github.com/huangang/codesentry/backend/internal/services"
+	"github.com/huangang/codesentry/backend/internal/services/webhook"
 	"github.com/huangang/codesentry/backend/internal/utils"
 )
 
@@ -78,7 +79,7 @@ func main() {
 	dailyReportService.StartScheduler()
 
 	// Initialize task queue (uses Redis if enabled, otherwise sync mode)
-	webhookService := services.NewWebhookService(models.GetDB(), &cfg.OpenAI)
+	webhookService := webhook.NewService(models.GetDB(), &cfg.OpenAI)
 	taskQueue := services.InitTaskQueue(cfg)
 	if syncQueue, ok := taskQueue.(*services.SyncQueue); ok {
 		syncQueue.SetProcessor(webhookService.ProcessReviewTask)
