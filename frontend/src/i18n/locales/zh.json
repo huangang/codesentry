@@ -289,7 +289,13 @@
     "topMembersComparison": "成员贡献对比 (Top 10)",
     "excellent": "优秀 (≥80)",
     "good": "良好 (60-79)",
-    "needWork": "待改进 (<60)"
+    "needWork": "待改进 (<60)",
+    "last7Days": "最近7天",
+    "last30Days": "最近30天",
+    "last90Days": "最近90天",
+    "thisMonth": "本月",
+    "lastMonth": "上月",
+    "thisYear": "今年"
   },
   "systemLogs": {
     "title": "系统日志",

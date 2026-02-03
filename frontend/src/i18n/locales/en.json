@@ -289,7 +289,13 @@
     "topMembersComparison": "Top 10 Members Comparison",
     "excellent": "Excellent (≥80)",
     "good": "Good (60-79)",
-    "needWork": "Need Work (<60)"
+    "needWork": "Need Work (<60)",
+    "last7Days": "Last 7 Days",
+    "last30Days": "Last 30 Days",
+    "last90Days": "Last 90 Days",
+    "thisMonth": "This Month",
+    "lastMonth": "Last Month",
+    "thisYear": "This Year"
   },
   "systemLogs": {
     "title": "System Logs",

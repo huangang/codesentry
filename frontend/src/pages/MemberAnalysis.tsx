@@ -263,7 +263,18 @@ const MemberAnalysis: React.FC = () => {
         <Space style={{ marginBottom: 16 }} wrap>
           <Input placeholder={t('memberAnalysis.searchAuthor')} style={{ width: 150 }} value={searchName} onChange={(e) => setSearchName(e.target.value)} onPressEnter={handleSearch} prefix={<UserOutlined />} />
           <Select placeholder={t('memberAnalysis.selectProject')} allowClear style={{ width: 180 }} value={projectId} onChange={setProjectId} options={projectsData?.items?.map((p) => ({ value: p.id, label: p.name })) ?? []} />
-          <RangePicker value={dateRange} onChange={(dates) => setDateRange(dates as [dayjs.Dayjs, dayjs.Dayjs])} />
+          <RangePicker
+            value={dateRange}
+            onChange={(dates) => setDateRange(dates as [dayjs.Dayjs, dayjs.Dayjs])}
+            presets={[
+              { label: t('memberAnalysis.last7Days'), value: [dayjs().subtract(7, 'day'), dayjs()] },
+              { label: t('memberAnalysis.last30Days'), value: [dayjs().subtract(30, 'day'), dayjs()] },
+              { label: t('memberAnalysis.last90Days'), value: [dayjs().subtract(90, 'day'), dayjs()] },
+              { label: t('memberAnalysis.thisMonth'), value: [dayjs().startOf('month'), dayjs()] },
+              { label: t('memberAnalysis.lastMonth'), value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
+              { label: t('memberAnalysis.thisYear'), value: [dayjs().startOf('year'), dayjs()] },
+            ]}
+          />
           <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
           <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
         </Space>
