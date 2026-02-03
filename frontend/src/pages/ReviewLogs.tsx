@@ -261,8 +261,14 @@ const ReviewLogs: React.FC = () => {
       case REVIEW_STATUS.ANALYZING: return t('reviewLogs.analyzing', 'Analyzing');
       case REVIEW_STATUS.COMPLETED: return t('reviewLogs.completed');
       case REVIEW_STATUS.FAILED: return t('reviewLogs.failed');
+      case REVIEW_STATUS.SKIPPED: return t('reviewLogs.skipped', 'Skipped');
       default: return status;
     }
+  };
+
+  // Check if retry is available for a status
+  const canRetry = (status: string) => {
+    return status === REVIEW_STATUS.FAILED || status === REVIEW_STATUS.PENDING || status === REVIEW_STATUS.ANALYZING;
   };
 
   const columns: ColumnsType<ReviewLog> = [
@@ -291,12 +297,26 @@ const ReviewLogs: React.FC = () => {
       title: t('reviewLogs.score'),
       dataIndex: 'score',
       key: 'score',
-      width: 80,
-      render: (score: number | null) => (
-        <Tag color={getScoreColor(score)}>
-          {score !== null ? score.toFixed(0) : '-'}
-        </Tag>
-      ),
+      width: 100,
+      render: (score: number | null, record: ReviewLog) => {
+        // Show status tag for non-completed reviews
+        if (record.review_status === REVIEW_STATUS.SKIPPED) {
+          return <Tag color="warning">{t('reviewLogs.skipped', 'Skipped')}</Tag>;
+        }
+        if (record.review_status === REVIEW_STATUS.PENDING ||
+          record.review_status === REVIEW_STATUS.ANALYZING ||
+          record.review_status === REVIEW_STATUS.PROCESSING) {
+          return <Tag color="processing">{getStatusText(record.review_status)}</Tag>;
+        }
+        if (record.review_status === REVIEW_STATUS.FAILED) {
+          return <Tag color="error">{t('reviewLogs.failed')}</Tag>;
+        }
+        return (
+          <Tag color={getScoreColor(score)}>
+            {score !== null ? score.toFixed(0) : '-'}
+          </Tag>
+        );
+      },
     },
     {
       title: t('reviewLogs.changes', 'Changes'),
@@ -325,7 +345,7 @@ const ReviewLogs: React.FC = () => {
     {
       title: t('common.actions'),
       key: 'action',
-      width: 150,
+      width: 180,
       render: (_, record) => (
         <Space>
           <Button
@@ -335,6 +355,16 @@ const ReviewLogs: React.FC = () => {
           >
             {t('common.details')}
           </Button>
+          {isAdmin && canRetry(record.review_status) && (
+            <Button
+              type="link"
+              icon={<ReloadOutlined />}
+              onClick={() => handleRetry(record.id)}
+              loading={retryReview.isPending}
+            >
+              {t('reviewLogs.retry', 'Retry')}
+            </Button>
+          )}
           {isAdmin && (
             <Popconfirm
               title={t('reviewLogs.deleteConfirm', 'Are you sure you want to delete this review log?')}

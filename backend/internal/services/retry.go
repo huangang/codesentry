@@ -14,6 +14,7 @@ const (
 	MaxRetryCount  = 3
 	RetryInterval  = 5 * time.Minute
 	RetryBatchSize = 10
+	StuckTimeout   = 10 * time.Minute // Reviews stuck in pending/analyzing for more than this will be marked as failed
 )
 
 type RetryService struct {
@@ -42,6 +43,7 @@ func StartRetryScheduler(db *gorm.DB, aiCfg *config.OpenAIConfig) {
 		for {
 			select {
 			case <-ticker.C:
+				service.ProcessStuckReviews() // Clean up stuck reviews first
 				service.ProcessFailedReviews()
 			case <-retryStopChan:
 				log.Println("[Retry] Scheduler stopped")
@@ -50,12 +52,55 @@ func StartRetryScheduler(db *gorm.DB, aiCfg *config.OpenAIConfig) {
 		}
 	}()
 
-	log.Printf("[Retry] Scheduler started, interval: %v, max retries: %d", RetryInterval, MaxRetryCount)
+	log.Printf("[Retry] Scheduler started, interval: %v, max retries: %d, stuck timeout: %v", RetryInterval, MaxRetryCount, StuckTimeout)
 }
 
 func StopRetryScheduler() {
 	if retryStopChan != nil {
 		close(retryStopChan)
+	}
+}
+
+// ProcessStuckReviews finds reviews stuck in pending/analyzing status for too long
+// and marks them as failed so they can be retried
+func (s *RetryService) ProcessStuckReviews() {
+	cutoffTime := time.Now().Add(-StuckTimeout)
+
+	var stuckReviews []models.ReviewLog
+	err := s.db.Where("review_status IN (?, ?) AND updated_at < ?", "pending", "analyzing", cutoffTime).
+		Order("created_at DESC").
+		Limit(RetryBatchSize).
+		Find(&stuckReviews).Error
+
+	if err != nil {
+		log.Printf("[Retry] Failed to fetch stuck reviews: %v", err)
+		return
+	}
+
+	if len(stuckReviews) == 0 {
+		return
+	}
+
+	log.Printf("[Retry] WARNING: Found %d stuck reviews (pending/analyzing > %v), marking as failed", len(stuckReviews), StuckTimeout)
+	LogWarning("Retry", "StuckReviews", "Found stuck reviews to be marked as failed", nil, "", "", map[string]interface{}{
+		"count":   len(stuckReviews),
+		"timeout": StuckTimeout.String(),
+	})
+
+	for _, review := range stuckReviews {
+		oldStatus := review.ReviewStatus
+		review.ReviewStatus = "failed"
+		review.ErrorMessage = "Review timeout: stuck in " + oldStatus + " status for more than " + StuckTimeout.String()
+
+		if err := s.db.Save(&review).Error; err != nil {
+			log.Printf("[Retry] Failed to update stuck review %d: %v", review.ID, err)
+			continue
+		}
+
+		log.Printf("[Retry] Marked review %d as failed (was %s since %v)", review.ID, oldStatus, review.UpdatedAt)
+
+		// Publish SSE event to notify frontend
+		PublishReviewEvent(review.ID, review.ProjectID, review.CommitHash, "failed", nil, review.ErrorMessage)
 	}
 }
 

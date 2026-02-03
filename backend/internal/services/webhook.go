@@ -2175,7 +2175,7 @@ func (s *WebhookService) GetReviewScore(commitSHA string) (*ReviewScoreResponse,
 	}
 
 	switch reviewLog.ReviewStatus {
-	case "pending", "processing":
+	case "pending", "processing", "analyzing":
 		resp.Message = "Review in progress"
 	case "completed":
 		var project models.Project
@@ -2186,6 +2186,11 @@ func (s *WebhookService) GetReviewScore(commitSHA string) (*ReviewScoreResponse,
 		resp.MinScore = minScore
 		resp.Passed = &passed
 		resp.Message = "Review completed"
+	case "skipped":
+		// Empty commits are skipped but should pass CI
+		passed := true
+		resp.Passed = &passed
+		resp.Message = "Skipped: " + reviewLog.ReviewResult
 	case "failed":
 		resp.Message = "Review failed: " + reviewLog.ErrorMessage
 	}

@@ -54,7 +54,7 @@ export interface ReviewLog {
   deletions: number;
   score: number | null;
   review_result: string;
-  review_status: 'pending' | 'completed' | 'failed';
+  review_status: 'pending' | 'processing' | 'analyzing' | 'completed' | 'failed' | 'skipped';
   error_message: string;
   retry_count: number;
   mr_number: number | null;

@@ -4,6 +4,7 @@ export const REVIEW_STATUS = {
   ANALYZING: 'analyzing',
   COMPLETED: 'completed',
   FAILED: 'failed',
+  SKIPPED: 'skipped',
 } as const;
 
 export type ReviewStatus = typeof REVIEW_STATUS[keyof typeof REVIEW_STATUS];
@@ -57,7 +58,7 @@ export function getScoreColor(score: number | null): 'success' | 'warning' | 'er
   return 'error';
 }
 
-export function getStatusColor(status: string): 'success' | 'error' | 'processing' | 'default' {
+export function getStatusColor(status: string): 'success' | 'error' | 'processing' | 'default' | 'warning' {
   switch (status) {
     case REVIEW_STATUS.COMPLETED:
       return 'success';
@@ -67,6 +68,8 @@ export function getStatusColor(status: string): 'success' | 'error' | 'processin
     case REVIEW_STATUS.ANALYZING:
     case REVIEW_STATUS.PENDING:
       return 'processing';
+    case REVIEW_STATUS.SKIPPED:
+      return 'warning';
     default:
       return 'default';
   }
