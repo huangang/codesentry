@@ -95,6 +95,29 @@ func parseRepoInfo(projectURL string) (*repoInfo, error) {
 	}, nil
 }
 
+// isEmptyDiff checks if the diff content has no actual code changes
+// A diff is considered empty if it only contains commit headers or whitespace
+func isEmptyDiff(diff string) bool {
+	if diff == "" {
+		return true
+	}
+	// Remove commit headers like "### Commit: abc12345"
+	lines := strings.Split(diff, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// Skip commit header lines
+		if strings.HasPrefix(line, "### Commit:") {
+			continue
+		}
+		// If we find any other non-empty line, it's not empty
+		return false
+	}
+	return true
+}
+
 // GitLabPushEvent represents a GitLab push webhook event
 type GitLabPushEvent struct {
 	ObjectKind  string `json:"object_kind"`
@@ -538,6 +561,22 @@ func (s *WebhookService) processGitLabPush(ctx context.Context, project *models.
 			project.FileExtensions, project.IgnorePatterns, len(diff), len(filteredDiff))
 	}
 
+	// Skip AI review for empty commits (no actual code changes after filtering)
+	if isEmptyDiff(filteredDiff) {
+		log.Printf("[Webhook] WARNING: Empty commit detected for project %d, commit %s - skipping AI review", project.ID, commitSHA)
+		LogWarning("Webhook", "EmptyCommit", fmt.Sprintf("Empty commit %s detected, skipping AI review", commitSHA[:8]), nil, "", "", map[string]interface{}{
+			"project_id": project.ID,
+			"commit":     commitSHA,
+			"branch":     branch,
+		})
+		reviewLog.ReviewStatus = "skipped"
+		reviewLog.ReviewResult = "Empty commit - no code changes to review"
+		s.reviewService.Update(reviewLog)
+		PublishReviewEvent(reviewLog.ID, reviewLog.ProjectID, reviewLog.CommitHash, "skipped", nil, "Empty commit - no code changes")
+		s.setCommitStatus(project, commitSHA, "success", "AI Review Skipped: Empty commit", event.ProjectID)
+		return nil
+	}
+
 	var fileContext string
 	if s.fileContextService.IsEnabled() {
 		fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, commitSHA)
@@ -652,6 +691,23 @@ func (s *WebhookService) processGitLabMR(ctx context.Context, project *models.Pr
 	s.reviewService.Create(reviewLog)
 
 	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
+
+	// Skip AI review for empty MR (no actual code changes after filtering)
+	if isEmptyDiff(filteredDiff) {
+		log.Printf("[Webhook] WARNING: Empty MR detected for project %d, MR !%d - skipping AI review", project.ID, mrNumber)
+		LogWarning("Webhook", "EmptyMR", fmt.Sprintf("Empty MR !%d detected, skipping AI review", mrNumber), nil, "", "", map[string]interface{}{
+			"project_id": project.ID,
+			"mr_number":  mrNumber,
+			"branch":     event.ObjectAttributes.SourceBranch,
+		})
+		reviewLog.ReviewStatus = "skipped"
+		reviewLog.ReviewResult = "Empty merge request - no code changes to review"
+		s.reviewService.Update(reviewLog)
+		if mrSHA != "" {
+			s.setCommitStatus(project, mrSHA, "success", "AI Review Skipped: Empty MR", event.Project.ID)
+		}
+		return nil
+	}
 
 	var fileContext string
 	if s.fileContextService.IsEnabled() {
@@ -860,6 +916,21 @@ func (s *WebhookService) processBitbucketPush(ctx context.Context, project *mode
 				project.FileExtensions, project.IgnorePatterns, len(diff), len(filteredDiff))
 		}
 
+		// Skip AI review for empty commits (no actual code changes after filtering)
+		if isEmptyDiff(filteredDiff) {
+			log.Printf("[Webhook] WARNING: Empty commit detected for project %d, commit %s - skipping AI review", project.ID, commitSHA[:8])
+			LogWarning("Webhook", "EmptyCommit", fmt.Sprintf("Empty commit %s detected, skipping AI review", commitSHA[:8]), nil, "", "", map[string]interface{}{
+				"project_id": project.ID,
+				"commit":     commitSHA,
+				"branch":     branch,
+			})
+			reviewLog.ReviewStatus = "skipped"
+			reviewLog.ReviewResult = "Empty commit - no code changes to review"
+			s.reviewService.Update(reviewLog)
+			s.setBitbucketCommitStatus(project, commitSHA, "SUCCESSFUL", "AI Review Skipped: Empty commit")
+			continue
+		}
+
 		var fileContext string
 		if s.fileContextService.IsEnabled() {
 			fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, commitSHA)
@@ -969,6 +1040,21 @@ func (s *WebhookService) processBitbucketPR(ctx context.Context, project *models
 
 	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
 
+	// Skip AI review for empty PR (no actual code changes after filtering)
+	if isEmptyDiff(filteredDiff) {
+		log.Printf("[Webhook] WARNING: Empty PR detected for project %d, PR #%d - skipping AI review", project.ID, prNumber)
+		LogWarning("Webhook", "EmptyPR", fmt.Sprintf("Empty PR #%d detected, skipping AI review", prNumber), nil, "", "", map[string]interface{}{
+			"project_id": project.ID,
+			"pr_number":  prNumber,
+			"branch":     branch,
+		})
+		reviewLog.ReviewStatus = "skipped"
+		reviewLog.ReviewResult = "Empty pull request - no code changes to review"
+		s.reviewService.Update(reviewLog)
+		s.setBitbucketCommitStatus(project, commitSHA, "SUCCESSFUL", "AI Review Skipped: Empty PR")
+		return nil
+	}
+
 	var fileContext string
 	if s.fileContextService.IsEnabled() {
 		fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, commitSHA)
@@ -1076,6 +1162,20 @@ func (s *WebhookService) processGitHubPush(ctx context.Context, project *models.
 
 	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
 
+	// Skip AI review for empty commits (no actual code changes after filtering)
+	if isEmptyDiff(filteredDiff) {
+		log.Printf("[Webhook] WARNING: Empty commit detected for project %d, commit %s - skipping AI review", project.ID, event.After[:8])
+		LogWarning("Webhook", "EmptyCommit", fmt.Sprintf("Empty commit %s detected, skipping AI review", event.After[:8]), nil, "", "", map[string]interface{}{
+			"project_id": project.ID,
+			"commit":     event.After,
+			"branch":     branch,
+		})
+		reviewLog.ReviewStatus = "skipped"
+		reviewLog.ReviewResult = "Empty commit - no code changes to review"
+		s.reviewService.Update(reviewLog)
+		return nil
+	}
+
 	var fileContext string
 	if s.fileContextService.IsEnabled() {
 		fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, event.After)
@@ -1167,6 +1267,20 @@ func (s *WebhookService) processGitHubPR(ctx context.Context, project *models.Pr
 	s.reviewService.Create(reviewLog)
 
 	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
+
+	// Skip AI review for empty PR (no actual code changes after filtering)
+	if isEmptyDiff(filteredDiff) {
+		log.Printf("[Webhook] WARNING: Empty PR detected for project %d, PR #%d - skipping AI review", project.ID, mrNumber)
+		LogWarning("Webhook", "EmptyPR", fmt.Sprintf("Empty PR #%d detected, skipping AI review", mrNumber), nil, "", "", map[string]interface{}{
+			"project_id": project.ID,
+			"pr_number":  mrNumber,
+			"branch":     event.PullRequest.Head.Ref,
+		})
+		reviewLog.ReviewStatus = "skipped"
+		reviewLog.ReviewResult = "Empty pull request - no code changes to review"
+		s.reviewService.Update(reviewLog)
+		return nil
+	}
 
 	var fileContext string
 	if s.fileContextService.IsEnabled() {
@@ -2209,6 +2323,21 @@ func (s *WebhookService) ProcessReviewTask(ctx context.Context, task *ReviewTask
 
 	// Filter diff
 	filteredDiff := s.filterDiff(task.Diff, project.FileExtensions, project.IgnorePatterns)
+
+	// Skip AI review for empty commits (no actual code changes after filtering)
+	if isEmptyDiff(filteredDiff) {
+		log.Printf("[TaskQueue] WARNING: Empty commit detected for review_log_id=%d - skipping AI review", task.ReviewLogID)
+		LogWarning("TaskQueue", "EmptyCommit", fmt.Sprintf("Empty commit %s detected, skipping AI review", task.CommitSHA[:8]), nil, "", "", map[string]interface{}{
+			"project_id":    task.ProjectID,
+			"review_log_id": task.ReviewLogID,
+			"commit":        task.CommitSHA,
+		})
+		reviewLog.ReviewStatus = "skipped"
+		reviewLog.ReviewResult = "Empty commit - no code changes to review"
+		s.reviewService.Update(reviewLog)
+		PublishReviewEvent(reviewLog.ID, reviewLog.ProjectID, reviewLog.CommitHash, "skipped", nil, "Empty commit - no code changes")
+		return nil
+	}
 
 	// Build file context if enabled
 	var fileContext string
