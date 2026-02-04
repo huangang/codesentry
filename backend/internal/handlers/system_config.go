@@ -9,12 +9,14 @@ import (
 )
 
 type SystemConfigHandler struct {
-	configService *services.SystemConfigService
+	configService  *services.SystemConfigService
+	holidayService *services.HolidayService
 }
 
 func NewSystemConfigHandler(db *gorm.DB) *SystemConfigHandler {
 	return &SystemConfigHandler{
-		configService: services.NewSystemConfigService(db),
+		configService:  services.NewSystemConfigService(db),
+		holidayService: services.NewHolidayService(),
 	}
 }
 
@@ -96,4 +98,9 @@ func (h *SystemConfigHandler) UpdateFileContextConfig(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, h.configService.GetFileContextConfig())
+}
+
+func (h *SystemConfigHandler) GetHolidayCountries(c *gin.Context) {
+	countries := h.holidayService.GetSupportedCountries()
+	c.JSON(http.StatusOK, countries)
 }

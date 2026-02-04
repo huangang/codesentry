@@ -232,6 +232,8 @@ export const systemConfigApi = {
 
   updateFileContextConfig: (data: Partial<FileContextConfig>) =>
     api.put<FileContextConfig>('/system-config/file-context', data),
+
+  getHolidayCountries: () => api.get<HolidayCountry[]>('/system-config/holiday-countries'),
 };
 
 export interface DailyReportConfig {
@@ -241,6 +243,14 @@ export interface DailyReportConfig {
   low_score: number;
   llm_config_id: number;
   im_bot_ids: number[];
+  workdays_only: boolean;
+  holiday_country: string;
+}
+
+export interface HolidayCountry {
+  code: string;
+  name: string;
+  name_zh: string;
 }
 
 export interface ChunkedReviewConfig {

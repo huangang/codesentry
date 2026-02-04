@@ -138,12 +138,14 @@ func (s *SystemConfigService) UpdateLDAPConfig(req *UpdateLDAPConfigRequest) err
 
 // Daily Report Config
 type DailyReportConfigResponse struct {
-	Enabled     bool   `json:"enabled"`
-	Time        string `json:"time"`
-	Timezone    string `json:"timezone"`
-	LowScore    int    `json:"low_score"`
-	LLMConfigID int    `json:"llm_config_id"`
-	IMBotIDs    []int  `json:"im_bot_ids"`
+	Enabled        bool   `json:"enabled"`
+	Time           string `json:"time"`
+	Timezone       string `json:"timezone"`
+	LowScore       int    `json:"low_score"`
+	LLMConfigID    int    `json:"llm_config_id"`
+	IMBotIDs       []int  `json:"im_bot_ids"`
+	WorkdaysOnly   bool   `json:"workdays_only"`
+	HolidayCountry string `json:"holiday_country"`
 }
 
 func (s *SystemConfigService) GetDailyReportConfig() *DailyReportConfigResponse {
@@ -159,12 +161,14 @@ func (s *SystemConfigService) GetDailyReportConfig() *DailyReportConfigResponse 
 		}
 	}
 	return &DailyReportConfigResponse{
-		Enabled:     s.GetWithDefault("daily_report_enabled", "false") == "true",
-		Time:        s.GetWithDefault("daily_report_time", "18:00"),
-		Timezone:    s.GetWithDefault("daily_report_timezone", "Asia/Shanghai"),
-		LowScore:    lowScore,
-		LLMConfigID: llmConfigID,
-		IMBotIDs:    imBotIDs,
+		Enabled:        s.GetWithDefault("daily_report_enabled", "false") == "true",
+		Time:           s.GetWithDefault("daily_report_time", "18:00"),
+		Timezone:       s.GetWithDefault("daily_report_timezone", "Asia/Shanghai"),
+		LowScore:       lowScore,
+		LLMConfigID:    llmConfigID,
+		IMBotIDs:       imBotIDs,
+		WorkdaysOnly:   s.GetWithDefault("daily_report_workdays_only", "true") == "true",
+		HolidayCountry: s.GetWithDefault("daily_report_holiday_country", "CN"),
 	}
 }
 
@@ -183,12 +187,14 @@ func splitAndTrim(s, sep string) []string {
 }
 
 type UpdateDailyReportConfigRequest struct {
-	Enabled     *bool   `json:"enabled"`
-	Time        *string `json:"time"`
-	Timezone    *string `json:"timezone"`
-	LowScore    *int    `json:"low_score"`
-	LLMConfigID *int    `json:"llm_config_id"`
-	IMBotIDs    []int   `json:"im_bot_ids"`
+	Enabled        *bool   `json:"enabled"`
+	Time           *string `json:"time"`
+	Timezone       *string `json:"timezone"`
+	LowScore       *int    `json:"low_score"`
+	LLMConfigID    *int    `json:"llm_config_id"`
+	IMBotIDs       []int   `json:"im_bot_ids"`
+	WorkdaysOnly   *bool   `json:"workdays_only"`
+	HolidayCountry *string `json:"holiday_country"`
 }
 
 func (s *SystemConfigService) UpdateDailyReportConfig(req *UpdateDailyReportConfigRequest) error {
@@ -223,6 +229,16 @@ func (s *SystemConfigService) UpdateDailyReportConfig(req *UpdateDailyReportConf
 			ids = append(ids, strconv.Itoa(id))
 		}
 		if err := s.Set("daily_report_im_bot_ids", strings.Join(ids, ",")); err != nil {
+			return err
+		}
+	}
+	if req.WorkdaysOnly != nil {
+		if err := s.Set("daily_report_workdays_only", strconv.FormatBool(*req.WorkdaysOnly)); err != nil {
+			return err
+		}
+	}
+	if req.HolidayCountry != nil {
+		if err := s.Set("daily_report_holiday_country", *req.HolidayCountry); err != nil {
 			return err
 		}
 	}

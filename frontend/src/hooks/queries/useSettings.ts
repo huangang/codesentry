@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { systemConfigApi, type DailyReportConfig, type ChunkedReviewConfig, type FileContextConfig } from '../../services';
+import { systemConfigApi, type DailyReportConfig, type ChunkedReviewConfig, type FileContextConfig, type HolidayCountry } from '../../services';
 import type { LDAPConfig } from '../../types';
 
 // Query keys
@@ -11,6 +11,7 @@ export const settingsKeys = {
     fileContext: () => [...settingsKeys.all, 'fileContext'] as const,
     activeLLMs: () => [...settingsKeys.all, 'activeLLMs'] as const,
     activeIMBots: () => [...settingsKeys.all, 'activeIMBots'] as const,
+    holidayCountries: () => [...settingsKeys.all, 'holidayCountries'] as const,
 };
 
 // Queries
@@ -51,6 +52,17 @@ export function useFileContextConfig() {
             const res = await systemConfigApi.getFileContextConfig();
             return res.data;
         },
+    });
+}
+
+export function useHolidayCountries() {
+    return useQuery<HolidayCountry[]>({
+        queryKey: settingsKeys.holidayCountries(),
+        queryFn: async () => {
+            const res = await systemConfigApi.getHolidayCountries();
+            return res.data;
+        },
+        staleTime: 24 * 60 * 60 * 1000,
     });
 }
 

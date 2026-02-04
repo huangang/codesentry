@@ -30,6 +30,7 @@ import {
   useUpdateDailyReportConfig,
   useUpdateChunkedReviewConfig,
   useUpdateFileContextConfig,
+  useHolidayCountries,
 } from '../hooks/queries';
 
 const Settings: React.FC = () => {
@@ -50,6 +51,8 @@ const Settings: React.FC = () => {
   const { data: fileContextConfig, isLoading: fileContextLoading } = useFileContextConfig();
   const { data: llmConfigs } = useActiveLLMConfigs();
   const { data: imBots } = useActiveImBots();
+  const { data: holidayCountries } = useHolidayCountries();
+  const [workdaysOnly, setWorkdaysOnly] = useState(true);
 
   // Mutations
   const updateLDAP = useUpdateLDAPConfig();
@@ -76,8 +79,11 @@ const Settings: React.FC = () => {
         low_score: dailyReportConfig.low_score || 60,
         llm_config_id: dailyReportConfig.llm_config_id || undefined,
         im_bot_ids: dailyReportConfig.im_bot_ids || [],
+        workdays_only: dailyReportConfig.workdays_only ?? true,
+        holiday_country: dailyReportConfig.holiday_country || 'CN',
       });
       setDailyReportEnabled(dailyReportConfig.enabled);
+      setWorkdaysOnly(dailyReportConfig.workdays_only ?? true);
     }
   }, [dailyReportConfig, dailyReportForm]);
 
@@ -119,10 +125,13 @@ const Settings: React.FC = () => {
         low_score: values.low_score,
         llm_config_id: values.llm_config_id || 0,
         im_bot_ids: values.im_bot_ids || [],
+        workdays_only: values.workdays_only ?? true,
+        holiday_country: values.holiday_country || 'CN',
       };
       await updateDailyReport.mutateAsync(payload);
       message.success(t('settings.dailyReport.saveSuccess'));
       setDailyReportEnabled(values.enabled);
+      setWorkdaysOnly(values.workdays_only ?? true);
     } catch (error: unknown) {
       const err = error as { response?: { data?: { error?: string } } };
       message.error(err.response?.data?.error || t('common.error'));
@@ -187,6 +196,18 @@ const Settings: React.FC = () => {
           <Form.Item name="im_bot_ids" label={t('settings.dailyReport.imBots')} extra={t('settings.dailyReport.imBotsHint')}>
             <Select mode="multiple" allowClear placeholder={t('settings.dailyReport.selectIMBots')} disabled={!dailyReportEnabled} options={(imBots || []).filter((b: { daily_report_enabled: boolean }) => b.daily_report_enabled).map((b: { id: number; name: string; type: string }) => ({ value: b.id, label: `${b.name} (${b.type})` }))} />
           </Form.Item>
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item name="workdays_only" label={t('settings.dailyReport.workdaysOnly')} valuePropName="checked" extra={t('settings.dailyReport.workdaysOnlyHint')}>
+                <Switch disabled={!dailyReportEnabled} onChange={setWorkdaysOnly} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="holiday_country" label={t('settings.dailyReport.holidayCountry')} extra={t('settings.dailyReport.holidayCountryHint')}>
+                <Select showSearch disabled={!dailyReportEnabled || !workdaysOnly} options={(holidayCountries || []).map((c) => ({ value: c.code, label: `${c.name_zh} (${c.name})` }))} />
+              </Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Card>
 

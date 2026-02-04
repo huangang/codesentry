@@ -377,7 +377,11 @@
       "selectLLM": "Select AI Model",
       "imBots": "Notification Bots",
       "imBotsHint": "Only bots with daily report enabled are shown",
-      "selectIMBots": "Select Notification Bots"
+      "selectIMBots": "Select Notification Bots",
+      "workdaysOnly": "Workdays Only",
+      "workdaysOnlyHint": "Skip daily reports on weekends and holidays",
+      "holidayCountry": "Holiday Country",
+      "holidayCountryHint": "Select country for holiday detection"
     },
     "ldap": {
       "title": "LDAP Configuration",

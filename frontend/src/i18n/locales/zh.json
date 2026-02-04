@@ -377,7 +377,11 @@
       "selectLLM": "选择 AI 模型",
       "imBots": "通知机器人",
       "imBotsHint": "仅显示已启用日报通知的机器人",
-      "selectIMBots": "选择通知机器人"
+      "selectIMBots": "选择通知机器人",
+      "workdaysOnly": "仅工作日",
+      "workdaysOnlyHint": "在周末和节假日跳过日报生成",
+      "holidayCountry": "假日国家",
+      "holidayCountryHint": "选择用于假日检测的国家"
     },
     "ldap": {
       "title": "LDAP 配置",

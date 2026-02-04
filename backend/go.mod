@@ -5,6 +5,7 @@ go 1.24.1
 toolchain go1.24.2
 
 require (
+	github.com/6tail/lunar-go v1.4.6
 	github.com/anthropics/anthropic-sdk-go v1.19.0
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.11.0
@@ -13,6 +14,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hibiken/asynq v0.25.1
 	github.com/ollama/ollama v0.15.2
+	github.com/rickar/cal/v2 v2.1.27
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/sashabaranov/go-openai v1.41.2
 	golang.org/x/crypto v0.47.0

@@ -19,6 +19,7 @@ type DailyReportService struct {
 	aiService           *AIService
 	notificationService *NotificationService
 	configService       *SystemConfigService
+	holidayService      *HolidayService
 	cronScheduler       *cron.Cron
 	currentEntryID      cron.EntryID
 }
@@ -29,6 +30,7 @@ func NewDailyReportService(db *gorm.DB, aiService *AIService, notificationServic
 		aiService:           aiService,
 		notificationService: notificationService,
 		configService:       NewSystemConfigService(db),
+		holidayService:      NewHolidayService(),
 	}
 }
 
@@ -91,6 +93,14 @@ func (s *DailyReportService) StopScheduler() {
 	if s.cronScheduler != nil {
 		s.cronScheduler.Stop()
 	}
+}
+
+func (s *DailyReportService) isWorkdaysOnly() bool {
+	return s.configService.GetWithDefault("daily_report_workdays_only", "true") == "true"
+}
+
+func (s *DailyReportService) getHolidayCountry() string {
+	return s.configService.GetWithDefault("daily_report_holiday_country", "CN")
 }
 
 func (s *DailyReportService) updateSchedule() {
@@ -171,7 +181,18 @@ func (s *DailyReportService) GenerateAndSendReport() error {
 		return nil
 	}
 
-	today := time.Now().Format("2006-01-02")
+	loc := s.getTimezoneLocation()
+	now := time.Now().In(loc)
+
+	if s.isWorkdaysOnly() {
+		countryCode := s.getHolidayCountry()
+		if !s.holidayService.IsWorkday(now, countryCode) {
+			log.Printf("[DailyReport] Today is not a workday in %s, skipping", countryCode)
+			return nil
+		}
+	}
+
+	today := now.Format("2006-01-02")
 	lockName := "daily_report"
 	lockKey := today
 
@@ -192,8 +213,8 @@ func (s *DailyReportService) GenerateAndSendReport() error {
 		return err
 	}
 
-	now := time.Now()
-	report.NotifiedAt = &now
+	notifiedAt := time.Now()
+	report.NotifiedAt = &notifiedAt
 	s.db.Save(report)
 
 	log.Printf("[DailyReport] Report generated and sent successfully (ID: %d)", report.ID)
