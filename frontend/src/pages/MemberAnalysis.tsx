@@ -49,6 +49,7 @@ import { useTranslation } from 'react-i18next';
 import { memberApi } from '../services';
 import { useMemberStats, useProjects, useTeamOverview, useHeatmap, type MemberStatsFilters } from '../hooks/queries';
 import { ContributionHeatmap } from '../components';
+import { getResponsiveWidth } from '../hooks';
 
 dayjs.extend(isoWeek);
 
@@ -81,6 +82,7 @@ const MemberAnalysis: React.FC = () => {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [memberDetail, setMemberDetail] = useState<MemberDetail | null>(null);
+  const [selectedAuthor, setSelectedAuthor] = useState<string>('');
   const { t } = useTranslation();
 
   const [searchName, setSearchName] = useState('');
@@ -100,10 +102,10 @@ const MemberAnalysis: React.FC = () => {
     project_id: projectId,
   });
 
-  const { data: heatmapData, isLoading: heatmapLoading } = useHeatmap({
+  const { data: memberHeatmapData, isLoading: memberHeatmapLoading } = useHeatmap({
     start_date: dayjs().subtract(1, 'year').format('YYYY-MM-DD'),
     end_date: dayjs().format('YYYY-MM-DD'),
-    project_id: projectId,
+    author: selectedAuthor,
   });
 
   const handleSearch = () => {
@@ -140,6 +142,7 @@ const MemberAnalysis: React.FC = () => {
   };
 
   const showMemberDetail = async (author: string) => {
+    setSelectedAuthor(author);
     setDrawerVisible(true);
     setDetailLoading(true);
     try {
@@ -182,20 +185,6 @@ const MemberAnalysis: React.FC = () => {
 
   return (
     <>
-      {/* Contribution Heatmap */}
-      <Card 
-        title={t('memberAnalysis.contributionHeatmap', 'Contribution Heatmap')} 
-        size="small" 
-        style={{ marginBottom: 16 }}
-      >
-        <ContributionHeatmap
-          data={heatmapData?.data ?? []}
-          totalCount={heatmapData?.total_count ?? 0}
-          maxCount={heatmapData?.max_count ?? 0}
-          loading={heatmapLoading}
-        />
-      </Card>
-
       {/* Overview Stats Cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} md={6}>
@@ -307,9 +296,18 @@ const MemberAnalysis: React.FC = () => {
           pagination={{ current: filters.page, pageSize: filters.page_size, total: memberData?.total ?? 0, showSizeChanger: true, showTotal: (total) => `${t('common.total')} ${total}`, onChange: handlePageChange }} />
       </Card>
 
-      <Drawer title={memberDetail?.author || t('memberAnalysis.memberDetail')} width={800} open={drawerVisible} onClose={() => setDrawerVisible(false)} loading={detailLoading}>
+      <Drawer title={memberDetail?.author || t('memberAnalysis.memberDetail')} width={getResponsiveWidth(800)} open={drawerVisible} onClose={() => { setDrawerVisible(false); setSelectedAuthor(''); }} loading={detailLoading}>
         {memberDetail && (
           <>
+            {/* Contribution Heatmap */}
+            <Card title={t('memberAnalysis.contributionHeatmap', 'Contribution Heatmap')} size="small" style={{ marginBottom: 16 }}>
+              <ContributionHeatmap
+                data={memberHeatmapData?.data ?? []}
+                totalCount={memberHeatmapData?.total_count ?? 0}
+                maxCount={memberHeatmapData?.max_count ?? 0}
+                loading={memberHeatmapLoading}
+              />
+            </Card>
             <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
               <Col span={6}><Card size="small"><Statistic title={t('memberAnalysis.commitCount')} value={memberDetail.total_stats.commit_count} prefix={<CodeOutlined />} /></Card></Col>
               <Col span={6}><Card size="small"><Statistic title={t('memberAnalysis.avgScore')} value={memberDetail.total_stats.avg_score} precision={1} prefix={<TrophyOutlined />} valueStyle={{ color: memberDetail.total_stats.avg_score >= 80 ? '#52c41a' : memberDetail.total_stats.avg_score >= 60 ? '#faad14' : '#ff4d4f' }} /></Card></Col>

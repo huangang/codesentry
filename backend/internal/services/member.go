@@ -343,7 +343,7 @@ func (s *MemberService) GetHeatmap(req *HeatmapRequest) (*HeatmapResponse, error
 	}
 
 	var rawData []struct {
-		Date      string
+		Date      time.Time
 		Count     int64
 		Additions int64
 		Deletions int64
@@ -354,17 +354,17 @@ func (s *MemberService) GetHeatmap(req *HeatmapRequest) (*HeatmapResponse, error
 	var totalCount, maxCount int64
 
 	for _, d := range rawData {
-		t, _ := time.Parse("2006-01-02", d.Date)
-		_, week := t.ISOWeek()
+		dateStr := d.Date.Format("2006-01-02")
+		_, week := d.Date.ISOWeek()
 		point := HeatmapDataPoint{
-			Date:       d.Date,
+			Date:       dateStr,
 			Count:      d.Count,
 			Additions:  d.Additions,
 			Deletions:  d.Deletions,
-			WeekDay:    int(t.Weekday()),
+			WeekDay:    int(d.Date.Weekday()),
 			WeekOfYear: week,
 		}
-		dataMap[d.Date] = point
+		dataMap[dateStr] = point
 		totalCount += d.Count
 		if d.Count > maxCount {
 			maxCount = d.Count
