@@ -30,3 +30,4 @@ backend/tmp/
 backend/cmd/server/static/*
 codesentry
 config.yaml
+backend/server
