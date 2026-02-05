@@ -69,6 +69,26 @@ export const reviewLogApi = {
   getById: (id: number) => api.get<ReviewLog>(`/review-logs/${id}`),
 
   retry: (id: number) => api.post<{ message: string }>(`/review-logs/${id}/retry`),
+
+  createManual: (data: {
+    project_id: number;
+    commit_hash: string;
+    commit_url?: string;
+    branch?: string;
+    author: string;
+    author_email?: string;
+    commit_message?: string;
+    files_changed?: number;
+    additions?: number;
+    deletions?: number;
+    commit_date?: string;
+  }) => api.post<ReviewLog>('/review-logs/manual', data),
+
+  importCommits: (data: {
+    project_id: number;
+    start_date: string;
+    end_date: string;
+  }) => api.post<{ imported: number; skipped: number; errors?: string[] }>('/review-logs/import', data),
 };
 
 // LLM Configs

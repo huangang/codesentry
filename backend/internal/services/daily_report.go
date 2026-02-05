@@ -323,7 +323,7 @@ func (s *DailyReportService) collectStats(startTime, endTime time.Time) ReportSt
 		Scan(&stats.TotalDeletions)
 
 	s.db.Model(&models.ReviewLog{}).
-		Where("created_at BETWEEN ? AND ? AND score IS NOT NULL", startTime, endTime).
+		Where("created_at BETWEEN ? AND ? AND score IS NOT NULL AND is_manual = false", startTime, endTime).
 		Select("COALESCE(AVG(score), 0)").
 		Scan(&stats.AverageScore)
 
@@ -331,13 +331,13 @@ func (s *DailyReportService) collectStats(startTime, endTime time.Time) ReportSt
 
 	var passedCount int64
 	s.db.Model(&models.ReviewLog{}).
-		Where("created_at BETWEEN ? AND ? AND score IS NOT NULL AND score >= ?", startTime, endTime, threshold).
+		Where("created_at BETWEEN ? AND ? AND score IS NOT NULL AND is_manual = false AND score >= ?", startTime, endTime, threshold).
 		Count(&passedCount)
 	stats.PassedCount = int(passedCount)
 
 	var failedCount int64
 	s.db.Model(&models.ReviewLog{}).
-		Where("created_at BETWEEN ? AND ? AND score IS NOT NULL AND score < ?", startTime, endTime, threshold).
+		Where("created_at BETWEEN ? AND ? AND score IS NOT NULL AND is_manual = false AND score < ?", startTime, endTime, threshold).
 		Count(&failedCount)
 	stats.FailedCount = int(failedCount)
 
@@ -358,7 +358,7 @@ func (s *DailyReportService) getTopProjects(startTime, endTime time.Time, limit 
 	}
 
 	s.db.Model(&models.ReviewLog{}).
-		Select("project_id, COUNT(*) as commit_count, COALESCE(AVG(score), 0) as avg_score").
+		Select("project_id, COUNT(*) as commit_count, COALESCE(AVG(CASE WHEN is_manual = false THEN score END), 0) as avg_score").
 		Where("created_at BETWEEN ? AND ?", startTime, endTime).
 		Group("project_id").
 		Order("commit_count DESC").
@@ -388,7 +388,7 @@ func (s *DailyReportService) getTopAuthors(startTime, endTime time.Time, limit i
 	}
 
 	s.db.Model(&models.ReviewLog{}).
-		Select("author, COUNT(*) as commit_count, COALESCE(AVG(score), 0) as avg_score").
+		Select("author, COUNT(*) as commit_count, COALESCE(AVG(CASE WHEN is_manual = false THEN score END), 0) as avg_score").
 		Where("created_at BETWEEN ? AND ?", startTime, endTime).
 		Group("author").
 		Order("commit_count DESC").

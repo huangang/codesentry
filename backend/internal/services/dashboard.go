@@ -108,13 +108,13 @@ func (s *DashboardService) GetStats(req *DashboardStatsRequest) (*DashboardRespo
 		Count(&stats.TotalCommits)
 
 	s.db.Model(&models.ReviewLog{}).
-		Where("created_at BETWEEN ? AND ? AND score IS NOT NULL", startDate, endDate).
+		Where("created_at BETWEEN ? AND ? AND score IS NOT NULL AND is_manual = false", startDate, endDate).
 		Select("COALESCE(AVG(score), 0)").
 		Scan(&stats.AverageScore)
 
 	var projectStats []ProjectStats
 	s.db.Model(&models.ReviewLog{}).
-		Select("project_id, COUNT(*) as commit_count, COALESCE(AVG(score), 0) as avg_score, COALESCE(SUM(additions), 0) as additions, COALESCE(SUM(deletions), 0) as deletions").
+		Select("project_id, COUNT(*) as commit_count, COALESCE(AVG(CASE WHEN is_manual = false THEN score END), 0) as avg_score, COALESCE(SUM(additions), 0) as additions, COALESCE(SUM(deletions), 0) as deletions").
 		Where("created_at BETWEEN ? AND ?", startDate, endDate).
 		Group("project_id").
 		Order("commit_count DESC").
@@ -130,7 +130,7 @@ func (s *DashboardService) GetStats(req *DashboardStatsRequest) (*DashboardRespo
 
 	var authorStats []AuthorStats
 	s.db.Model(&models.ReviewLog{}).
-		Select("author, COUNT(*) as commit_count, COALESCE(AVG(score), 0) as avg_score, COALESCE(SUM(additions), 0) as additions, COALESCE(SUM(deletions), 0) as deletions").
+		Select("author, COUNT(*) as commit_count, COALESCE(AVG(CASE WHEN is_manual = false THEN score END), 0) as avg_score, COALESCE(SUM(additions), 0) as additions, COALESCE(SUM(deletions), 0) as deletions").
 		Where("created_at BETWEEN ? AND ?", startDate, endDate).
 		Group("author").
 		Order("commit_count DESC").

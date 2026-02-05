@@ -166,7 +166,13 @@
     "pleaseSelectTemplate": "Please select a template",
     "pleaseInputPrompt": "Please input prompt",
     "promptPriority": "Prompt Priority",
-    "minScore": "Min Score"
+    "minScore": "Min Score",
+    "importCommits": "Import Commits",
+    "dateRange": "Date Range",
+    "pleaseSelectDateRange": "Please select date range",
+    "importSuccess": "Imported {{imported}} commits, skipped {{skipped}} existing",
+    "importStarted": "Import task started, you will be notified when complete",
+    "importFailed": "Import failed for {{name}}: {{error}}"
   },
   "reviewLogs": {
     "title": "Review Logs",

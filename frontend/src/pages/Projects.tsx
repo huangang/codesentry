@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Card,
   Table,
@@ -17,6 +17,7 @@ import {
   Radio,
   Divider,
   InputNumber,
+  DatePicker,
 } from 'antd';
 import {
   PlusOutlined,
@@ -26,6 +27,7 @@ import {
   DeleteOutlined,
   SettingOutlined,
   CopyOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useTranslation } from 'react-i18next';
@@ -43,6 +45,7 @@ import {
   type ProjectFilters,
 } from '../hooks/queries';
 import { PLATFORMS } from '../constants';
+import { reviewLogApi } from '../services';
 
 const { TextArea } = Input;
 
@@ -72,6 +75,49 @@ const Projects: React.FC = () => {
   const modal = useModal<Project>();
   const [promptDrawerVisible, setPromptDrawerVisible] = useState(false);
   const [currentProjectForPrompt, setCurrentProjectForPrompt] = useState<Project | null>(null);
+  const [manualModalVisible, setManualModalVisible] = useState(false);
+  const [manualProjectId, setManualProjectId] = useState<number | null>(null);
+  const [manualForm] = Form.useForm();
+  const [manualLoading, setManualLoading] = useState(false);
+
+  // SSE subscription for import events
+  const eventSourceRef = useRef<EventSource | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const eventSource = new EventSource(`/api/events/imports?token=${token}`);
+    eventSourceRef.current = eventSource;
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.error) {
+          message.error(t('projects.importFailed', 'Import failed for {{name}}: {{error}}')
+            .replace('{{name}}', data.project_name)
+            .replace('{{error}}', data.error));
+        } else {
+          message.success(t('projects.importSuccess', 'Imported {{imported}} commits, skipped {{skipped}} existing')
+            .replace('{{imported}}', String(data.imported))
+            .replace('{{skipped}}', String(data.skipped)));
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    };
+
+    eventSource.onerror = () => {
+      // Silently reconnect on error
+    };
+
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+    };
+  }, [t]);
 
   const getWebhookUrl = (record: Project) => {
     const baseUrl = window.location.origin;
@@ -187,6 +233,36 @@ const Projects: React.FC = () => {
     message.success(t('common.copied') + ': ' + url);
   };
 
+  const showManualModal = (projectId: number) => {
+    setManualProjectId(projectId);
+    setManualModalVisible(true);
+    manualForm.resetFields();
+  };
+
+  const handleManualSubmit = async () => {
+    if (!manualProjectId) return;
+    try {
+      const values = await manualForm.validateFields();
+      if (!values.date_range || values.date_range.length !== 2) {
+        message.error(t('projects.pleaseSelectDateRange', 'Please select date range'));
+        return;
+      }
+      setManualLoading(true);
+      await reviewLogApi.importCommits({
+        project_id: manualProjectId,
+        start_date: values.date_range[0].format('YYYY-MM-DD'),
+        end_date: values.date_range[1].format('YYYY-MM-DD'),
+      });
+      setManualModalVisible(false);
+      manualForm.resetFields();
+      message.success(t('projects.importStarted', 'Import task started, you will be notified when complete'), 5);
+    } catch (error: any) {
+      message.error(error.response?.data?.error || t('common.error'));
+    } finally {
+      setManualLoading(false);
+    }
+  };
+
   const columns: ColumnsType<Project> = [
     {
       title: 'ID',
@@ -258,6 +334,11 @@ const Projects: React.FC = () => {
           <Tooltip title={t('projects.copyWebhookUrl')}>
             <Button type="link" size="small" icon={<CopyOutlined />} onClick={() => copyWebhookUrl(record)} />
           </Tooltip>
+          {isAdmin && (
+            <Tooltip title={t('projects.importCommits', 'Import Commits')}>
+              <Button type="link" size="small" icon={<UploadOutlined />} onClick={() => showManualModal(record.id)} />
+            </Tooltip>
+          )}
           {isAdmin && (
             <Popconfirm title={t('projects.deleteConfirm')} onConfirm={() => handleDelete(record.id)}>
               <Button type="link" size="small" danger icon={<DeleteOutlined />} />
@@ -513,6 +594,28 @@ const Projects: React.FC = () => {
           </div>
         </Form>
       </Drawer>
+
+      <Modal
+        title={t('projects.importCommits', 'Import Commits')}
+        open={manualModalVisible}
+        onOk={handleManualSubmit}
+        onCancel={() => setManualModalVisible(false)}
+        confirmLoading={manualLoading}
+        width={getResponsiveWidth(450)}
+      >
+        <Form form={manualForm} layout="vertical">
+          <Form.Item 
+            name="date_range" 
+            label={t('projects.dateRange', 'Date Range')} 
+            rules={[{ required: true, message: t('projects.pleaseSelectDateRange', 'Please select date range') }]}
+            extra={i18n.language?.startsWith('zh') 
+              ? '系统将自动从 Git 平台拉取该时间范围内的所有提交' 
+              : 'The system will fetch all commits within this date range from the Git platform'}
+          >
+            <DatePicker.RangePicker style={{ width: '100%' }} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </>
   );
 };

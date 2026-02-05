@@ -104,3 +104,54 @@ func (s *ReviewLogService) Update(log *models.ReviewLog) error {
 func (s *ReviewLogService) Delete(id uint) error {
 	return s.db.Delete(&models.ReviewLog{}, id).Error
 }
+
+type ManualCommitRequest struct {
+	ProjectID     uint   `json:"project_id" binding:"required"`
+	CommitHash    string `json:"commit_hash" binding:"required"`
+	CommitURL     string `json:"commit_url"`
+	Branch        string `json:"branch"`
+	Author        string `json:"author" binding:"required"`
+	AuthorEmail   string `json:"author_email"`
+	CommitMessage string `json:"commit_message"`
+	FilesChanged  int    `json:"files_changed"`
+	Additions     int    `json:"additions"`
+	Deletions     int    `json:"deletions"`
+	CommitDate    string `json:"commit_date"`
+}
+
+func (s *ReviewLogService) CreateManualCommit(req *ManualCommitRequest) (*models.ReviewLog, error) {
+	var project models.Project
+	if err := s.db.First(&project, req.ProjectID).Error; err != nil {
+		return nil, err
+	}
+
+	commitDate := time.Now()
+	if req.CommitDate != "" {
+		if parsed, err := time.Parse("2006-01-02", req.CommitDate); err == nil {
+			commitDate = parsed
+		}
+	}
+
+	log := &models.ReviewLog{
+		ProjectID:     req.ProjectID,
+		EventType:     "push",
+		CommitHash:    req.CommitHash,
+		CommitURL:     req.CommitURL,
+		Branch:        req.Branch,
+		Author:        req.Author,
+		AuthorEmail:   req.AuthorEmail,
+		CommitMessage: req.CommitMessage,
+		FilesChanged:  req.FilesChanged,
+		Additions:     req.Additions,
+		Deletions:     req.Deletions,
+		ReviewStatus:  "manual",
+		IsManual:      true,
+		CreatedAt:     commitDate,
+	}
+
+	if err := s.db.Create(log).Error; err != nil {
+		return nil, err
+	}
+
+	return log, nil
+}

@@ -14,6 +14,15 @@ type ReviewEvent struct {
 	Error     string   `json:"error,omitempty"`
 }
 
+// ImportEvent represents a commit import completion event
+type ImportEvent struct {
+	ProjectID   uint   `json:"project_id"`
+	ProjectName string `json:"project_name"`
+	Imported    int    `json:"imported"`
+	Skipped     int    `json:"skipped"`
+	Error       string `json:"error,omitempty"`
+}
+
 // SSEHub manages SSE client connections and event broadcasting
 type SSEHub struct {
 	clients map[string]chan ReviewEvent
@@ -92,5 +101,61 @@ func PublishReviewEvent(id uint, projectID uint, commitSHA, status string, score
 		Status:    status,
 		Score:     score,
 		Error:     errMsg,
+	})
+}
+
+// ImportEventHub manages import event subscribers
+type ImportEventHub struct {
+	clients map[string]chan ImportEvent
+	mu      sync.RWMutex
+}
+
+var globalImportHub *ImportEventHub
+var importHubOnce sync.Once
+
+func GetImportHub() *ImportEventHub {
+	importHubOnce.Do(func() {
+		globalImportHub = &ImportEventHub{
+			clients: make(map[string]chan ImportEvent),
+		}
+	})
+	return globalImportHub
+}
+
+func (h *ImportEventHub) Subscribe(clientID string) <-chan ImportEvent {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	ch := make(chan ImportEvent, 10)
+	h.clients[clientID] = ch
+	return ch
+}
+
+func (h *ImportEventHub) Unsubscribe(clientID string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if ch, ok := h.clients[clientID]; ok {
+		close(ch)
+		delete(h.clients, clientID)
+	}
+}
+
+func (h *ImportEventHub) Publish(event ImportEvent) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for _, ch := range h.clients {
+		select {
+		case ch <- event:
+		default:
+		}
+	}
+}
+
+func PublishImportEvent(projectID uint, projectName string, imported, skipped int, errMsg string) {
+	GetImportHub().Publish(ImportEvent{
+		ProjectID:   projectID,
+		ProjectName: projectName,
+		Imported:    imported,
+		Skipped:     skipped,
+		Error:       errMsg,
 	})
 }

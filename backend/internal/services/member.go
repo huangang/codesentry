@@ -126,9 +126,9 @@ func (s *MemberService) List(req *MemberListRequest) (*MemberListResponse, error
 			author,
 			MAX(author_email) as author_email,
 			COUNT(*) as commit_count,
-			COALESCE(AVG(score), 0) as avg_score,
-			COALESCE(MAX(score), 0) as max_score,
-			COALESCE(MIN(NULLIF(score, 0)), 0) as min_score,
+			COALESCE(AVG(CASE WHEN is_manual = false THEN score END), 0) as avg_score,
+			COALESCE(MAX(CASE WHEN is_manual = false THEN score END), 0) as max_score,
+			COALESCE(MIN(NULLIF(CASE WHEN is_manual = false THEN score END, 0)), 0) as min_score,
 			COALESCE(SUM(additions), 0) as additions,
 			COALESCE(SUM(deletions), 0) as deletions,
 			COALESCE(SUM(files_changed), 0) as files_changed,
@@ -195,9 +195,9 @@ func (s *MemberService) GetDetail(req *MemberDetailRequest) (*MemberDetailRespon
 			author,
 			MAX(author_email) as author_email,
 			COUNT(*) as commit_count,
-			COALESCE(AVG(score), 0) as avg_score,
-			COALESCE(MAX(score), 0) as max_score,
-			COALESCE(MIN(NULLIF(score, 0)), 0) as min_score,
+			COALESCE(AVG(CASE WHEN is_manual = false THEN score END), 0) as avg_score,
+			COALESCE(MAX(CASE WHEN is_manual = false THEN score END), 0) as max_score,
+			COALESCE(MIN(NULLIF(CASE WHEN is_manual = false THEN score END, 0)), 0) as min_score,
 			COALESCE(SUM(additions), 0) as additions,
 			COALESCE(SUM(deletions), 0) as deletions,
 			COALESCE(SUM(files_changed), 0) as files_changed,
@@ -213,7 +213,7 @@ func (s *MemberService) GetDetail(req *MemberDetailRequest) (*MemberDetailRespon
 		Select(`
 			project_id,
 			COUNT(*) as commit_count,
-			COALESCE(AVG(score), 0) as avg_score,
+			COALESCE(AVG(CASE WHEN is_manual = false THEN score END), 0) as avg_score,
 			COALESCE(SUM(additions), 0) as additions,
 			COALESCE(SUM(deletions), 0) as deletions
 		`).
@@ -235,7 +235,7 @@ func (s *MemberService) GetDetail(req *MemberDetailRequest) (*MemberDetailRespon
 		Select(`
 			DATE(created_at) as date,
 			COUNT(*) as commit_count,
-			COALESCE(AVG(score), 0) as avg_score
+			COALESCE(AVG(CASE WHEN is_manual = false THEN score END), 0) as avg_score
 		`).
 		Where("author = ?", req.Author).
 		Where("created_at BETWEEN ? AND ?", startDate, endDate).
@@ -439,13 +439,13 @@ func (s *MemberService) GetTeamOverview(req *TeamOverviewRequest) (*TeamOverview
 	s.db.Model(&models.ReviewLog{}).
 		Where("created_at BETWEEN ? AND ?", startDate, endDate).
 		Where("author != ''").
-		Select("COUNT(*) as total_commits, COALESCE(AVG(score), 0) as avg_score, COALESCE(SUM(additions), 0) as total_additions, COALESCE(SUM(deletions), 0) as total_deletions").
+		Select("COUNT(*) as total_commits, COALESCE(AVG(CASE WHEN is_manual = false THEN score END), 0) as avg_score, COALESCE(SUM(additions), 0) as total_additions, COALESCE(SUM(deletions), 0) as total_deletions").
 		Row().Scan(&totalCommits, &avgScore, &totalAdditions, &totalDeletions)
 
 	// Team trend
 	var trend []MemberTrendItem
 	trendQuery := s.db.Model(&models.ReviewLog{}).
-		Select(`DATE(created_at) as date, COUNT(*) as commit_count, COALESCE(AVG(score), 0) as avg_score`).
+		Select(`DATE(created_at) as date, COUNT(*) as commit_count, COALESCE(AVG(CASE WHEN is_manual = false THEN score END), 0) as avg_score`).
 		Where("created_at BETWEEN ? AND ?", startDate, endDate).
 		Where("author != ''").
 		Group("DATE(created_at)").
@@ -463,9 +463,9 @@ func (s *MemberService) GetTeamOverview(req *TeamOverviewRequest) (*TeamOverview
 			author,
 			MAX(author_email) as author_email,
 			COUNT(*) as commit_count,
-			COALESCE(AVG(score), 0) as avg_score,
-			COALESCE(MAX(score), 0) as max_score,
-			COALESCE(MIN(NULLIF(score, 0)), 0) as min_score,
+			COALESCE(AVG(CASE WHEN is_manual = false THEN score END), 0) as avg_score,
+			COALESCE(MAX(CASE WHEN is_manual = false THEN score END), 0) as max_score,
+			COALESCE(MIN(NULLIF(CASE WHEN is_manual = false THEN score END, 0)), 0) as min_score,
 			COALESCE(SUM(additions), 0) as additions,
 			COALESCE(SUM(deletions), 0) as deletions,
 			COALESCE(SUM(files_changed), 0) as files_changed,
@@ -482,24 +482,27 @@ func (s *MemberService) GetTeamOverview(req *TeamOverviewRequest) (*TeamOverview
 	}
 	topQuery.Scan(&topMembers)
 
-	// Score distribution
+	// Score distribution (exclude manual records)
 	var excellent, good, needWork int64
 
 	s.db.Model(&models.ReviewLog{}).
 		Where("created_at BETWEEN ? AND ?", startDate, endDate).
 		Where("author != ''").
+		Where("is_manual = false").
 		Where("score >= 80").
 		Distinct("author").Count(&excellent)
 
 	s.db.Model(&models.ReviewLog{}).
 		Where("created_at BETWEEN ? AND ?", startDate, endDate).
 		Where("author != ''").
+		Where("is_manual = false").
 		Where("score >= 60 AND score < 80").
 		Distinct("author").Count(&good)
 
 	s.db.Model(&models.ReviewLog{}).
 		Where("created_at BETWEEN ? AND ?", startDate, endDate).
 		Where("author != ''").
+		Where("is_manual = false").
 		Where("score < 60 AND score > 0").
 		Distinct("author").Count(&needWork)
 

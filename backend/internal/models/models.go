@@ -72,6 +72,7 @@ type ReviewLog struct {
 	CommentPosted bool           `gorm:"default:false" json:"comment_posted"`
 	ErrorMessage  string         `gorm:"type:text" json:"error_message"`
 	RetryCount    int            `gorm:"default:0" json:"retry_count"`
+	IsManual      bool           `gorm:"default:false" json:"is_manual"`
 	LLMConfigID   *uint          `json:"llm_config_id"` // Which LLM was used
 	MRNumber      *int           `json:"mr_number"`     // Merge Request number
 	MRURL         string         `gorm:"size:500" json:"mr_url"`

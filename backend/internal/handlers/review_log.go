@@ -11,16 +11,18 @@ import (
 )
 
 type ReviewLogHandler struct {
-	db               *gorm.DB
-	reviewLogService *services.ReviewLogService
-	retryService     *services.RetryService
+	db                   *gorm.DB
+	reviewLogService     *services.ReviewLogService
+	retryService         *services.RetryService
+	importCommitsService *services.ImportCommitsService
 }
 
 func NewReviewLogHandler(db *gorm.DB, aiCfg *config.OpenAIConfig) *ReviewLogHandler {
 	return &ReviewLogHandler{
-		db:               db,
-		reviewLogService: services.NewReviewLogService(db),
-		retryService:     services.NewRetryService(db, aiCfg),
+		db:                   db,
+		reviewLogService:     services.NewReviewLogService(db),
+		retryService:         services.NewRetryService(db, aiCfg),
+		importCommitsService: services.NewImportCommitsService(db),
 	}
 }
 
@@ -88,4 +90,36 @@ func (h *ReviewLogHandler) Delete(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "review log deleted"})
+}
+
+func (h *ReviewLogHandler) CreateManualCommit(c *gin.Context) {
+	var req services.ManualCommitRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	log, err := h.reviewLogService.CreateManualCommit(&req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, log)
+}
+
+func (h *ReviewLogHandler) ImportCommits(c *gin.Context) {
+	var req services.ImportCommitsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	resp, err := h.importCommitsService.ImportCommits(&req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
 }

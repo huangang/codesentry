@@ -166,7 +166,13 @@
     "pleaseSelectTemplate": "请选择一个模板",
     "pleaseInputPrompt": "请输入提示词",
     "promptPriority": "提示词优先级",
-    "minScore": "最低分"
+    "minScore": "最低分",
+    "importCommits": "补录提交",
+    "dateRange": "时间范围",
+    "pleaseSelectDateRange": "请选择时间范围",
+    "importSuccess": "已导入 {{imported}} 条提交，跳过 {{skipped}} 条已存在",
+    "importStarted": "导入任务已启动，完成后将通知您",
+    "importFailed": "{{name}} 导入失败: {{error}}"
   },
   "reviewLogs": {
     "title": "审查记录",

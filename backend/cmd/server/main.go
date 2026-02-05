@@ -139,6 +139,7 @@ func main() {
 		// SSE Events (public route with internal token validation)
 		sseHandler := handlers.NewSSEHandler(services.GetSSEHub())
 		api.GET("/events/reviews", sseHandler.StreamReviewEvents)
+		api.GET("/events/imports", sseHandler.StreamImportEvents)
 
 		// Protected routes
 		protected := api.Group("")
@@ -203,6 +204,8 @@ func main() {
 			// Review Logs (write operations)
 			reviewLogHandler := handlers.NewReviewLogHandler(models.GetDB(), &cfg.OpenAI)
 			admin.POST("/review-logs/:id/retry", reviewLogHandler.Retry)
+			admin.POST("/review-logs/manual", reviewLogHandler.CreateManualCommit)
+			admin.POST("/review-logs/import", reviewLogHandler.ImportCommits)
 			admin.DELETE("/review-logs/:id", reviewLogHandler.Delete)
 
 			// Users
