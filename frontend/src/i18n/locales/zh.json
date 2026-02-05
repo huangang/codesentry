@@ -48,7 +48,8 @@
     "submit": "提交",
     "close": "关闭",
     "darkMode": "暗黑模式",
-    "lightMode": "浅色模式"
+    "lightMode": "浅色模式",
+    "default": "默认"
   },
   "auth": {
     "login": "登录",
@@ -188,6 +189,7 @@
     "processing": "处理中",
     "completed": "已完成",
     "failed": "失败",
+    "skipped": "已跳过",
     "push": "推送",
     "mergeRequest": "合并请求",
     "pullRequest": "拉取请求",
@@ -197,7 +199,9 @@
     "viewCommit": "查看 Commit",
     "viewMR": "查看 MR",
     "deleteConfirm": "确定要删除此审查记录吗？",
-    "deleteSuccess": "审查记录删除成功"
+    "deleteSuccess": "审查记录删除成功",
+    "analyzing": "分析中",
+    "changes": "变更"
   },
   "llmModels": {
     "title": "大模型管理",
@@ -224,7 +228,15 @@
     "openai": "OpenAI",
     "azure": "Azure OpenAI",
     "ollama": "Ollama",
-    "gemini": "Gemini"
+    "gemini": "Gemini",
+    "anthropicBaseUrlPlaceholder": "可选 - SDK 使用 https://api.anthropic.com",
+    "anthropicBaseUrlHint": "留空使用官方 API（原生 SDK）",
+    "geminiBaseUrlPlaceholder": "可选 - SDK 使用 Google AI API",
+    "geminiBaseUrlHint": "留空使用官方 API（原生 SDK）",
+    "ollamaBaseUrlHint": "Ollama 服务器地址",
+    "azureBaseUrlHint": "Azure OpenAI 资源地址",
+    "openaiBaseUrlHint": "OpenAI API 地址或兼容代理",
+    "keepExistingKey": "留空保留现有密钥"
   },
   "imBots": {
     "title": "通知机器人",
@@ -260,7 +272,8 @@
     "telegram": "Telegram",
     "custom": "自定义 Webhook",
     "dailyReportEnabled": "日报通知",
-    "dailyReportHelp": "接收每日审查汇总报告"
+    "dailyReportHelp": "接收每日审查汇总报告",
+    "secretPlaceholder": "SEC..."
   },
   "memberAnalysis": {
     "title": "成员分析",
@@ -472,5 +485,39 @@
     "authorName": "作者",
     "commitCount": "提交数",
     "avgScore": "均分"
+  },
+  "feedback": {
+    "title": "AI 反馈对话",
+    "type": "反馈类型",
+    "placeholder": "输入您的反馈或问题，AI将重新评估...",
+    "submit": "提交反馈",
+    "submitSuccess": "反馈已提交",
+    "submitError": "提交失败",
+    "history": "历史反馈",
+    "yourMessage": "您的反馈",
+    "scoreChanged": "评分已更新",
+    "types": {
+      "agree": "同意",
+      "disagree": "不同意",
+      "question": "提问",
+      "clarification": "需要说明"
+    },
+    "status": {
+      "pending": "等待中",
+      "processing": "处理中",
+      "completed": "已回复",
+      "failed": "失败"
+    }
+  },
+  "reviewTemplates": {
+    "title": "审查模板",
+    "name": "名称",
+    "type": "类型",
+    "description": "描述",
+    "content": "模板内容",
+    "builtIn": "内置",
+    "create": "创建模板",
+    "edit": "编辑模板",
+    "filterByType": "按类型筛选"
   }
 }
