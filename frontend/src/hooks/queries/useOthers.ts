@@ -71,6 +71,7 @@ export const memberKeys = {
     list: (filters: MemberFilters) => [...memberKeys.lists(), filters] as const,
     detail: (params: { author: string; start_date?: string; end_date?: string }) => [...memberKeys.all, 'detail', params] as const,
     overview: (params: { start_date?: string; end_date?: string; project_id?: number }) => [...memberKeys.all, 'overview', params] as const,
+    heatmap: (params: { start_date?: string; end_date?: string; project_id?: number; author?: string }) => [...memberKeys.all, 'heatmap', params] as const,
 };
 
 export function useMembers(filters: MemberFilters) {
@@ -99,6 +100,16 @@ export function useTeamOverview(params: { start_date?: string; end_date?: string
         queryKey: memberKeys.overview(params),
         queryFn: async () => {
             const res = await memberApi.getTeamOverview(params);
+            return res.data;
+        },
+    });
+}
+
+export function useHeatmap(params: { start_date?: string; end_date?: string; project_id?: number; author?: string }) {
+    return useQuery({
+        queryKey: memberKeys.heatmap(params),
+        queryFn: async () => {
+            const res = await memberApi.getHeatmap(params);
             return res.data;
         },
     });

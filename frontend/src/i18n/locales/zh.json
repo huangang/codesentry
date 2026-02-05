@@ -308,7 +308,11 @@
     "last90Days": "最近90天",
     "thisMonth": "本月",
     "lastMonth": "上月",
-    "thisYear": "今年"
+    "thisYear": "今年",
+    "contributionHeatmap": "贡献热力图",
+    "contributionsInYear": "过去一年共 {{count}} 次贡献",
+    "less": "少",
+    "more": "多"
   },
   "systemLogs": {
     "title": "系统日志",

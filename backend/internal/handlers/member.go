@@ -72,3 +72,19 @@ func (h *MemberHandler) GetTeamOverview(c *gin.Context) {
 
 	c.JSON(http.StatusOK, result)
 }
+
+func (h *MemberHandler) GetHeatmap(c *gin.Context) {
+	var req services.HeatmapRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	result, err := h.memberService.GetHeatmap(&req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}

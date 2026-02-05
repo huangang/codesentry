@@ -169,6 +169,7 @@ func main() {
 			protected.GET("/members", memberHandler.List)
 			protected.GET("/members/detail", memberHandler.GetDetail)
 			protected.GET("/members/overview", memberHandler.GetTeamOverview)
+			protected.GET("/members/heatmap", memberHandler.GetHeatmap)
 
 			// Prompts (read for all users)
 			promptHandler := handlers.NewPromptHandler(models.GetDB())

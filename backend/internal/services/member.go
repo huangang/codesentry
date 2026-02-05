@@ -276,6 +276,128 @@ type ScoreDistribution struct {
 	NeedWork  int64 `json:"need_work"` // < 60
 }
 
+type HeatmapRequest struct {
+	StartDate string `form:"start_date"`
+	EndDate   string `form:"end_date"`
+	ProjectID *uint  `form:"project_id"`
+	Author    string `form:"author"`
+}
+
+type HeatmapDataPoint struct {
+	Date       string `json:"date"`
+	Count      int64  `json:"count"`
+	Additions  int64  `json:"additions"`
+	Deletions  int64  `json:"deletions"`
+	WeekDay    int    `json:"week_day"`
+	WeekOfYear int    `json:"week_of_year"`
+}
+
+type HeatmapResponse struct {
+	Data       []HeatmapDataPoint `json:"data"`
+	TotalCount int64              `json:"total_count"`
+	MaxCount   int64              `json:"max_count"`
+	StartDate  string             `json:"start_date"`
+	EndDate    string             `json:"end_date"`
+}
+
+func (s *MemberService) GetHeatmap(req *HeatmapRequest) (*HeatmapResponse, error) {
+	var startDate, endDate time.Time
+	var err error
+
+	if req.StartDate != "" {
+		startDate, err = time.Parse("2006-01-02", req.StartDate)
+		if err != nil {
+			startDate = time.Now().AddDate(-1, 0, 0)
+		}
+	} else {
+		startDate = time.Now().AddDate(-1, 0, 0)
+	}
+
+	if req.EndDate != "" {
+		endDate, err = time.Parse("2006-01-02", req.EndDate)
+		if err != nil {
+			endDate = time.Now()
+		}
+		endDate = endDate.Add(24*time.Hour - time.Second)
+	} else {
+		endDate = time.Now()
+	}
+
+	query := s.db.Model(&models.ReviewLog{}).
+		Select(`
+			DATE(created_at) as date,
+			COUNT(*) as count,
+			COALESCE(SUM(additions), 0) as additions,
+			COALESCE(SUM(deletions), 0) as deletions
+		`).
+		Where("created_at BETWEEN ? AND ?", startDate, endDate).
+		Where("author != ''").
+		Group("DATE(created_at)").
+		Order("date ASC")
+
+	if req.ProjectID != nil {
+		query = query.Where("project_id = ?", *req.ProjectID)
+	}
+	if req.Author != "" {
+		query = query.Where("author = ?", req.Author)
+	}
+
+	var rawData []struct {
+		Date      string
+		Count     int64
+		Additions int64
+		Deletions int64
+	}
+	query.Scan(&rawData)
+
+	dataMap := make(map[string]HeatmapDataPoint)
+	var totalCount, maxCount int64
+
+	for _, d := range rawData {
+		t, _ := time.Parse("2006-01-02", d.Date)
+		_, week := t.ISOWeek()
+		point := HeatmapDataPoint{
+			Date:       d.Date,
+			Count:      d.Count,
+			Additions:  d.Additions,
+			Deletions:  d.Deletions,
+			WeekDay:    int(t.Weekday()),
+			WeekOfYear: week,
+		}
+		dataMap[d.Date] = point
+		totalCount += d.Count
+		if d.Count > maxCount {
+			maxCount = d.Count
+		}
+	}
+
+	var result []HeatmapDataPoint
+	for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
+		dateStr := d.Format("2006-01-02")
+		if point, exists := dataMap[dateStr]; exists {
+			result = append(result, point)
+		} else {
+			_, week := d.ISOWeek()
+			result = append(result, HeatmapDataPoint{
+				Date:       dateStr,
+				Count:      0,
+				Additions:  0,
+				Deletions:  0,
+				WeekDay:    int(d.Weekday()),
+				WeekOfYear: week,
+			})
+		}
+	}
+
+	return &HeatmapResponse{
+		Data:       result,
+		TotalCount: totalCount,
+		MaxCount:   maxCount,
+		StartDate:  startDate.Format("2006-01-02"),
+		EndDate:    endDate.Format("2006-01-02"),
+	}, nil
+}
+
 func (s *MemberService) GetTeamOverview(req *TeamOverviewRequest) (*TeamOverviewResponse, error) {
 	var startDate, endDate time.Time
 	var err error

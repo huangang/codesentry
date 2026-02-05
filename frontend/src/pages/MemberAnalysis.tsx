@@ -44,9 +44,13 @@ import {
   Area,
 } from 'recharts';
 import dayjs from 'dayjs';
+import isoWeek from 'dayjs/plugin/isoWeek';
 import { useTranslation } from 'react-i18next';
 import { memberApi } from '../services';
-import { useMemberStats, useProjects, useTeamOverview, type MemberStatsFilters } from '../hooks/queries';
+import { useMemberStats, useProjects, useTeamOverview, useHeatmap, type MemberStatsFilters } from '../hooks/queries';
+import { ContributionHeatmap } from '../components';
+
+dayjs.extend(isoWeek);
 
 const { RangePicker } = DatePicker;
 
@@ -93,6 +97,12 @@ const MemberAnalysis: React.FC = () => {
   const { data: overview, isLoading: overviewLoading } = useTeamOverview({
     start_date: dateRange[0].format('YYYY-MM-DD'),
     end_date: dateRange[1].format('YYYY-MM-DD'),
+    project_id: projectId,
+  });
+
+  const { data: heatmapData, isLoading: heatmapLoading } = useHeatmap({
+    start_date: dayjs().subtract(1, 'year').format('YYYY-MM-DD'),
+    end_date: dayjs().format('YYYY-MM-DD'),
     project_id: projectId,
   });
 
@@ -172,6 +182,20 @@ const MemberAnalysis: React.FC = () => {
 
   return (
     <>
+      {/* Contribution Heatmap */}
+      <Card 
+        title={t('memberAnalysis.contributionHeatmap', 'Contribution Heatmap')} 
+        size="small" 
+        style={{ marginBottom: 16 }}
+      >
+        <ContributionHeatmap
+          data={heatmapData?.data ?? []}
+          totalCount={heatmapData?.total_count ?? 0}
+          maxCount={heatmapData?.max_count ?? 0}
+          loading={heatmapLoading}
+        />
+      </Card>
+
       {/* Overview Stats Cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={12} md={6}>

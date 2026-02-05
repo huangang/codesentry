@@ -141,6 +141,23 @@ export interface TeamOverview {
   score_distribution: { excellent: number; good: number; need_work: number };
 }
 
+export interface HeatmapDataPoint {
+  date: string;
+  count: number;
+  additions: number;
+  deletions: number;
+  week_day: number;
+  week_of_year: number;
+}
+
+export interface HeatmapResponse {
+  data: HeatmapDataPoint[];
+  total_count: number;
+  max_count: number;
+  start_date: string;
+  end_date: string;
+}
+
 export const memberApi = {
   list: (params?: {
     page?: number;
@@ -158,6 +175,9 @@ export const memberApi = {
 
   getTeamOverview: (params?: { start_date?: string; end_date?: string; project_id?: number }) =>
     api.get<TeamOverview>('/members/overview', { params }),
+
+  getHeatmap: (params?: { start_date?: string; end_date?: string; project_id?: number; author?: string }) =>
+    api.get<HeatmapResponse>('/members/heatmap', { params }),
 };
 
 // System Logs

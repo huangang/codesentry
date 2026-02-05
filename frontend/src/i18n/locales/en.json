@@ -308,7 +308,11 @@
     "last90Days": "Last 90 Days",
     "thisMonth": "This Month",
     "lastMonth": "Last Month",
-    "thisYear": "This Year"
+    "thisYear": "This Year",
+    "contributionHeatmap": "Contribution Heatmap",
+    "contributionsInYear": "{{count}} contributions in the last year",
+    "less": "Less",
+    "more": "More"
   },
   "systemLogs": {
     "title": "System Logs",
