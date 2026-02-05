@@ -297,8 +297,10 @@ func ParseDiffStats(diff string) (additions, deletions, filesChanged int) {
 
 func (s *Service) isCommitAlreadyReviewed(projectID uint, commitSHA string) bool {
 	var count int64
+	// Check for any existing review regardless of status (completed, pending, processing, analyzing)
+	// This prevents duplicate reviews when the same commit is pushed to multiple branches simultaneously
 	s.db.Model(&models.ReviewLog{}).
-		Where("project_id = ? AND commit_hash = ? AND review_status = ?", projectID, commitSHA, "completed").
+		Where("project_id = ? AND commit_hash = ? AND review_status IN ?", projectID, commitSHA, []string{"completed", "pending", "processing", "analyzing"}).
 		Count(&count)
 	return count > 0
 }
