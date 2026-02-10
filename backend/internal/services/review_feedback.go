@@ -3,8 +3,9 @@ package services
 import (
 	"context"
 	"fmt"
-	"github.com/huangang/codesentry/backend/pkg/logger"
 	"strings"
+
+	"github.com/huangang/codesentry/backend/pkg/logger"
 
 	"github.com/huangang/codesentry/backend/internal/config"
 	"github.com/huangang/codesentry/backend/internal/models"
@@ -100,8 +101,12 @@ func (s *ReviewFeedbackService) processFeedback(feedbackID, reviewLogID uint, ll
 		updates["updated_score"] = *newScore
 		updates["score_changed"] = true
 
-		// Update the original review's score
-		s.db.Model(&reviewLog).Update("score", *newScore)
+		// Update the original review's score and status
+		reviewUpdates := map[string]interface{}{"score": *newScore}
+		if *newScore == 0 {
+			reviewUpdates["review_status"] = "unreviewable"
+		}
+		s.db.Model(&reviewLog).Updates(reviewUpdates)
 		logger.Infof("[Feedback] Score updated: %.1f -> %.1f", *reviewLog.Score, *newScore)
 	}
 
@@ -152,7 +157,7 @@ func (s *ReviewFeedbackService) parseScoreFromResponse(response string) *float64
 					var score float64
 					for _, word := range strings.Fields(line) {
 						word = strings.Trim(word, ",:：分*/")
-						if _, err := fmt.Sscanf(word, "%f", &score); err == nil && score > 0 && score <= 100 {
+						if _, err := fmt.Sscanf(word, "%f", &score); err == nil && score >= 0 && score <= 100 {
 							return &score
 						}
 					}
