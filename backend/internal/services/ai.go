@@ -3,7 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
-	"log"
+	"github.com/huangang/codesentry/backend/pkg/logger"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -61,13 +61,13 @@ func (s *AIService) Review(ctx context.Context, req *ReviewRequest) (*ReviewResu
 
 	prompt = s.processFileContextBlock(prompt, req.FileContext)
 
-	log.Printf("[AI] Prompt length: %d chars, Diffs length: %d chars, Commits length: %d chars, FileContext length: %d chars",
+	logger.Infof("[AI] Prompt length: %d chars, Diffs length: %d chars, Commits length: %d chars, FileContext length: %d chars",
 		len(prompt), len(req.Diffs), len(req.Commits), len(req.FileContext))
 
 	if len(prompt) > 500 {
-		log.Printf("[AI] Prompt preview (first 500 chars): %s...", prompt[:500])
+		logger.Infof("[AI] Prompt preview (first 500 chars): %s...", prompt[:500])
 	} else {
-		log.Printf("[AI] Prompt: %s", prompt)
+		logger.Infof("[AI] Prompt: %s", prompt)
 	}
 
 	llmConfigs := s.getOrderedLLMConfigs(&project)
@@ -77,16 +77,16 @@ func (s *AIService) Review(ctx context.Context, req *ReviewRequest) (*ReviewResu
 
 	var lastErr error
 	for i, llmConfig := range llmConfigs {
-		log.Printf("[AI] Attempting LLM %d/%d: %s (model: %s)", i+1, len(llmConfigs), llmConfig.Name, llmConfig.Model)
+		logger.Infof("[AI] Attempting LLM %d/%d: %s (model: %s)", i+1, len(llmConfigs), llmConfig.Name, llmConfig.Model)
 
 		result, err := s.callLLM(ctx, &llmConfig, prompt)
 		if err == nil {
-			log.Printf("[AI] Success with LLM: %s", llmConfig.Name)
+			logger.Infof("[AI] Success with LLM: %s", llmConfig.Name)
 			return result, nil
 		}
 
 		lastErr = err
-		log.Printf("[AI] LLM %s failed: %v, trying next...", llmConfig.Name, err)
+		logger.Infof("[AI] LLM %s failed: %v, trying next...", llmConfig.Name, err)
 	}
 
 	return nil, fmt.Errorf("all LLMs failed, last error: %w", lastErr)
@@ -135,7 +135,7 @@ func (s *AIService) getOrderedLLMConfigs(project *models.Project) []models.LLMCo
 
 // callLLM dispatches to the appropriate provider-specific function based on Provider field
 func (s *AIService) callLLM(ctx context.Context, llmConfig *models.LLMConfig, prompt string) (*ReviewResult, error) {
-	log.Printf("[AI] Using provider: %s, model: %s, baseURL: %s", llmConfig.Provider, llmConfig.Model, llmConfig.BaseURL)
+	logger.Infof("[AI] Using provider: %s, model: %s, baseURL: %s", llmConfig.Provider, llmConfig.Model, llmConfig.BaseURL)
 
 	switch llmConfig.Provider {
 	case "anthropic":
@@ -177,7 +177,7 @@ func (s *AIService) callOpenAI(ctx context.Context, llmConfig *models.LLMConfig,
 	})
 
 	if err != nil {
-		log.Printf("[AI] OpenAI API error: %v", err)
+		logger.Infof("[AI] OpenAI API error: %v", err)
 		return nil, fmt.Errorf("OpenAI API error: %w", err)
 	}
 
@@ -186,7 +186,7 @@ func (s *AIService) callOpenAI(ctx context.Context, llmConfig *models.LLMConfig,
 	}
 
 	content := resp.Choices[0].Message.Content
-	log.Printf("[AI] OpenAI response length: %d chars", len(content))
+	logger.Infof("[AI] OpenAI response length: %d chars", len(content))
 
 	return &ReviewResult{
 		Content: content,
@@ -218,7 +218,7 @@ func (s *AIService) callAnthropic(ctx context.Context, llmConfig *models.LLMConf
 		},
 	})
 	if err != nil {
-		log.Printf("[AI] Anthropic API error: %v", err)
+		logger.Infof("[AI] Anthropic API error: %v", err)
 		return nil, fmt.Errorf("Anthropic API error: %w", err)
 	}
 
@@ -230,7 +230,7 @@ func (s *AIService) callAnthropic(ctx context.Context, llmConfig *models.LLMConf
 		}
 	}
 
-	log.Printf("[AI] Anthropic response length: %d chars", len(content))
+	logger.Infof("[AI] Anthropic response length: %d chars", len(content))
 
 	return &ReviewResult{
 		Content: content,
@@ -272,12 +272,12 @@ func (s *AIService) callOllama(ctx context.Context, llmConfig *models.LLMConfig,
 	})
 
 	if err != nil {
-		log.Printf("[AI] Ollama API error: %v", err)
+		logger.Infof("[AI] Ollama API error: %v", err)
 		return nil, fmt.Errorf("Ollama API error: %w", err)
 	}
 
 	result := content.String()
-	log.Printf("[AI] Ollama response length: %d chars", len(result))
+	logger.Infof("[AI] Ollama response length: %d chars", len(result))
 
 	return &ReviewResult{
 		Content: result,
@@ -301,12 +301,12 @@ func (s *AIService) callGemini(ctx context.Context, llmConfig *models.LLMConfig,
 
 	resp, err := client.Models.GenerateContent(ctx, model, genai.Text(prompt), nil)
 	if err != nil {
-		log.Printf("[AI] Gemini API error: %v", err)
+		logger.Infof("[AI] Gemini API error: %v", err)
 		return nil, fmt.Errorf("Gemini API error: %w", err)
 	}
 
 	content := resp.Text()
-	log.Printf("[AI] Gemini response length: %d chars", len(content))
+	logger.Infof("[AI] Gemini response length: %d chars", len(content))
 
 	return &ReviewResult{
 		Content: content,
@@ -335,7 +335,7 @@ func (s *AIService) callAzure(ctx context.Context, llmConfig *models.LLMConfig, 
 	})
 
 	if err != nil {
-		log.Printf("[AI] Azure OpenAI API error: %v", err)
+		logger.Infof("[AI] Azure OpenAI API error: %v", err)
 		return nil, fmt.Errorf("Azure OpenAI API error: %w", err)
 	}
 
@@ -344,7 +344,7 @@ func (s *AIService) callAzure(ctx context.Context, llmConfig *models.LLMConfig, 
 	}
 
 	content := resp.Choices[0].Message.Content
-	log.Printf("[AI] Azure OpenAI response length: %d chars", len(content))
+	logger.Infof("[AI] Azure OpenAI response length: %d chars", len(content))
 
 	return &ReviewResult{
 		Content: content,
@@ -357,15 +357,15 @@ func (s *AIService) getPromptForProject(project *models.Project, customPrompt st
 	var isSystemDefault bool
 
 	if customPrompt != "" {
-		log.Printf("[AI] Using custom prompt from request")
+		logger.Infof("[AI] Using custom prompt from request")
 		prompt = customPrompt
 	} else if project.AIPrompt != "" {
-		log.Printf("[AI] Using project custom prompt")
+		logger.Infof("[AI] Using project custom prompt")
 		prompt = project.AIPrompt
 	} else if project.AIPromptID != nil {
 		var promptTemplate models.PromptTemplate
 		if err := s.db.First(&promptTemplate, *project.AIPromptID).Error; err == nil {
-			log.Printf("[AI] Using linked prompt template: %s (ID: %d)", promptTemplate.Name, promptTemplate.ID)
+			logger.Infof("[AI] Using linked prompt template: %s (ID: %d)", promptTemplate.Name, promptTemplate.ID)
 			prompt = promptTemplate.Content
 		}
 	}
@@ -373,17 +373,17 @@ func (s *AIService) getPromptForProject(project *models.Project, customPrompt st
 	if prompt == "" {
 		var defaultPrompt models.PromptTemplate
 		if err := s.db.Where("is_default = ?", true).First(&defaultPrompt).Error; err == nil {
-			log.Printf("[AI] Using system default prompt: %s (ID: %d)", defaultPrompt.Name, defaultPrompt.ID)
+			logger.Infof("[AI] Using system default prompt: %s (ID: %d)", defaultPrompt.Name, defaultPrompt.ID)
 			prompt = defaultPrompt.Content
 		} else {
-			log.Printf("[AI] Using hardcoded default prompt")
+			logger.Infof("[AI] Using hardcoded default prompt")
 			prompt = NewProjectService(s.db).GetDefaultPrompt()
 		}
 		isSystemDefault = true
 	}
 
 	if !isSystemDefault && !containsScoringInstruction(prompt) {
-		log.Printf("[AI] Prompt missing scoring instructions, auto-appending")
+		logger.Infof("[AI] Prompt missing scoring instructions, auto-appending")
 		prompt = appendScoringInstruction(prompt)
 	}
 
@@ -465,7 +465,7 @@ func (s *AIService) CallWithConfig(ctx context.Context, llmConfigID uint, prompt
 
 	if llmConfigID > 0 {
 		if err := s.db.Where("id = ? AND is_active = ?", llmConfigID, true).First(&llmConfig).Error; err != nil {
-			log.Printf("[AI] Specified LLM config %d not found or inactive, falling back to default", llmConfigID)
+			logger.Infof("[AI] Specified LLM config %d not found or inactive, falling back to default", llmConfigID)
 		}
 	}
 
@@ -479,7 +479,7 @@ func (s *AIService) CallWithConfig(ctx context.Context, llmConfigID uint, prompt
 		}
 	}
 
-	log.Printf("[AI] CallWithConfig using LLM: %s (ID: %d)", llmConfig.Name, llmConfig.ID)
+	logger.Infof("[AI] CallWithConfig using LLM: %s (ID: %d)", llmConfig.Name, llmConfig.ID)
 
 	result, err := s.callLLM(ctx, &llmConfig, prompt)
 	if err != nil {
@@ -523,14 +523,14 @@ func (s *AIService) ReviewChunked(ctx context.Context, req *ReviewRequest) (*Rev
 
 	files := ParseDiffToFiles(req.Diffs)
 	if len(files) <= 1 {
-		log.Printf("[AI] Large diff (%d chars) but only %d file(s), using regular review", diffSize, len(files))
+		logger.Infof("[AI] Large diff (%d chars) but only %d file(s), using regular review", diffSize, len(files))
 		return s.Review(ctx, req)
 	}
 
 	maxTokens := s.getMaxTokensPerBatch()
 	batches := CreateBatches(files, maxTokens)
 
-	log.Printf("[AI] Large diff detected (%d chars, %d files), using chunked review with %d batches",
+	logger.Infof("[AI] Large diff detected (%d chars, %d files), using chunked review with %d batches",
 		diffSize, len(files), len(batches))
 
 	var (
@@ -548,7 +548,7 @@ func (s *AIService) ReviewChunked(ctx context.Context, req *ReviewRequest) (*Rev
 			fileNames := GetBatchFileNames(b)
 			weight := GetBatchWeight(b)
 
-			log.Printf("[AI] Reviewing batch %d/%d: %d files, ~%d tokens",
+			logger.Infof("[AI] Reviewing batch %d/%d: %d files, ~%d tokens",
 				batchIdx+1, len(batches), len(b.Files), b.TotalTokens)
 
 			result, err := s.Review(ctx, &ReviewRequest{
@@ -558,7 +558,7 @@ func (s *AIService) ReviewChunked(ctx context.Context, req *ReviewRequest) (*Rev
 			})
 
 			if err != nil {
-				log.Printf("[AI] Batch %d/%d failed: %v", batchIdx+1, len(batches), err)
+				logger.Infof("[AI] Batch %d/%d failed: %v", batchIdx+1, len(batches), err)
 				return
 			}
 
@@ -572,7 +572,7 @@ func (s *AIService) ReviewChunked(ctx context.Context, req *ReviewRequest) (*Rev
 			})
 			mu.Unlock()
 
-			log.Printf("[AI] Batch %d/%d completed: score=%.0f", batchIdx+1, len(batches), result.Score)
+			logger.Infof("[AI] Batch %d/%d completed: score=%.0f", batchIdx+1, len(batches), result.Score)
 		}(i, batch)
 	}
 
@@ -584,7 +584,7 @@ func (s *AIService) ReviewChunked(ctx context.Context, req *ReviewRequest) (*Rev
 
 	aggregated := AggregateResults(batchResults)
 
-	log.Printf("[AI] Chunked review completed: %d/%d batches succeeded, aggregated score=%.0f",
+	logger.Infof("[AI] Chunked review completed: %d/%d batches succeeded, aggregated score=%.0f",
 		len(batchResults), len(batches), aggregated.Score)
 
 	return &ReviewResult{

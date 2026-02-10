@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"github.com/huangang/codesentry/backend/pkg/logger"
 	"net/http"
 	"net/url"
 	"time"
@@ -48,9 +48,9 @@ func (s *NotificationService) SendReviewNotification(project *models.Project, no
 		if err := s.db.First(&bot, *project.IMBotID).Error; err != nil {
 			imErr = fmt.Errorf("IM bot not found: %w", err)
 		} else if !bot.IsActive {
-			log.Printf("[Notification] IM bot %d is not active", bot.ID)
+			logger.Infof("[Notification] IM bot %d is not active", bot.ID)
 		} else {
-			log.Printf("[Notification] Sending notification to bot %s (type: %s)", bot.Name, bot.Type)
+			logger.Infof("[Notification] Sending notification to bot %s (type: %s)", bot.Name, bot.Type)
 
 			switch bot.Type {
 			case "wechat_work":
@@ -87,10 +87,10 @@ func (s *NotificationService) SendReviewNotification(project *models.Project, no
 	}
 
 	if imErr != nil {
-		log.Printf("[Notification] IM notification failed: %v", imErr)
+		logger.Infof("[Notification] IM notification failed: %v", imErr)
 	}
 	if emailErr != nil {
-		log.Printf("[Notification] Email notification failed: %v", emailErr)
+		logger.Infof("[Notification] Email notification failed: %v", emailErr)
 	}
 
 	if imErr != nil {
@@ -441,7 +441,7 @@ func (s *NotificationService) postJSON(webhookURL string, payload interface{}) e
 		return err
 	}
 
-	log.Printf("[Notification] POST %s, payload length: %d", webhookURL, len(body))
+	logger.Infof("[Notification] POST %s, payload length: %d", webhookURL, len(body))
 
 	resp, err := http.Post(webhookURL, "application/json", bytes.NewReader(body))
 	if err != nil {
@@ -450,7 +450,7 @@ func (s *NotificationService) postJSON(webhookURL string, payload interface{}) e
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(resp.Body)
-	log.Printf("[Notification] Response: %d - %s", resp.StatusCode, string(respBody))
+	logger.Infof("[Notification] Response: %d - %s", resp.StatusCode, string(respBody))
 
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("webhook returned status %d: %s", resp.StatusCode, string(respBody))

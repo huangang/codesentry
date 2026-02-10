@@ -3,7 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"github.com/huangang/codesentry/backend/pkg/logger"
 	"sync"
 
 	"github.com/hibiken/asynq"
@@ -55,14 +55,14 @@ func InitTaskQueue(cfg *config.Config) TaskQueue {
 		if cfg.Redis.Enabled {
 			queue, err := NewAsyncQueue(&cfg.Redis)
 			if err != nil {
-				log.Printf("[TaskQueue] Redis unavailable, falling back to sync mode: %v", err)
+				logger.Infof("[TaskQueue] Redis unavailable, falling back to sync mode: %v", err)
 				globalTaskQueue = NewSyncQueue()
 			} else {
-				log.Printf("[TaskQueue] Async queue initialized with Redis at %s", cfg.Redis.Addr)
+				logger.Infof("[TaskQueue] Async queue initialized with Redis at %s", cfg.Redis.Addr)
 				globalTaskQueue = queue
 			}
 		} else {
-			log.Printf("[TaskQueue] Sync queue initialized (Redis disabled)")
+			logger.Infof("[TaskQueue] Sync queue initialized (Redis disabled)")
 			globalTaskQueue = NewSyncQueue()
 		}
 	})
@@ -119,7 +119,7 @@ func (q *AsyncQueue) Enqueue(task *ReviewTask) error {
 		return err
 	}
 
-	log.Printf("[AsyncQueue] Task enqueued: id=%s, queue=%s", info.ID, info.Queue)
+	logger.Infof("[AsyncQueue] Task enqueued: id=%s, queue=%s", info.ID, info.Queue)
 	return nil
 }
 
@@ -151,7 +151,7 @@ func (q *SyncQueue) SetProcessor(processor func(context.Context, *ReviewTask) er
 // Enqueue processes the task immediately in the current goroutine
 func (q *SyncQueue) Enqueue(task *ReviewTask) error {
 	if q.processor == nil {
-		log.Printf("[SyncQueue] Warning: no processor set, task will be dropped")
+		logger.Infof("[SyncQueue] Warning: no processor set, task will be dropped")
 		return nil
 	}
 
@@ -159,7 +159,7 @@ func (q *SyncQueue) Enqueue(task *ReviewTask) error {
 	go func() {
 		ctx := context.Background()
 		if err := q.processor(ctx, task); err != nil {
-			log.Printf("[SyncQueue] Task processing failed: %v", err)
+			logger.Infof("[SyncQueue] Task processing failed: %v", err)
 		}
 	}()
 

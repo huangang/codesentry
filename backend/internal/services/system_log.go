@@ -3,11 +3,11 @@ package services
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strconv"
 	"time"
 
 	"github.com/huangang/codesentry/backend/internal/models"
+	"github.com/huangang/codesentry/backend/pkg/logger"
 	"gorm.io/gorm"
 )
 
@@ -37,7 +37,7 @@ func sendErrorNotification(module, action, message string, extra interface{}) {
 
 	var bots []models.IMBot
 	if err := globalDB.Where("is_active = ? AND error_notify = ?", true, true).Find(&bots).Error; err != nil {
-		log.Printf("[SystemLog] Failed to get error notify bots: %v", err)
+		logger.Errorf("[SystemLog] Failed to get error notify bots: %v", err)
 		return
 	}
 
@@ -50,7 +50,7 @@ func sendErrorNotification(module, action, message string, extra interface{}) {
 
 	for _, bot := range bots {
 		if err := notificationService.SendErrorNotification(&bot, errorMsg); err != nil {
-			log.Printf("[SystemLog] Failed to send error notification to bot %s: %v", bot.Name, err)
+			logger.Errorf("[SystemLog] Failed to send error notification to bot %s: %v", bot.Name, err)
 		}
 	}
 }
@@ -88,7 +88,7 @@ func writeLog(level, module, action, message string, userID *uint, ip, userAgent
 		}
 	}
 
-	log := &models.SystemLog{
+	sysLog := &models.SystemLog{
 		Level:     level,
 		Module:    module,
 		Action:    action,
@@ -99,7 +99,7 @@ func writeLog(level, module, action, message string, userID *uint, ip, userAgent
 		Extra:     extraStr,
 		CreatedAt: time.Now(),
 	}
-	globalDB.Create(log)
+	globalDB.Create(sysLog)
 }
 
 type SystemLogService struct {
@@ -241,7 +241,7 @@ func StartLogCleanupScheduler(db *gorm.DB) {
 			case <-ticker.C:
 				runCleanup(service)
 			case <-logCleanupStopChan:
-				log.Println("[SystemLog] Log cleanup scheduler stopped")
+				logger.Infof("[SystemLog] Log cleanup scheduler stopped")
 				return
 			}
 		}
@@ -258,17 +258,17 @@ func StopLogCleanupScheduler() {
 func runCleanup(service *SystemLogService) {
 	retentionDays := service.GetRetentionDays()
 	if retentionDays <= 0 {
-		log.Println("[SystemLog] Log cleanup disabled (retention_days <= 0)")
+		logger.Infof("[SystemLog] Log cleanup disabled (retention_days <= 0)")
 		return
 	}
 
 	deleted, err := service.CleanupOldLogs(retentionDays)
 	if err != nil {
-		log.Printf("[SystemLog] Failed to cleanup old logs: %v", err)
+		logger.Errorf("[SystemLog] Failed to cleanup old logs: %v", err)
 		return
 	}
 
 	if deleted > 0 {
-		log.Printf("[SystemLog] Cleaned up %d logs older than %d days", deleted, retentionDays)
+		logger.Infof("[SystemLog] Cleaned up %d logs older than %d days", deleted, retentionDays)
 	}
 }

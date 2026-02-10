@@ -3,7 +3,7 @@ package services
 import (
 	"crypto/tls"
 	"fmt"
-	"log"
+	"github.com/huangang/codesentry/backend/pkg/logger"
 	"net/smtp"
 	"strconv"
 	"strings"
@@ -152,11 +152,11 @@ func (s *EmailService) sendEmail(config *EmailConfig, to []string, subject, body
 	}
 
 	if err != nil {
-		log.Printf("[Email] Failed to send email: %v", err)
+		logger.Infof("[Email] Failed to send email: %v", err)
 		return err
 	}
 
-	log.Printf("[Email] Sent notification to %v", to)
+	logger.Infof("[Email] Sent notification to %v", to)
 	return nil
 }
 

@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"github.com/huangang/codesentry/backend/pkg/logger"
 	"net/http"
 	"strings"
 
@@ -140,7 +140,7 @@ func (s *Service) processGitHubPush(ctx context.Context, project *models.Project
 		if project.CommentEnabled {
 			comment := s.formatReviewComment(result.Score, result.Content)
 			if err := s.postGitHubCommitComment(project, event.After, comment); err != nil {
-				log.Printf("[Webhook] Failed to post GitHub commit comment: %v", err)
+				logger.Infof("[Webhook] Failed to post GitHub commit comment: %v", err)
 			} else {
 				reviewLog.CommentPosted = true
 			}

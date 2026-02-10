@@ -2,7 +2,7 @@ package services
 
 import (
 	"context"
-	"log"
+	"github.com/huangang/codesentry/backend/pkg/logger"
 	"time"
 
 	"github.com/huangang/codesentry/backend/internal/config"
@@ -46,13 +46,13 @@ func StartRetryScheduler(db *gorm.DB, aiCfg *config.OpenAIConfig) {
 				service.ProcessStuckReviews() // Clean up stuck reviews first
 				service.ProcessFailedReviews()
 			case <-retryStopChan:
-				log.Println("[Retry] Scheduler stopped")
+				logger.Infof("[Retry] Scheduler stopped")
 				return
 			}
 		}
 	}()
 
-	log.Printf("[Retry] Scheduler started, interval: %v, max retries: %d, stuck timeout: %v", RetryInterval, MaxRetryCount, StuckTimeout)
+	logger.Infof("[Retry] Scheduler started, interval: %v, max retries: %d, stuck timeout: %v", RetryInterval, MaxRetryCount, StuckTimeout)
 }
 
 func StopRetryScheduler() {
@@ -73,7 +73,7 @@ func (s *RetryService) ProcessStuckReviews() {
 		Find(&stuckReviews).Error
 
 	if err != nil {
-		log.Printf("[Retry] Failed to fetch stuck reviews: %v", err)
+		logger.Infof("[Retry] Failed to fetch stuck reviews: %v", err)
 		return
 	}
 
@@ -81,7 +81,7 @@ func (s *RetryService) ProcessStuckReviews() {
 		return
 	}
 
-	log.Printf("[Retry] WARNING: Found %d stuck reviews (pending/analyzing > %v), marking as failed", len(stuckReviews), StuckTimeout)
+	logger.Warnf("[Retry] WARNING: Found %d stuck reviews (pending/analyzing > %v), marking as failed", len(stuckReviews), StuckTimeout)
 	LogWarning("Retry", "StuckReviews", "Found stuck reviews to be marked as failed", nil, "", "", map[string]interface{}{
 		"count":   len(stuckReviews),
 		"timeout": StuckTimeout.String(),
@@ -93,11 +93,11 @@ func (s *RetryService) ProcessStuckReviews() {
 		review.ErrorMessage = "Review timeout: stuck in " + oldStatus + " status for more than " + StuckTimeout.String()
 
 		if err := s.db.Save(&review).Error; err != nil {
-			log.Printf("[Retry] Failed to update stuck review %d: %v", review.ID, err)
+			logger.Infof("[Retry] Failed to update stuck review %d: %v", review.ID, err)
 			continue
 		}
 
-		log.Printf("[Retry] Marked review %d as failed (was %s since %v)", review.ID, oldStatus, review.UpdatedAt)
+		logger.Infof("[Retry] Marked review %d as failed (was %s since %v)", review.ID, oldStatus, review.UpdatedAt)
 
 		// Publish SSE event to notify frontend
 		PublishReviewEvent(review.ID, review.ProjectID, review.CommitHash, "failed", nil, review.ErrorMessage)
@@ -113,7 +113,7 @@ func (s *RetryService) ProcessFailedReviews() {
 		Find(&failedReviews).Error
 
 	if err != nil {
-		log.Printf("[Retry] Failed to fetch failed reviews: %v", err)
+		logger.Infof("[Retry] Failed to fetch failed reviews: %v", err)
 		return
 	}
 
@@ -121,7 +121,7 @@ func (s *RetryService) ProcessFailedReviews() {
 		return
 	}
 
-	log.Printf("[Retry] Processing %d failed reviews", len(failedReviews))
+	logger.Infof("[Retry] Processing %d failed reviews", len(failedReviews))
 
 	for _, review := range failedReviews {
 		s.retryReview(&review)
@@ -129,11 +129,11 @@ func (s *RetryService) ProcessFailedReviews() {
 }
 
 func (s *RetryService) retryReview(review *models.ReviewLog) {
-	log.Printf("[Retry] Retrying review ID %d (attempt %d/%d)", review.ID, review.RetryCount+1, MaxRetryCount)
+	logger.Infof("[Retry] Retrying review ID %d (attempt %d/%d)", review.ID, review.RetryCount+1, MaxRetryCount)
 
 	var project models.Project
 	if err := s.db.First(&project, review.ProjectID).Error; err != nil {
-		log.Printf("[Retry] Project not found for review %d: %v", review.ID, err)
+		logger.Infof("[Retry] Project not found for review %d: %v", review.ID, err)
 		return
 	}
 
@@ -146,13 +146,13 @@ func (s *RetryService) retryReview(review *models.ReviewLog) {
 	})
 
 	if err != nil {
-		log.Printf("[Retry] Review %d failed again: %v", review.ID, err)
+		logger.Infof("[Retry] Review %d failed again: %v", review.ID, err)
 		review.ErrorMessage = err.Error()
 		if review.RetryCount >= MaxRetryCount {
-			log.Printf("[Retry] Review %d exceeded max retries, marking as permanently failed", review.ID)
+			logger.Infof("[Retry] Review %d exceeded max retries, marking as permanently failed", review.ID)
 		}
 	} else {
-		log.Printf("[Retry] Review %d succeeded on retry", review.ID)
+		logger.Infof("[Retry] Review %d succeeded on retry", review.ID)
 		review.ReviewStatus = "completed"
 		review.ReviewResult = result.Content
 		review.Score = &result.Score

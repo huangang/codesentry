@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/huangang/codesentry/backend/internal/services"
+	"github.com/huangang/codesentry/backend/pkg/response"
 )
 
 type DailyReportHandler struct {
@@ -29,11 +29,11 @@ func (h *DailyReportHandler) List(c *gin.Context) {
 
 	reports, total, err := h.service.List(page, pageSize)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	response.Success(c, gin.H{
 		"total":     total,
 		"page":      page,
 		"page_size": pageSize,
@@ -44,40 +44,40 @@ func (h *DailyReportHandler) List(c *gin.Context) {
 func (h *DailyReportHandler) Get(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		response.BadRequest(c, "invalid id")
 		return
 	}
 
 	report, err := h.service.GetByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "report not found"})
+		response.NotFound(c, "report not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, report)
+	response.Success(c, report)
 }
 
 func (h *DailyReportHandler) Generate(c *gin.Context) {
 	report, err := h.service.GenerateReport()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, report)
+	response.Success(c, report)
 }
 
 func (h *DailyReportHandler) Resend(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		response.BadRequest(c, "invalid id")
 		return
 	}
 
 	if err := h.service.ResendNotification(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "notification resent"})
+	response.Success(c, gin.H{"message": "notification resent"})
 }

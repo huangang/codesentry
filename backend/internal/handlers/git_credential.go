@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/huangang/codesentry/backend/internal/models"
 	"github.com/huangang/codesentry/backend/internal/services"
+	"github.com/huangang/codesentry/backend/pkg/response"
 	"gorm.io/gorm"
 )
 
@@ -76,7 +76,7 @@ func (h *GitCredentialHandler) List(c *gin.Context) {
 
 	credentials, total, err := h.service.List(params)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
@@ -85,7 +85,7 @@ func (h *GitCredentialHandler) List(c *gin.Context) {
 		items[i] = toGitCredentialResponse(&cred)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	response.Success(c, gin.H{
 		"total":     total,
 		"page":      page,
 		"page_size": pageSize,
@@ -96,23 +96,23 @@ func (h *GitCredentialHandler) List(c *gin.Context) {
 func (h *GitCredentialHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		response.BadRequest(c, "invalid id")
 		return
 	}
 
 	credential, err := h.service.GetByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "credential not found"})
+		response.NotFound(c, "credential not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, toGitCredentialResponse(credential))
+	response.Success(c, toGitCredentialResponse(credential))
 }
 
 func (h *GitCredentialHandler) GetActive(c *gin.Context) {
 	credentials, err := h.service.GetActive()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
@@ -121,7 +121,7 @@ func (h *GitCredentialHandler) GetActive(c *gin.Context) {
 		items[i] = toGitCredentialResponse(&cred)
 	}
 
-	c.JSON(http.StatusOK, items)
+	response.Success(c, items)
 }
 
 type CreateGitCredentialRequest struct {
@@ -141,7 +141,7 @@ type CreateGitCredentialRequest struct {
 func (h *GitCredentialHandler) Create(c *gin.Context) {
 	var req CreateGitCredentialRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -170,13 +170,13 @@ func (h *GitCredentialHandler) Create(c *gin.Context) {
 	}
 
 	if err := h.service.Create(credential); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
 	services.LogInfo("GitCredential", "Create", "Git credential created: "+credential.Name, &credential.CreatedBy, c.ClientIP(), c.GetHeader("User-Agent"), nil)
 
-	c.JSON(http.StatusOK, toGitCredentialResponse(credential))
+	response.Success(c, toGitCredentialResponse(credential))
 }
 
 type UpdateGitCredentialRequest struct {
@@ -196,19 +196,19 @@ type UpdateGitCredentialRequest struct {
 func (h *GitCredentialHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		response.BadRequest(c, "invalid id")
 		return
 	}
 
 	credential, err := h.service.GetByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "credential not found"})
+		response.NotFound(c, "credential not found")
 		return
 	}
 
 	var req UpdateGitCredentialRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -247,7 +247,7 @@ func (h *GitCredentialHandler) Update(c *gin.Context) {
 	}
 
 	if err := h.service.Update(credential); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
@@ -255,24 +255,24 @@ func (h *GitCredentialHandler) Update(c *gin.Context) {
 	uid := userID.(uint)
 	services.LogInfo("GitCredential", "Update", "Git credential updated: "+credential.Name, &uid, c.ClientIP(), c.GetHeader("User-Agent"), nil)
 
-	c.JSON(http.StatusOK, toGitCredentialResponse(credential))
+	response.Success(c, toGitCredentialResponse(credential))
 }
 
 func (h *GitCredentialHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		response.BadRequest(c, "invalid id")
 		return
 	}
 
 	credential, err := h.service.GetByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "credential not found"})
+		response.NotFound(c, "credential not found")
 		return
 	}
 
 	if err := h.service.Delete(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
@@ -280,5 +280,5 @@ func (h *GitCredentialHandler) Delete(c *gin.Context) {
 	uid := userID.(uint)
 	services.LogInfo("GitCredential", "Delete", "Git credential deleted: "+credential.Name, &uid, c.ClientIP(), c.GetHeader("User-Agent"), nil)
 
-	c.JSON(http.StatusOK, gin.H{"message": "credential deleted"})
+	response.Success(c, gin.H{"message": "credential deleted"})
 }

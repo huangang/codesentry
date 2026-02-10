@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"github.com/huangang/codesentry/backend/pkg/logger"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -215,7 +215,7 @@ func (s *Service) matchIgnorePattern(filePath, pattern string) bool {
 }
 
 func (s *Service) fetchDiff(apiURL, token, tokenHeader string) (string, error) {
-	log.Printf("[Webhook] Fetching diff from: %s", apiURL)
+	logger.Infof("[Webhook] Fetching diff from: %s", apiURL)
 
 	req, _ := http.NewRequest("GET", apiURL, nil)
 	if token != "" {
@@ -233,7 +233,7 @@ func (s *Service) fetchDiff(apiURL, token, tokenHeader string) (string, error) {
 		return "", err
 	}
 
-	log.Printf("[Webhook] Diff API response status: %d, body length: %d", resp.StatusCode, len(body))
+	logger.Infof("[Webhook] Diff API response status: %d, body length: %d", resp.StatusCode, len(body))
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))

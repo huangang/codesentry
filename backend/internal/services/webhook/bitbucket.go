@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"github.com/huangang/codesentry/backend/pkg/logger"
 	"net/http"
 	"strings"
 
@@ -292,7 +292,7 @@ func (s *Service) setBitbucketCommitStatus(project *models.Project, sha, state, 
 	}
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		log.Printf("[Webhook] Failed to send Bitbucket commit status: %v", err)
+		logger.Infof("[Webhook] Failed to send Bitbucket commit status: %v", err)
 		return
 	}
 	defer resp.Body.Close()

@@ -2,13 +2,13 @@ package handlers
 
 import (
 	"context"
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/huangang/codesentry/backend/internal/config"
 	"github.com/huangang/codesentry/backend/internal/models"
 	"github.com/huangang/codesentry/backend/internal/services"
+	"github.com/huangang/codesentry/backend/pkg/response"
 	"gorm.io/gorm"
 )
 
@@ -22,25 +22,22 @@ func NewReviewFeedbackHandler(db *gorm.DB, openAICfg *config.OpenAIConfig) *Revi
 	}
 }
 
-// CreateFeedbackRequest represents the request body for creating feedback
 type CreateFeedbackRequest struct {
 	ReviewLogID  uint   `json:"review_log_id" binding:"required"`
 	FeedbackType string `json:"feedback_type" binding:"required,oneof=agree disagree question clarification"`
 	UserMessage  string `json:"user_message" binding:"required"`
 }
 
-// Create handles POST /review-feedbacks
 func (h *ReviewFeedbackHandler) Create(c *gin.Context) {
 	var req CreateFeedbackRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	// Get user from context
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		response.Unauthorized(c, "unauthorized")
 		return
 	}
 
@@ -54,45 +51,43 @@ func (h *ReviewFeedbackHandler) Create(c *gin.Context) {
 
 	ctx := context.Background()
 	if err := h.service.Create(ctx, feedback); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusCreated, feedback)
+	response.Created(c, feedback)
 }
 
-// ListByReview handles GET /review-logs/:id/feedbacks
 func (h *ReviewFeedbackHandler) ListByReview(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid review ID"})
+		response.BadRequest(c, "invalid review ID")
 		return
 	}
 
 	feedbacks, err := h.service.ListByReviewLog(uint(id))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, feedbacks)
+	response.Success(c, feedbacks)
 }
 
-// Get handles GET /review-feedbacks/:id
 func (h *ReviewFeedbackHandler) Get(c *gin.Context) {
 	idParam := c.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid feedback ID"})
+		response.BadRequest(c, "invalid feedback ID")
 		return
 	}
 
 	feedback, err := h.service.GetByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "feedback not found"})
+		response.NotFound(c, "feedback not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, feedback)
+	response.Success(c, feedback)
 }

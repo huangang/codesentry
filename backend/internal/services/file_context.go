@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"github.com/huangang/codesentry/backend/pkg/logger"
 	"net/http"
 	"regexp"
 	"sort"
@@ -88,12 +88,12 @@ func (s *FileContextService) BuildFileContext(project *models.Project, diff stri
 
 		content, err := s.fetchFileContent(project, file.FilePath, ref)
 		if err != nil {
-			log.Printf("[FileContext] Failed to fetch %s: %v", file.FilePath, err)
+			logger.Infof("[FileContext] Failed to fetch %s: %v", file.FilePath, err)
 			continue
 		}
 
 		if len(content) > maxFileSize {
-			log.Printf("[FileContext] File %s exceeds max size (%d > %d), skipping", file.FilePath, len(content), maxFileSize)
+			logger.Infof("[FileContext] File %s exceeds max size (%d > %d), skipping", file.FilePath, len(content), maxFileSize)
 			continue
 		}
 
@@ -144,12 +144,12 @@ func (s *FileContextService) BuildFunctionContext(project *models.Project, diff 
 
 		content, err := s.fetchFileContent(project, file.FilePath, ref)
 		if err != nil {
-			log.Printf("[FileContext] Failed to fetch %s: %v", file.FilePath, err)
+			logger.Infof("[FileContext] Failed to fetch %s: %v", file.FilePath, err)
 			continue
 		}
 
 		if len(content) > maxFileSize {
-			log.Printf("[FileContext] File %s exceeds max size, skipping", file.FilePath)
+			logger.Infof("[FileContext] File %s exceeds max size, skipping", file.FilePath)
 			continue
 		}
 
@@ -174,7 +174,7 @@ func (s *FileContextService) BuildFunctionContext(project *models.Project, diff 
 		return "", nil
 	}
 
-	log.Printf("[FileContext] Extracted %d function(s) from modified files", totalFunctions)
+	logger.Infof("[FileContext] Extracted %d function(s) from modified files", totalFunctions)
 	return builder.String(), nil
 }
 

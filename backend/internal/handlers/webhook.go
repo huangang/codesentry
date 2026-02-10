@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,6 +14,8 @@ import (
 	"github.com/huangang/codesentry/backend/internal/models"
 	"github.com/huangang/codesentry/backend/internal/services"
 	"github.com/huangang/codesentry/backend/internal/services/webhook"
+	"github.com/huangang/codesentry/backend/pkg/logger"
+	"github.com/huangang/codesentry/backend/pkg/response"
 	"gorm.io/gorm"
 )
 
@@ -47,7 +48,7 @@ type signatureVerifier func(secret string, body []byte, signature string) bool
 func (h *WebhookHandler) resolveProject(ctx *webhookContext, signature string, verifyFn signatureVerifier) (*models.Project, error, int) {
 	project, err := h.projectService.GetByURL(ctx.projectURL)
 	if err != nil {
-		log.Printf("[Webhook] Project not found for URL: %s, checking for matching credential", ctx.projectURL)
+		logger.Info().Str("url", ctx.projectURL).Msg("Project not found, checking for matching credential")
 
 		credential, credErr := h.gitCredentialService.FindMatchingCredential(ctx.projectURL, ctx.platform)
 		if credErr != nil || credential == nil {
@@ -137,25 +138,25 @@ func bitbucketVerifier(secret string, body []byte, signature string) bool {
 func (h *WebhookHandler) HandleGitLabWebhook(c *gin.Context) {
 	projectID, err := strconv.ParseUint(c.Param("project_id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
+		response.BadRequest(c, "invalid project id")
 		return
 	}
 
 	project, err := h.projectService.GetByID(uint(projectID))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "project not found"})
+		response.NotFound(c, "project not found")
 		return
 	}
 
 	token := c.GetHeader("X-Gitlab-Token")
 	if project.WebhookSecret != "" && !webhook.VerifyGitLabSignature(project.WebhookSecret, token) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid webhook token"})
+		response.Unauthorized(c, "invalid webhook token")
 		return
 	}
 
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read body"})
+		response.BadRequest(c, "failed to read body")
 		return
 	}
 
@@ -167,31 +168,31 @@ func (h *WebhookHandler) HandleGitLabWebhook(c *gin.Context) {
 		_ = h.webhookService.HandleGitLabWebhook(ctx, uint(projectID), eventType, body)
 	}()
 
-	c.JSON(http.StatusOK, gin.H{"message": "webhook received"})
+	response.Success(c, gin.H{"message": "webhook received"})
 }
 
 func (h *WebhookHandler) HandleGitHubWebhook(c *gin.Context) {
 	projectID, err := strconv.ParseUint(c.Param("project_id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
+		response.BadRequest(c, "invalid project id")
 		return
 	}
 
 	project, err := h.projectService.GetByID(uint(projectID))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "project not found"})
+		response.NotFound(c, "project not found")
 		return
 	}
 
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read body"})
+		response.BadRequest(c, "failed to read body")
 		return
 	}
 
 	signature := c.GetHeader("X-Hub-Signature-256")
 	if project.WebhookSecret != "" && !webhook.VerifyGitHubSignature(project.WebhookSecret, body, signature) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid webhook signature"})
+		response.Unauthorized(c, "invalid webhook signature")
 		return
 	}
 
@@ -203,13 +204,13 @@ func (h *WebhookHandler) HandleGitHubWebhook(c *gin.Context) {
 		_ = h.webhookService.HandleGitHubWebhook(ctx, uint(projectID), eventType, body)
 	}()
 
-	c.JSON(http.StatusOK, gin.H{"message": "webhook received"})
+	response.Success(c, gin.H{"message": "webhook received"})
 }
 
 func (h *WebhookHandler) HandleGitLabWebhookGeneric(c *gin.Context) {
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read body"})
+		response.BadRequest(c, "failed to read body")
 		return
 	}
 
@@ -221,7 +222,7 @@ func (h *WebhookHandler) HandleGitLabWebhookGeneric(c *gin.Context) {
 		} `json:"project"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to parse body"})
+		response.BadRequest(c, "failed to parse body")
 		return
 	}
 
@@ -232,7 +233,7 @@ func (h *WebhookHandler) HandleGitLabWebhookGeneric(c *gin.Context) {
 	projectURL = strings.TrimSuffix(projectURL, ".git")
 
 	if projectURL == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "project URL not found in webhook payload"})
+		response.BadRequest(c, "project URL not found in webhook payload")
 		return
 	}
 
@@ -257,11 +258,11 @@ func (h *WebhookHandler) HandleGitLabWebhookGeneric(c *gin.Context) {
 	if resolveErr != nil {
 		switch statusCode {
 		case http.StatusUnauthorized:
-			c.JSON(statusCode, gin.H{"error": "invalid webhook token"})
+			response.Unauthorized(c, "invalid webhook token")
 		case http.StatusNotFound:
-			c.JSON(statusCode, gin.H{"error": "project not found for URL: " + projectURL})
+			response.NotFound(c, "project not found for URL: "+projectURL)
 		default:
-			c.JSON(statusCode, gin.H{"error": "failed to auto-create project"})
+			response.ServerError(c, "failed to auto-create project")
 		}
 		return
 	}
@@ -278,13 +279,13 @@ func (h *WebhookHandler) HandleGitLabWebhookGeneric(c *gin.Context) {
 		_ = h.webhookService.HandleGitLabWebhook(bgCtx, project.ID, ctx.eventType, body)
 	}()
 
-	c.JSON(http.StatusOK, gin.H{"message": "webhook received", "project_id": project.ID})
+	response.Success(c, gin.H{"message": "webhook received", "project_id": project.ID})
 }
 
 func (h *WebhookHandler) HandleGitHubWebhookGeneric(c *gin.Context) {
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read body"})
+		response.BadRequest(c, "failed to read body")
 		return
 	}
 
@@ -296,7 +297,7 @@ func (h *WebhookHandler) HandleGitHubWebhookGeneric(c *gin.Context) {
 		} `json:"repository"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to parse body"})
+		response.BadRequest(c, "failed to parse body")
 		return
 	}
 
@@ -307,7 +308,7 @@ func (h *WebhookHandler) HandleGitHubWebhookGeneric(c *gin.Context) {
 	projectURL = strings.TrimSuffix(projectURL, ".git")
 
 	if projectURL == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "repository URL not found in webhook payload"})
+		response.BadRequest(c, "repository URL not found in webhook payload")
 		return
 	}
 
@@ -332,11 +333,11 @@ func (h *WebhookHandler) HandleGitHubWebhookGeneric(c *gin.Context) {
 	if resolveErr != nil {
 		switch statusCode {
 		case http.StatusUnauthorized:
-			c.JSON(statusCode, gin.H{"error": "invalid webhook signature"})
+			response.Unauthorized(c, "invalid webhook signature")
 		case http.StatusNotFound:
-			c.JSON(statusCode, gin.H{"error": "project not found for URL: " + projectURL})
+			response.NotFound(c, "project not found for URL: "+projectURL)
 		default:
-			c.JSON(statusCode, gin.H{"error": "failed to auto-create project"})
+			response.ServerError(c, "failed to auto-create project")
 		}
 		return
 	}
@@ -353,31 +354,31 @@ func (h *WebhookHandler) HandleGitHubWebhookGeneric(c *gin.Context) {
 		_ = h.webhookService.HandleGitHubWebhook(bgCtx, project.ID, ctx.eventType, body)
 	}()
 
-	c.JSON(http.StatusOK, gin.H{"message": "webhook received", "project_id": project.ID})
+	response.Success(c, gin.H{"message": "webhook received", "project_id": project.ID})
 }
 
 func (h *WebhookHandler) HandleBitbucketWebhook(c *gin.Context) {
 	projectID, err := strconv.ParseUint(c.Param("project_id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
+		response.BadRequest(c, "invalid project id")
 		return
 	}
 
 	project, err := h.projectService.GetByID(uint(projectID))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "project not found"})
+		response.NotFound(c, "project not found")
 		return
 	}
 
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read body"})
+		response.BadRequest(c, "failed to read body")
 		return
 	}
 
 	signature := c.GetHeader("X-Hub-Signature")
 	if project.WebhookSecret != "" && !webhook.VerifyBitbucketSignature(project.WebhookSecret, body, signature) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid webhook signature"})
+		response.Unauthorized(c, "invalid webhook signature")
 		return
 	}
 
@@ -389,13 +390,13 @@ func (h *WebhookHandler) HandleBitbucketWebhook(c *gin.Context) {
 		_ = h.webhookService.HandleBitbucketWebhook(ctx, uint(projectID), eventType, body)
 	}()
 
-	c.JSON(http.StatusOK, gin.H{"message": "webhook received"})
+	response.Success(c, gin.H{"message": "webhook received"})
 }
 
 func (h *WebhookHandler) HandleBitbucketWebhookGeneric(c *gin.Context) {
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read body"})
+		response.BadRequest(c, "failed to read body")
 		return
 	}
 
@@ -411,7 +412,7 @@ func (h *WebhookHandler) HandleBitbucketWebhookGeneric(c *gin.Context) {
 		} `json:"repository"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to parse body"})
+		response.BadRequest(c, "failed to parse body")
 		return
 	}
 
@@ -422,7 +423,7 @@ func (h *WebhookHandler) HandleBitbucketWebhookGeneric(c *gin.Context) {
 	projectURL = strings.TrimSuffix(projectURL, ".git")
 
 	if projectURL == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "repository URL not found in webhook payload"})
+		response.BadRequest(c, "repository URL not found in webhook payload")
 		return
 	}
 
@@ -447,11 +448,11 @@ func (h *WebhookHandler) HandleBitbucketWebhookGeneric(c *gin.Context) {
 	if resolveErr != nil {
 		switch statusCode {
 		case http.StatusUnauthorized:
-			c.JSON(statusCode, gin.H{"error": "invalid webhook signature"})
+			response.Unauthorized(c, "invalid webhook signature")
 		case http.StatusNotFound:
-			c.JSON(statusCode, gin.H{"error": "project not found for URL: " + projectURL})
+			response.NotFound(c, "project not found for URL: "+projectURL)
 		default:
-			c.JSON(statusCode, gin.H{"error": "failed to auto-create project"})
+			response.ServerError(c, "failed to auto-create project")
 		}
 		return
 	}
@@ -468,7 +469,7 @@ func (h *WebhookHandler) HandleBitbucketWebhookGeneric(c *gin.Context) {
 		_ = h.webhookService.HandleBitbucketWebhook(bgCtx, project.ID, ctx.eventType, body)
 	}()
 
-	c.JSON(http.StatusOK, gin.H{"message": "webhook received", "project_id": project.ID})
+	response.Success(c, gin.H{"message": "webhook received", "project_id": project.ID})
 }
 
 func (h *WebhookHandler) HandleUnifiedWebhook(c *gin.Context) {
@@ -483,7 +484,7 @@ func (h *WebhookHandler) HandleUnifiedWebhook(c *gin.Context) {
 	} else if bitbucketEvent != "" {
 		h.HandleBitbucketWebhookGeneric(c)
 	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "unknown webhook source, missing X-Gitlab-Event, X-GitHub-Event, or X-Event-Key header"})
+		response.BadRequest(c, "unknown webhook source, missing X-Gitlab-Event, X-GitHub-Event, or X-Event-Key header")
 	}
 }
 
@@ -497,7 +498,7 @@ func (h *WebhookHandler) HandleSyncReview(c *gin.Context) {
 		Diffs      string `json:"diffs" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
+		response.BadRequest(c, "invalid request: "+err.Error())
 		return
 	}
 
@@ -508,7 +509,7 @@ func (h *WebhookHandler) HandleSyncReview(c *gin.Context) {
 			"project_url": projectURL,
 			"commit_sha":  req.CommitSHA,
 		})
-		c.JSON(http.StatusNotFound, gin.H{"error": "project not found for URL: " + projectURL})
+		response.NotFound(c, "project not found for URL: "+projectURL)
 		return
 	}
 
@@ -518,7 +519,7 @@ func (h *WebhookHandler) HandleSyncReview(c *gin.Context) {
 			"project_id":  project.ID,
 			"project_url": projectURL,
 		})
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid API key"})
+		response.Unauthorized(c, "invalid API key")
 		return
 	}
 
@@ -529,10 +530,10 @@ func (h *WebhookHandler) HandleSyncReview(c *gin.Context) {
 		"ref":          req.Ref,
 	})
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Minute)
+	bgCtx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Minute)
 	defer cancel()
 
-	result, err := h.webhookService.SyncReview(ctx, project, &webhook.SyncReviewRequest{
+	result, err := h.webhookService.SyncReview(bgCtx, project, &webhook.SyncReviewRequest{
 		ProjectURL: req.ProjectURL,
 		CommitSHA:  req.CommitSHA,
 		Ref:        req.Ref,
@@ -545,25 +546,25 @@ func (h *WebhookHandler) HandleSyncReview(c *gin.Context) {
 			"project_id": project.ID,
 			"commit_sha": req.CommitSHA,
 		})
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "review failed: " + err.Error()})
+		response.ServerError(c, "review failed: "+err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	response.Success(c, result)
 }
 
 func (h *WebhookHandler) GetReviewScore(c *gin.Context) {
 	commitSHA := c.Query("commit_sha")
 	if commitSHA == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "commit_sha is required"})
+		response.BadRequest(c, "commit_sha is required")
 		return
 	}
 
 	result, err := h.webhookService.GetReviewScore(commitSHA)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		response.NotFound(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	response.Success(c, result)
 }

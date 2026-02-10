@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/huangang/codesentry/backend/internal/middleware"
 	"github.com/huangang/codesentry/backend/internal/models"
+	"github.com/huangang/codesentry/backend/pkg/response"
 	"gorm.io/gorm"
 )
 
@@ -50,7 +50,7 @@ func (h *UserHandler) List(c *gin.Context) {
 	query.Count(&total)
 	query.Order("id ASC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&users)
 
-	c.JSON(http.StatusOK, gin.H{
+	response.Success(c, gin.H{
 		"items":     users,
 		"total":     total,
 		"page":      page,
@@ -67,32 +67,32 @@ type UpdateUserRequest struct {
 func (h *UserHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		response.BadRequest(c, "invalid user id")
 		return
 	}
 
 	currentUserID := middleware.GetUserID(c)
 	if uint(id) == currentUserID {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot modify your own account"})
+		response.BadRequest(c, "cannot modify your own account")
 		return
 	}
 
 	var user models.User
 	if err := h.db.First(&user, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		response.NotFound(c, "user not found")
 		return
 	}
 
 	var req UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
 	updates := make(map[string]interface{})
 	if req.Role != nil {
 		if *req.Role != "admin" && *req.Role != "user" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid role, must be 'admin' or 'user'"})
+			response.BadRequest(c, "invalid role, must be 'admin' or 'user'")
 			return
 		}
 		updates["role"] = *req.Role
@@ -105,42 +105,42 @@ func (h *UserHandler) Update(c *gin.Context) {
 	}
 
 	if len(updates) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "no fields to update"})
+		response.BadRequest(c, "no fields to update")
 		return
 	}
 
 	if err := h.db.Model(&user).Updates(updates).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
 	h.db.First(&user, id)
-	c.JSON(http.StatusOK, user)
+	response.Success(c, user)
 }
 
 func (h *UserHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		response.BadRequest(c, "invalid user id")
 		return
 	}
 
 	currentUserID := middleware.GetUserID(c)
 	if uint(id) == currentUserID {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot delete your own account"})
+		response.BadRequest(c, "cannot delete your own account")
 		return
 	}
 
 	var user models.User
 	if err := h.db.First(&user, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		response.NotFound(c, "user not found")
 		return
 	}
 
 	if err := h.db.Delete(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "user deleted"})
+	response.Success(c, gin.H{"message": "user deleted"})
 }

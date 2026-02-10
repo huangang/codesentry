@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"github.com/huangang/codesentry/backend/pkg/logger"
 	"net/http"
 	"strings"
 
@@ -16,46 +16,46 @@ import (
 
 // HandleGitLabWebhook processes GitLab webhook events
 func (s *Service) HandleGitLabWebhook(ctx context.Context, projectID uint, eventType string, body []byte) error {
-	log.Printf("[Webhook] Received GitLab webhook: projectID=%d, eventType=%s", projectID, eventType)
+	logger.Infof("[Webhook] Received GitLab webhook: projectID=%d, eventType=%s", projectID, eventType)
 
 	project, err := s.projectService.GetByID(projectID)
 	if err != nil {
-		log.Printf("[Webhook] Project not found: %d, error: %v", projectID, err)
+		logger.Infof("[Webhook] Project not found: %d, error: %v", projectID, err)
 		return fmt.Errorf("project not found: %w", err)
 	}
 
 	if !project.AIEnabled {
-		log.Printf("[Webhook] AI disabled for project %d, skipping", projectID)
+		logger.Infof("[Webhook] AI disabled for project %d, skipping", projectID)
 		return nil
 	}
 
 	switch eventType {
 	case "Push Hook":
 		if !strings.Contains(project.ReviewEvents, "push") {
-			log.Printf("[Webhook] Push events not enabled for project %d, skipping", projectID)
+			logger.Infof("[Webhook] Push events not enabled for project %d, skipping", projectID)
 			return nil
 		}
 		var event GitLabPushEvent
 		if err := json.Unmarshal(body, &event); err != nil {
-			log.Printf("[Webhook] Failed to parse GitLab push event: %v", err)
+			logger.Infof("[Webhook] Failed to parse GitLab push event: %v", err)
 			return err
 		}
 		return s.processGitLabPush(ctx, project, &event)
 
 	case "Merge Request Hook":
 		if !strings.Contains(project.ReviewEvents, "merge_request") {
-			log.Printf("[Webhook] MR events not enabled for project %d, skipping", projectID)
+			logger.Infof("[Webhook] MR events not enabled for project %d, skipping", projectID)
 			return nil
 		}
 		var event GitLabMREvent
 		if err := json.Unmarshal(body, &event); err != nil {
-			log.Printf("[Webhook] Failed to parse GitLab MR event: %v", err)
+			logger.Infof("[Webhook] Failed to parse GitLab MR event: %v", err)
 			return err
 		}
 		return s.processGitLabMR(ctx, project, &event)
 
 	default:
-		log.Printf("[Webhook] Unknown GitLab event type: %s, skipping", eventType)
+		logger.Infof("[Webhook] Unknown GitLab event type: %s, skipping", eventType)
 	}
 
 	return nil
@@ -68,7 +68,7 @@ func (s *Service) processGitLabPush(ctx context.Context, project *models.Project
 
 	branch := strings.TrimPrefix(event.Ref, "refs/heads/")
 	if s.isBranchIgnored(branch, project.BranchFilter) {
-		log.Printf("[Webhook] Branch %s is in ignore list, skipping review", branch)
+		logger.Infof("[Webhook] Branch %s is in ignore list, skipping review", branch)
 		return nil
 	}
 
@@ -78,7 +78,7 @@ func (s *Service) processGitLabPush(ctx context.Context, project *models.Project
 	}
 
 	if s.isCommitAlreadyReviewed(project.ID, commitSHA) {
-		log.Printf("[Webhook] Commit %s already reviewed, skipping", commitSHA[:8])
+		logger.Infof("[Webhook] Commit %s already reviewed, skipping", commitSHA[:8])
 		return nil
 	}
 
@@ -91,7 +91,7 @@ func (s *Service) processGitLabPush(ctx context.Context, project *models.Project
 		}
 	}
 
-	log.Printf("[Webhook] Processing GitLab push: %d commits, branch=%s, commit=%s",
+	logger.Infof("[Webhook] Processing GitLab push: %d commits, branch=%s, commit=%s",
 		len(event.Commits), branch, commitSHA[:8])
 
 	services.LogInfo("Webhook", "GitLabPush", fmt.Sprintf("Processing push from %s: %d commits", event.UserName, len(event.Commits)), nil, "", "", map[string]interface{}{
@@ -106,7 +106,7 @@ func (s *Service) processGitLabPush(ctx context.Context, project *models.Project
 	for _, c := range event.Commits {
 		diff, err := s.getGitLabDiff(project, c.ID)
 		if err != nil {
-			log.Printf("[Webhook] Failed to get diff for commit %s: %v", c.ID[:8], err)
+			logger.Infof("[Webhook] Failed to get diff for commit %s: %v", c.ID[:8], err)
 			continue
 		}
 		allDiffs.WriteString(fmt.Sprintf("\n### Commit: %s\n%s\n", c.ID[:8], diff))
@@ -115,9 +115,9 @@ func (s *Service) processGitLabPush(ctx context.Context, project *models.Project
 	diff := allDiffs.String()
 	if diff == "" {
 		diff = "Failed to get diff for all commits"
-		log.Printf("[Webhook] No diffs retrieved for any commits")
+		logger.Infof("[Webhook] No diffs retrieved for any commits")
 	} else {
-		log.Printf("[Webhook] Got combined diffs, total length: %d bytes", len(diff))
+		logger.Infof("[Webhook] Got combined diffs, total length: %d bytes", len(diff))
 	}
 
 	additions, deletions, filesChanged := ParseDiffStats(diff)
@@ -139,16 +139,16 @@ func (s *Service) processGitLabPush(ctx context.Context, project *models.Project
 	}
 	s.reviewService.Create(reviewLog)
 
-	log.Printf("[Webhook] Starting AI review for project %d, commit %s", project.ID, commitSHA[:8])
+	logger.Infof("[Webhook] Starting AI review for project %d, commit %s", project.ID, commitSHA[:8])
 
 	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
 	if filteredDiff != diff {
-		log.Printf("[Webhook] Filtered diff by extensions (%s) and ignore patterns (%s): %d -> %d bytes",
+		logger.Infof("[Webhook] Filtered diff by extensions (%s) and ignore patterns (%s): %d -> %d bytes",
 			project.FileExtensions, project.IgnorePatterns, len(diff), len(filteredDiff))
 	}
 
 	if IsEmptyDiff(filteredDiff) {
-		log.Printf("[Webhook] WARNING: Empty commit detected for project %d, commit %s - skipping AI review", project.ID, commitSHA[:8])
+		logger.Warnf("[Webhook] WARNING: Empty commit detected for project %d, commit %s - skipping AI review", project.ID, commitSHA[:8])
 		services.LogWarning("Webhook", "EmptyCommit", fmt.Sprintf("Empty commit %s detected, skipping AI review", commitSHA[:8]), nil, "", "", map[string]interface{}{
 			"project_id": project.ID,
 			"commit":     commitSHA,
@@ -165,7 +165,7 @@ func (s *Service) processGitLabPush(ctx context.Context, project *models.Project
 	if s.fileContextService.IsEnabled() {
 		fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, commitSHA)
 		if fileContext != "" {
-			log.Printf("[Webhook] Built file context: %d chars", len(fileContext))
+			logger.Infof("[Webhook] Built file context: %d chars", len(fileContext))
 		}
 	}
 
@@ -177,7 +177,7 @@ func (s *Service) processGitLabPush(ctx context.Context, project *models.Project
 	})
 
 	if err != nil {
-		log.Printf("[Webhook] AI review failed: %v", err)
+		logger.Infof("[Webhook] AI review failed: %v", err)
 		services.LogError("AIReview", "ReviewFailed", err.Error(), nil, "", "", map[string]interface{}{
 			"project_id": project.ID,
 			"commit":     commitSHA,
@@ -186,7 +186,7 @@ func (s *Service) processGitLabPush(ctx context.Context, project *models.Project
 		reviewLog.ErrorMessage = err.Error()
 		s.setGitLabCommitStatus(project, commitSHA, "failed", "AI Review Failed", event.ProjectID)
 	} else {
-		log.Printf("[Webhook] AI review completed, score: %.1f, result length: %d", result.Score, len(result.Content))
+		logger.Infof("[Webhook] AI review completed, score: %.1f, result length: %d", result.Score, len(result.Content))
 		services.LogInfo("AIReview", "ReviewCompleted", fmt.Sprintf("Review completed with score %.0f", result.Score), nil, "", "", map[string]interface{}{
 			"project_id": project.ID,
 			"commit":     commitSHA,
@@ -209,7 +209,7 @@ func (s *Service) processGitLabPush(ctx context.Context, project *models.Project
 		if project.CommentEnabled {
 			comment := s.formatReviewComment(result.Score, result.Content)
 			if err := s.postGitLabCommitComment(project, commitSHA, comment); err != nil {
-				log.Printf("[Webhook] Failed to post GitLab commit comment: %v", err)
+				logger.Infof("[Webhook] Failed to post GitLab commit comment: %v", err)
 			} else {
 				reviewLog.CommentPosted = true
 			}
@@ -232,14 +232,14 @@ func (s *Service) processGitLabMR(ctx context.Context, project *models.Project, 
 	}
 
 	if s.isBranchIgnored(event.ObjectAttributes.SourceBranch, project.BranchFilter) {
-		log.Printf("[Webhook] Branch %s is in ignore list, skipping review", event.ObjectAttributes.SourceBranch)
+		logger.Infof("[Webhook] Branch %s is in ignore list, skipping review", event.ObjectAttributes.SourceBranch)
 		return nil
 	}
 
 	mrIID := event.ObjectAttributes.IID
 	commitSHA, err := s.getGitLabRequestSHA(project, mrIID)
 	if err != nil {
-		log.Printf("[Webhook] Failed to get MR commit SHA: %v", err)
+		logger.Infof("[Webhook] Failed to get MR commit SHA: %v", err)
 		return err
 	}
 
@@ -273,7 +273,7 @@ func (s *Service) processGitLabMR(ctx context.Context, project *models.Project, 
 	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
 
 	if IsEmptyDiff(filteredDiff) {
-		log.Printf("[Webhook] WARNING: Empty MR detected for project %d, MR #%d - skipping AI review", project.ID, mrIID)
+		logger.Warnf("[Webhook] WARNING: Empty MR detected for project %d, MR #%d - skipping AI review", project.ID, mrIID)
 		services.LogWarning("Webhook", "EmptyMR", fmt.Sprintf("Empty MR #%d detected, skipping AI review", mrIID), nil, "", "", map[string]interface{}{
 			"project_id": project.ID,
 			"mr_iid":     mrIID,
@@ -290,7 +290,7 @@ func (s *Service) processGitLabMR(ctx context.Context, project *models.Project, 
 	if s.fileContextService.IsEnabled() {
 		fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, commitSHA)
 		if fileContext != "" {
-			log.Printf("[Webhook] Built file context for MR: %d chars", len(fileContext))
+			logger.Infof("[Webhook] Built file context for MR: %d chars", len(fileContext))
 		}
 	}
 
@@ -324,7 +324,7 @@ func (s *Service) processGitLabMR(ctx context.Context, project *models.Project, 
 		if project.CommentEnabled {
 			comment := s.formatReviewComment(result.Score, result.Content)
 			if err := s.postGitLabMRComment(project, mrIID, comment); err != nil {
-				log.Printf("[Webhook] Failed to post GitLab MR comment: %v", err)
+				logger.Infof("[Webhook] Failed to post GitLab MR comment: %v", err)
 			} else {
 				reviewLog.CommentPosted = true
 			}
@@ -399,7 +399,7 @@ func (s *Service) getGitLabRequestSHA(project *models.Project, mrIID int) (strin
 func (s *Service) setGitLabCommitStatus(project *models.Project, sha string, state string, description string, gitlabProjectID int) {
 	info, err := parseRepoInfo(project.URL)
 	if err != nil {
-		log.Printf("[Webhook] Failed to parse repo info for GitLab status update: %v", err)
+		logger.Infof("[Webhook] Failed to parse repo info for GitLab status update: %v", err)
 		return
 	}
 
@@ -420,7 +420,7 @@ func (s *Service) setGitLabCommitStatus(project *models.Project, sha string, sta
 	payload, _ := json.Marshal(data)
 	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(payload))
 	if err != nil {
-		log.Printf("[Webhook] Failed to create GitLab status request: %v", err)
+		logger.Infof("[Webhook] Failed to create GitLab status request: %v", err)
 		return
 	}
 
@@ -431,16 +431,16 @@ func (s *Service) setGitLabCommitStatus(project *models.Project, sha string, sta
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		log.Printf("[Webhook] Failed to send GitLab commit status: %v", err)
+		logger.Infof("[Webhook] Failed to send GitLab commit status: %v", err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
-		log.Printf("[Webhook] Failed to set GitLab commit status (code %d): %s", resp.StatusCode, string(body))
+		logger.Infof("[Webhook] Failed to set GitLab commit status (code %d): %s", resp.StatusCode, string(body))
 	} else {
-		log.Printf("[Webhook] Set GitLab commit status for %s to %s", sha[:8], state)
+		logger.Infof("[Webhook] Set GitLab commit status for %s to %s", sha[:8], state)
 	}
 }
 
@@ -474,7 +474,7 @@ func (s *Service) postGitLabMRComment(project *models.Project, mrIID int, commen
 		return fmt.Errorf("GitLab API returned %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	log.Printf("[Webhook] Posted comment to GitLab MR %d", mrIID)
+	logger.Infof("[Webhook] Posted comment to GitLab MR %d", mrIID)
 	return nil
 }
 
@@ -508,6 +508,6 @@ func (s *Service) postGitLabCommitComment(project *models.Project, commitSHA str
 		return fmt.Errorf("GitLab API returned %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	log.Printf("[Webhook] Posted comment to GitLab commit %s", commitSHA[:8])
+	logger.Infof("[Webhook] Posted comment to GitLab commit %s", commitSHA[:8])
 	return nil
 }

@@ -3,7 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
-	"log"
+	"github.com/huangang/codesentry/backend/pkg/logger"
 	"strings"
 
 	"github.com/huangang/codesentry/backend/internal/config"
@@ -47,18 +47,18 @@ func (s *ReviewFeedbackService) Create(ctx context.Context, feedback *models.Rev
 
 // processFeedback handles AI re-evaluation based on user feedback
 func (s *ReviewFeedbackService) processFeedback(feedbackID, reviewLogID uint, llmConfigID *uint) {
-	log.Printf("[Feedback] Processing feedback ID=%d for review ID=%d", feedbackID, reviewLogID)
+	logger.Infof("[Feedback] Processing feedback ID=%d for review ID=%d", feedbackID, reviewLogID)
 
 	// Reload feedback and review
 	var feedback models.ReviewFeedback
 	if err := s.db.First(&feedback, feedbackID).Error; err != nil {
-		log.Printf("[Feedback] Failed to load feedback: %v", err)
+		logger.Infof("[Feedback] Failed to load feedback: %v", err)
 		return
 	}
 
 	var reviewLog models.ReviewLog
 	if err := s.db.First(&reviewLog, reviewLogID).Error; err != nil {
-		log.Printf("[Feedback] Failed to load review: %v", err)
+		logger.Infof("[Feedback] Failed to load review: %v", err)
 		s.db.Model(&feedback).Updates(map[string]interface{}{
 			"process_status": "failed",
 			"error_message":  "Failed to load review log",
@@ -79,7 +79,7 @@ func (s *ReviewFeedbackService) processFeedback(feedbackID, reviewLogID uint, ll
 	ctx := context.Background()
 	content, _, err := s.aiService.CallWithConfig(ctx, configID, prompt)
 	if err != nil {
-		log.Printf("[Feedback] AI call failed: %v", err)
+		logger.Infof("[Feedback] AI call failed: %v", err)
 		s.db.Model(&feedback).Updates(map[string]interface{}{
 			"process_status": "failed",
 			"error_message":  err.Error(),
@@ -102,11 +102,11 @@ func (s *ReviewFeedbackService) processFeedback(feedbackID, reviewLogID uint, ll
 
 		// Update the original review's score
 		s.db.Model(&reviewLog).Update("score", *newScore)
-		log.Printf("[Feedback] Score updated: %.1f -> %.1f", *reviewLog.Score, *newScore)
+		logger.Infof("[Feedback] Score updated: %.1f -> %.1f", *reviewLog.Score, *newScore)
 	}
 
 	s.db.Model(&feedback).Updates(updates)
-	log.Printf("[Feedback] Completed processing feedback ID=%d", feedbackID)
+	logger.Infof("[Feedback] Completed processing feedback ID=%d", feedbackID)
 }
 
 // buildFeedbackPrompt creates the prompt for AI feedback response

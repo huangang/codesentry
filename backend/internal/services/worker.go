@@ -3,7 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"github.com/huangang/codesentry/backend/pkg/logger"
 	"sync"
 
 	"github.com/hibiken/asynq"
@@ -40,7 +40,7 @@ func NewWorker(cfg *config.RedisConfig) *Worker {
 				"default": 1,
 			},
 			ErrorHandler: asynq.ErrorHandlerFunc(func(ctx context.Context, task *asynq.Task, err error) {
-				log.Printf("[Worker] Error processing task %s: %v", task.Type(), err)
+				logger.Infof("[Worker] Error processing task %s: %v", task.Type(), err)
 			}),
 		},
 	)
@@ -73,9 +73,9 @@ func (w *Worker) Start() error {
 
 	go func() {
 		defer w.wg.Done()
-		log.Printf("[Worker] Starting async worker...")
+		logger.Infof("[Worker] Starting async worker...")
 		if err := w.server.Run(w.mux); err != nil {
-			log.Printf("[Worker] Server error: %v", err)
+			logger.Infof("[Worker] Server error: %v", err)
 		}
 	}()
 
@@ -91,26 +91,26 @@ func (w *Worker) Stop() {
 		return
 	}
 
-	log.Printf("[Worker] Shutting down...")
+	logger.Infof("[Worker] Shutting down...")
 	w.server.Shutdown()
 	w.running = false
 	w.wg.Wait()
-	log.Printf("[Worker] Shutdown complete")
+	logger.Infof("[Worker] Shutdown complete")
 }
 
 // handleReviewTask processes a single review task
 func (w *Worker) handleReviewTask(ctx context.Context, t *asynq.Task) error {
 	var task ReviewTask
 	if err := json.Unmarshal(t.Payload(), &task); err != nil {
-		log.Printf("[Worker] Failed to unmarshal task: %v", err)
+		logger.Infof("[Worker] Failed to unmarshal task: %v", err)
 		return err
 	}
 
-	log.Printf("[Worker] Processing review task: review_log_id=%d, project_id=%d, commit=%s",
+	logger.Infof("[Worker] Processing review task: review_log_id=%d, project_id=%d, commit=%s",
 		task.ReviewLogID, task.ProjectID, task.CommitSHA)
 
 	if w.processor == nil {
-		log.Printf("[Worker] Warning: no processor set")
+		logger.Infof("[Worker] Warning: no processor set")
 		return nil
 	}
 

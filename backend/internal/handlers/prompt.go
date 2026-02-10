@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/huangang/codesentry/backend/internal/models"
 	"github.com/huangang/codesentry/backend/internal/services"
+	"github.com/huangang/codesentry/backend/pkg/response"
 	"gorm.io/gorm"
 )
 
@@ -38,115 +38,115 @@ func (h *PromptHandler) List(c *gin.Context) {
 		IsSystem: isSystem,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+	response.Success(c, result)
 }
 
 func (h *PromptHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		response.BadRequest(c, "Invalid ID")
 		return
 	}
 
 	prompt, err := h.service.GetByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Prompt not found"})
+		response.NotFound(c, "Prompt not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, prompt)
+	response.Success(c, prompt)
 }
 
 func (h *PromptHandler) GetDefault(c *gin.Context) {
 	prompt, err := h.service.GetDefault()
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Default prompt not found"})
+		response.NotFound(c, "Default prompt not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, prompt)
+	response.Success(c, prompt)
 }
 
 func (h *PromptHandler) GetAllActive(c *gin.Context) {
 	prompts, err := h.service.GetAllActive()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, prompts)
+	response.Success(c, prompts)
 }
 
 func (h *PromptHandler) Create(c *gin.Context) {
 	var prompt models.PromptTemplate
 	if err := c.ShouldBindJSON(&prompt); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
 	if err := h.service.Create(&prompt); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusCreated, prompt)
+	response.Created(c, prompt)
 }
 
 func (h *PromptHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		response.BadRequest(c, "Invalid ID")
 		return
 	}
 
 	var updates map[string]interface{}
 	if err := c.ShouldBindJSON(&updates); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
 	if err := h.service.Update(uint(id), updates); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Updated successfully"})
+	response.Success(c, gin.H{"message": "Updated successfully"})
 }
 
 func (h *PromptHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		response.BadRequest(c, "Invalid ID")
 		return
 	}
 
 	if err := h.service.Delete(uint(id)); err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Cannot delete system prompt"})
+			response.Forbidden(c, "Cannot delete system prompt")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Deleted successfully"})
+	response.Success(c, gin.H{"message": "Deleted successfully"})
 }
 
 func (h *PromptHandler) SetDefault(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		response.BadRequest(c, "Invalid ID")
 		return
 	}
 
 	if err := h.service.SetDefault(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Set as default successfully"})
+	response.Success(c, gin.H{"message": "Set as default successfully"})
 }

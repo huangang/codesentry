@@ -3,7 +3,7 @@ package webhook
 import (
 	"context"
 	"fmt"
-	"log"
+	"github.com/huangang/codesentry/backend/pkg/logger"
 	"net/http"
 	"strings"
 	"time"
@@ -126,7 +126,7 @@ func (s *Service) SyncReview(ctx context.Context, project *models.Project, req *
 	if s.fileContextService.IsEnabled() {
 		fileContext, _ = s.fileContextService.BuildFileContext(project, req.Diffs, req.CommitSHA)
 		if fileContext != "" {
-			log.Printf("[Webhook] Built file context for sync review: %d chars", len(fileContext))
+			logger.Infof("[Webhook] Built file context for sync review: %d chars", len(fileContext))
 		}
 	}
 
@@ -167,7 +167,7 @@ func (s *Service) SyncReview(ctx context.Context, project *models.Project, req *
 
 // ProcessReviewTask processes a review task from the async queue
 func (s *Service) ProcessReviewTask(ctx context.Context, task *services.ReviewTask) error {
-	log.Printf("[TaskQueue] Processing review task: review_log_id=%d, project=%d, commit=%s",
+	logger.Infof("[TaskQueue] Processing review task: review_log_id=%d, project=%d, commit=%s",
 		task.ReviewLogID, task.ProjectID, task.CommitSHA)
 
 	reviewLog, err := s.reviewService.GetByID(task.ReviewLogID)
@@ -187,7 +187,7 @@ func (s *Service) ProcessReviewTask(ctx context.Context, task *services.ReviewTa
 	filteredDiff := s.filterDiff(task.Diff, project.FileExtensions, project.IgnorePatterns)
 
 	if IsEmptyDiff(filteredDiff) {
-		log.Printf("[TaskQueue] WARNING: Empty commit detected for review_log_id=%d - skipping AI review", task.ReviewLogID)
+		logger.Warnf("[TaskQueue] WARNING: Empty commit detected for review_log_id=%d - skipping AI review", task.ReviewLogID)
 		services.LogWarning("TaskQueue", "EmptyCommit", fmt.Sprintf("Empty commit %s detected, skipping AI review", task.CommitSHA[:8]), nil, "", "", map[string]interface{}{
 			"project_id":    task.ProjectID,
 			"review_log_id": task.ReviewLogID,
@@ -213,7 +213,7 @@ func (s *Service) ProcessReviewTask(ctx context.Context, task *services.ReviewTa
 	})
 
 	if err != nil {
-		log.Printf("[TaskQueue] AI review failed: %v", err)
+		logger.Infof("[TaskQueue] AI review failed: %v", err)
 		reviewLog.ReviewStatus = "failed"
 		reviewLog.ErrorMessage = err.Error()
 		s.reviewService.Update(reviewLog)
@@ -221,7 +221,7 @@ func (s *Service) ProcessReviewTask(ctx context.Context, task *services.ReviewTa
 		return err
 	}
 
-	log.Printf("[TaskQueue] AI review completed, score: %.1f", result.Score)
+	logger.Infof("[TaskQueue] AI review completed, score: %.1f", result.Score)
 	reviewLog.ReviewStatus = "completed"
 	reviewLog.ReviewResult = result.Content
 	reviewLog.Score = &result.Score
@@ -243,14 +243,14 @@ func (s *Service) ProcessReviewTask(ctx context.Context, task *services.ReviewTa
 		switch project.Platform {
 		case "gitlab":
 			if err := s.postGitLabCommitComment(project, task.CommitSHA, comment); err != nil {
-				log.Printf("[TaskQueue] Failed to post GitLab comment: %v", err)
+				logger.Infof("[TaskQueue] Failed to post GitLab comment: %v", err)
 			} else {
 				reviewLog.CommentPosted = true
 				s.reviewService.Update(reviewLog)
 			}
 		case "github":
 			if err := s.postGitHubCommitComment(project, task.CommitSHA, comment); err != nil {
-				log.Printf("[TaskQueue] Failed to post GitHub comment: %v", err)
+				logger.Infof("[TaskQueue] Failed to post GitHub comment: %v", err)
 			} else {
 				reviewLog.CommentPosted = true
 				s.reviewService.Update(reviewLog)

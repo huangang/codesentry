@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"github.com/huangang/codesentry/backend/pkg/logger"
 	"net/http"
 	"net/url"
 	"strings"
@@ -123,7 +123,7 @@ func (s *ImportCommitsService) ImportCommits(req *ImportCommitsRequest) (*Import
 	// Add one day to end date to include the entire day
 	endDate = endDate.Add(24*time.Hour - time.Second)
 
-	log.Printf("[ImportCommits] Starting async import for project %d (%s) from %s to %s",
+	logger.Infof("[ImportCommits] Starting async import for project %d (%s) from %s to %s",
 		project.ID, project.Name, req.StartDate, req.EndDate)
 
 	go s.importCommitsAsync(&project, startDate, endDate)
@@ -150,10 +150,10 @@ func (s *ImportCommitsService) importCommitsAsync(project *models.Project, start
 	}
 
 	if err != nil {
-		log.Printf("[ImportCommits] Async import failed for project %d: %v", project.ID, err)
+		logger.Infof("[ImportCommits] Async import failed for project %d: %v", project.ID, err)
 		PublishImportEvent(project.ID, project.Name, 0, 0, err.Error())
 	} else {
-		log.Printf("[ImportCommits] Async import complete for project %d: imported=%d, skipped=%d",
+		logger.Infof("[ImportCommits] Async import complete for project %d: imported=%d, skipped=%d",
 			project.ID, response.Imported, response.Skipped)
 		PublishImportEvent(project.ID, project.Name, response.Imported, response.Skipped, "")
 	}
@@ -238,7 +238,7 @@ func (s *ImportCommitsService) importGitLabCommits(project *models.Project, star
 		page++
 	}
 
-	log.Printf("[ImportCommits] GitLab import complete: imported=%d, skipped=%d", response.Imported, response.Skipped)
+	logger.Infof("[ImportCommits] GitLab import complete: imported=%d, skipped=%d", response.Imported, response.Skipped)
 	return response, nil
 }
 
@@ -318,7 +318,7 @@ func (s *ImportCommitsService) importGitHubCommits(project *models.Project, star
 		page++
 	}
 
-	log.Printf("[ImportCommits] GitHub import complete: imported=%d, skipped=%d", response.Imported, response.Skipped)
+	logger.Infof("[ImportCommits] GitHub import complete: imported=%d, skipped=%d", response.Imported, response.Skipped)
 	return response, nil
 }
 
@@ -443,7 +443,7 @@ func (s *ImportCommitsService) importBitbucketCommits(project *models.Project, s
 		nextURL = commitsResp.Next
 	}
 
-	log.Printf("[ImportCommits] Bitbucket import complete: imported=%d, skipped=%d", response.Imported, response.Skipped)
+	logger.Infof("[ImportCommits] Bitbucket import complete: imported=%d, skipped=%d", response.Imported, response.Skipped)
 	return response, nil
 }
 

@@ -1,11 +1,10 @@
 package handlers
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 	"github.com/huangang/codesentry/backend/internal/config"
 	"github.com/huangang/codesentry/backend/internal/services"
+	"github.com/huangang/codesentry/backend/pkg/response"
 	"gorm.io/gorm"
 )
 
@@ -23,34 +22,34 @@ func NewAuthHandler(db *gorm.DB, cfg *config.Config) *AuthHandler {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req services.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
 	resp, err := h.authService.Login(&req)
 	if err != nil {
 		services.LogWarning("Auth", "LoginFailed", "Login failed: "+err.Error(), nil, c.ClientIP(), c.Request.UserAgent(), map[string]string{"username": req.Username})
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		response.Unauthorized(c, err.Error())
 		return
 	}
 
 	services.LogInfo("Auth", "LoginSuccess", "User logged in: "+req.Username, &resp.User.ID, c.ClientIP(), c.Request.UserAgent(), nil)
-	c.JSON(http.StatusOK, resp)
+	response.Success(c, resp)
 }
 
 func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	user, err := h.authService.GetUserByID(userID.(uint))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		response.NotFound(c, "user not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	response.Success(c, user)
 }
 
 func (h *AuthHandler) GetAuthConfig(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
+	response.Success(c, gin.H{
 		"ldap_enabled": h.authService.IsLDAPEnabled(),
 	})
 }
@@ -61,7 +60,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		uid := userID.(uint)
 		services.LogInfo("Auth", "Logout", "User logged out", &uid, c.ClientIP(), c.Request.UserAgent(), nil)
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "logged out successfully"})
+	response.Success(c, gin.H{"message": "logged out successfully"})
 }
 
 func (h *AuthHandler) CreateAdminIfNotExists() error {
@@ -73,16 +72,16 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 
 	var req services.ChangePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
 	if err := h.authService.ChangePassword(userID.(uint), &req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
 	uid := userID.(uint)
 	services.LogInfo("Auth", "ChangePassword", "User changed password", &uid, c.ClientIP(), c.Request.UserAgent(), nil)
-	c.JSON(http.StatusOK, gin.H{"message": "password changed successfully"})
+	response.Success(c, gin.H{"message": "password changed successfully"})
 }

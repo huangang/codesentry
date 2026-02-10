@@ -1,10 +1,9 @@
 package handlers
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 	"github.com/huangang/codesentry/backend/internal/services"
+	"github.com/huangang/codesentry/backend/pkg/response"
 	"gorm.io/gorm"
 )
 
@@ -21,26 +20,26 @@ func NewSystemLogHandler(db *gorm.DB) *SystemLogHandler {
 func (h *SystemLogHandler) List(c *gin.Context) {
 	var req services.SystemLogListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
 	resp, err := h.systemLogService.List(&req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, resp)
+	response.Success(c, resp)
 }
 
 func (h *SystemLogHandler) GetModules(c *gin.Context) {
 	modules, err := h.systemLogService.GetModules()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"modules": modules})
+	response.Success(c, gin.H{"modules": modules})
 }
 
 func (h *SystemLogHandler) Cleanup(c *gin.Context) {
@@ -48,7 +47,7 @@ func (h *SystemLogHandler) Cleanup(c *gin.Context) {
 		Days int `json:"days"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -59,11 +58,11 @@ func (h *SystemLogHandler) Cleanup(c *gin.Context) {
 
 	deleted, err := h.systemLogService.CleanupOldLogs(days)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	response.Success(c, gin.H{
 		"deleted":        deleted,
 		"retention_days": days,
 	})
@@ -71,7 +70,7 @@ func (h *SystemLogHandler) Cleanup(c *gin.Context) {
 
 func (h *SystemLogHandler) GetRetentionDays(c *gin.Context) {
 	days := h.systemLogService.GetRetentionDays()
-	c.JSON(http.StatusOK, gin.H{"retention_days": days})
+	response.Success(c, gin.H{"retention_days": days})
 }
 
 func (h *SystemLogHandler) SetRetentionDays(c *gin.Context) {
@@ -79,14 +78,14 @@ func (h *SystemLogHandler) SetRetentionDays(c *gin.Context) {
 		Days int `json:"days" binding:"required,min=1,max=365"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
 	if err := h.systemLogService.SetRetentionDays(req.Days); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"retention_days": req.Days})
+	response.Success(c, gin.H{"retention_days": req.Days})
 }

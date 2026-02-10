@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"github.com/huangang/codesentry/backend/pkg/logger"
 	"strconv"
 	"strings"
 	"time"
@@ -72,7 +72,7 @@ func (s *DailyReportService) StartScheduler() {
 	s.updateSchedule()
 
 	s.cronScheduler.Start()
-	log.Printf("[DailyReport] Scheduler started with timezone: %s", loc.String())
+	logger.Infof("[DailyReport] Scheduler started with timezone: %s", loc.String())
 }
 
 func (s *DailyReportService) getTimezone() string {
@@ -83,7 +83,7 @@ func (s *DailyReportService) getTimezoneLocation() *time.Location {
 	tz := s.getTimezone()
 	loc, err := time.LoadLocation(tz)
 	if err != nil {
-		log.Printf("[DailyReport] Invalid timezone %s, using Asia/Shanghai: %v", tz, err)
+		logger.Infof("[DailyReport] Invalid timezone %s, using Asia/Shanghai: %v", tz, err)
 		loc, _ = time.LoadLocation("Asia/Shanghai")
 	}
 	return loc
@@ -123,12 +123,12 @@ func (s *DailyReportService) updateSchedule() {
 		s.GenerateAndSendReport()
 	})
 	if err != nil {
-		log.Printf("[DailyReport] Failed to add cron job: %v", err)
+		logger.Infof("[DailyReport] Failed to add cron job: %v", err)
 		return
 	}
 
 	s.currentEntryID = entryID
-	log.Printf("[DailyReport] Scheduled at %s (cron: %s)", reportTime, cronExpr)
+	logger.Infof("[DailyReport] Scheduled at %s (cron: %s)", reportTime, cronExpr)
 }
 
 func (s *DailyReportService) getReportTime() string {
@@ -177,7 +177,7 @@ func (s *DailyReportService) releaseLock(lockName, lockKey string) {
 
 func (s *DailyReportService) GenerateAndSendReport() error {
 	if !s.isEnabled() {
-		log.Println("[DailyReport] Daily report is disabled, skipping")
+		logger.Infof("[DailyReport] Daily report is disabled, skipping")
 		return nil
 	}
 
@@ -187,7 +187,7 @@ func (s *DailyReportService) GenerateAndSendReport() error {
 	if s.isWorkdaysOnly() {
 		countryCode := s.getHolidayCountry()
 		if !s.holidayService.IsWorkday(now, countryCode) {
-			log.Printf("[DailyReport] Today is not a workday in %s, skipping", countryCode)
+			logger.Infof("[DailyReport] Today is not a workday in %s, skipping", countryCode)
 			return nil
 		}
 	}
@@ -197,7 +197,7 @@ func (s *DailyReportService) GenerateAndSendReport() error {
 	lockKey := today
 
 	if !s.acquireLock(lockName, lockKey, 10*time.Minute) {
-		log.Printf("[DailyReport] Failed to acquire lock for %s, another pod is processing", today)
+		logger.Infof("[DailyReport] Failed to acquire lock for %s, another pod is processing", today)
 		return nil
 	}
 	defer s.releaseLock(lockName, lockKey)
@@ -217,12 +217,12 @@ func (s *DailyReportService) GenerateAndSendReport() error {
 	report.NotifiedAt = &notifiedAt
 	s.db.Save(report)
 
-	log.Printf("[DailyReport] Report generated and sent successfully (ID: %d)", report.ID)
+	logger.Infof("[DailyReport] Report generated and sent successfully (ID: %d)", report.ID)
 	return nil
 }
 
 func (s *DailyReportService) GenerateReport() (*models.DailyReport, error) {
-	log.Println("[DailyReport] Generating daily report...")
+	logger.Infof("[DailyReport] Generating daily report...")
 
 	today := time.Now()
 	startOfDay := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
@@ -230,7 +230,7 @@ func (s *DailyReportService) GenerateReport() (*models.DailyReport, error) {
 
 	report, err := s.generateReport(startOfDay, endOfDay)
 	if err != nil {
-		log.Printf("[DailyReport] Failed to generate report: %v", err)
+		logger.Infof("[DailyReport] Failed to generate report: %v", err)
 		return nil, err
 	}
 
@@ -240,16 +240,16 @@ func (s *DailyReportService) GenerateReport() (*models.DailyReport, error) {
 		report.CreatedAt = existingReport.CreatedAt
 		report.NotifiedAt = existingReport.NotifiedAt
 		if err := s.db.Save(report).Error; err != nil {
-			log.Printf("[DailyReport] Failed to update report: %v", err)
+			logger.Infof("[DailyReport] Failed to update report: %v", err)
 			return nil, err
 		}
-		log.Printf("[DailyReport] Updated existing report (ID: %d)", report.ID)
+		logger.Infof("[DailyReport] Updated existing report (ID: %d)", report.ID)
 	} else {
 		if err := s.db.Create(report).Error; err != nil {
-			log.Printf("[DailyReport] Failed to save report: %v", err)
+			logger.Infof("[DailyReport] Failed to save report: %v", err)
 			return nil, err
 		}
-		log.Printf("[DailyReport] Created new report (ID: %d)", report.ID)
+		logger.Infof("[DailyReport] Created new report (ID: %d)", report.ID)
 	}
 
 	return report, nil
@@ -481,7 +481,7 @@ func (s *DailyReportService) generateAIAnalysis(stats ReportStats, topProjects [
 	content, modelName, err := s.aiService.CallWithConfig(context.Background(), llmConfigID, prompt)
 
 	if err != nil {
-		log.Printf("[DailyReport] AI analysis failed: %v", err)
+		logger.Infof("[DailyReport] AI analysis failed: %v", err)
 		return s.buildDefaultSummary(stats, topProjects, topAuthors, lowScores), ""
 	}
 
@@ -560,7 +560,7 @@ func (s *DailyReportService) sendNotifications(report *models.DailyReport) error
 	}
 
 	if len(bots) == 0 {
-		log.Println("[DailyReport] No bots enabled for daily report")
+		logger.Infof("[DailyReport] No bots enabled for daily report")
 		return nil
 	}
 
@@ -583,10 +583,10 @@ func (s *DailyReportService) sendNotifications(report *models.DailyReport) error
 	successCount := 0
 	for _, bot := range bots {
 		if err := s.notificationService.SendErrorNotification(&bot, message); err != nil {
-			log.Printf("[DailyReport] Failed to send to bot %s: %v", bot.Name, err)
+			logger.Infof("[DailyReport] Failed to send to bot %s: %v", bot.Name, err)
 			lastErr = err
 		} else {
-			log.Printf("[DailyReport] Sent to bot %s", bot.Name)
+			logger.Infof("[DailyReport] Sent to bot %s", bot.Name)
 			successCount++
 		}
 	}
