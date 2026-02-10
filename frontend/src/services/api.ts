@@ -24,9 +24,16 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle errors
+// Response interceptor to unwrap envelope and handle errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Unwrap {code, data, message} envelope from response.Success()
+    const body = response.data;
+    if (body && typeof body === 'object' && 'code' in body && 'data' in body) {
+      response.data = body.data;
+    }
+    return response;
+  },
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
