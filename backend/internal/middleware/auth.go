@@ -1,11 +1,11 @@
 package middleware
 
 import (
-	"net/http"
 	"strings"
 
-	"github.com/huangang/codesentry/backend/internal/utils"
 	"github.com/gin-gonic/gin"
+	"github.com/huangang/codesentry/backend/internal/utils"
+	"github.com/huangang/codesentry/backend/pkg/response"
 )
 
 const (
@@ -19,7 +19,7 @@ func AuthRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "authorization header required"})
+			response.Unauthorized(c, "authorization header required")
 			c.Abort()
 			return
 		}
@@ -27,7 +27,7 @@ func AuthRequired() gin.HandlerFunc {
 		// Extract token from "Bearer <token>"
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization header format"})
+			response.Unauthorized(c, "invalid authorization header format")
 			c.Abort()
 			return
 		}
@@ -35,7 +35,7 @@ func AuthRequired() gin.HandlerFunc {
 		tokenString := parts[1]
 		claims, err := utils.ParseToken(tokenString)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+			response.Unauthorized(c, "invalid or expired token")
 			c.Abort()
 			return
 		}
@@ -54,7 +54,7 @@ func AdminRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, exists := c.Get(ContextRole)
 		if !exists || role != "admin" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "admin access required"})
+			response.Forbidden(c, "admin access required")
 			c.Abort()
 			return
 		}

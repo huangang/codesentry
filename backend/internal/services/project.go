@@ -33,7 +33,7 @@ type ProjectListResponse struct {
 type CreateProjectRequest struct {
 	Name           string  `json:"name" binding:"required"`
 	URL            string  `json:"url" binding:"required"`
-	Platform       string  `json:"platform" binding:"required,oneof=github gitlab"`
+	Platform       string  `json:"platform" binding:"required,oneof=github gitlab bitbucket"`
 	AccessToken    string  `json:"access_token"`
 	WebhookSecret  string  `json:"webhook_secret"`
 	FileExtensions string  `json:"file_extensions"`
@@ -48,7 +48,7 @@ type CreateProjectRequest struct {
 type UpdateProjectRequest struct {
 	Name           string   `json:"name"`
 	URL            string   `json:"url"`
-	Platform       string   `json:"platform" binding:"omitempty,oneof=github gitlab"`
+	Platform       string   `json:"platform" binding:"omitempty,oneof=github gitlab bitbucket"`
 	AccessToken    string   `json:"access_token"`
 	WebhookSecret  string   `json:"webhook_secret"`
 	FileExtensions string   `json:"file_extensions"`

@@ -16,8 +16,10 @@ require (
 	github.com/ollama/ollama v0.15.2
 	github.com/rickar/cal/v2 v2.1.27
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/rs/zerolog v1.34.0
 	github.com/sashabaranov/go-openai v1.41.2
 	golang.org/x/crypto v0.47.0
+	golang.org/x/time v0.8.0
 	google.golang.org/genai v1.43.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.6.0
@@ -64,6 +66,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-sqlite3 v1.14.33 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
@@ -87,7 +90,6 @@ require (
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
-	golang.org/x/time v0.8.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect
 	google.golang.org/grpc v1.66.2 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect

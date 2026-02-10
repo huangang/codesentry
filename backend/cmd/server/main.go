@@ -4,10 +4,11 @@ import (
 	"context"
 	"embed"
 	"io/fs"
-	"log"
+	"mime"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"github.com/huangang/codesentry/backend/internal/services"
 	"github.com/huangang/codesentry/backend/internal/services/webhook"
 	"github.com/huangang/codesentry/backend/internal/utils"
+	"github.com/huangang/codesentry/backend/pkg/logger"
 )
 
 //go:embed static/*
@@ -35,32 +37,39 @@ func maskDSN(dsn string) string {
 func main() {
 	cfg, err := config.Load(os.Getenv("CONFIG_PATH"))
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		logger.Fatalf("Failed to load config: %v", err)
 	}
 
-	log.Printf("Config loaded: driver=%s, dsn=%s", cfg.Database.Driver, maskDSN(cfg.Database.DSN))
+	// Initialize structured logger
+	logLevel := "info"
+	if cfg.Server.Mode == "debug" {
+		logLevel = "debug"
+	}
+	logger.Init(logLevel)
+
+	logger.Info().Str("driver", cfg.Database.Driver).Str("dsn", maskDSN(cfg.Database.DSN)).Msg("Config loaded")
 
 	utils.SetJWTSecret(cfg.JWT.Secret)
 
 	// Initialize database
 	if err := models.InitDB(&cfg.Database); err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		logger.Fatalf("Failed to connect to database: %v", err)
 	}
 
 	// Auto migrate database
 	if err := models.AutoMigrate(); err != nil {
-		log.Fatalf("Failed to migrate database: %v", err)
+		logger.Fatalf("Failed to migrate database: %v", err)
 	}
 
 	// Seed default data
 	if err := models.SeedDefaultData(); err != nil {
-		log.Printf("Warning: Failed to seed default data: %v", err)
+		logger.Warn().Err(err).Msg("Failed to seed default data")
 	}
 
 	// Seed default review templates
 	reviewTemplateHandler := handlers.NewReviewTemplateHandler(models.GetDB())
 	if err := reviewTemplateHandler.SeedTemplates(); err != nil {
-		log.Printf("Warning: Failed to seed review templates: %v", err)
+		logger.Warn().Err(err).Msg("Failed to seed review templates")
 	}
 
 	// Initialize system logger
@@ -98,14 +107,15 @@ func main() {
 	// Create default admin user
 	authHandler := handlers.NewAuthHandler(models.GetDB(), cfg)
 	if err := authHandler.CreateAdminIfNotExists(); err != nil {
-		log.Printf("Warning: Failed to create admin user: %v", err)
+		logger.Warn().Err(err).Msg("Failed to create admin user")
 	}
 
 	// Set Gin mode
 	gin.SetMode(cfg.Server.Mode)
 
-	// Create router
-	r := gin.Default()
+	// Create router with structured logging middleware
+	r := gin.New()
+	r.Use(logger.GinLogger(), logger.GinRecovery())
 
 	// Disable redirect behaviors that cause issues with webhooks
 	r.RedirectTrailingSlash = false
@@ -114,6 +124,9 @@ func main() {
 	// Apply CORS middleware
 	r.Use(middleware.CORS())
 
+	// Rate limiter for webhook routes
+	webhookLimiter := middleware.NewRateLimiter(10, 20)
+
 	// Health check endpoint
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok", "service": "codesentry"})
@@ -121,10 +134,13 @@ func main() {
 
 	// Root-level webhook routes (without /api prefix for compatibility)
 	webhookHandler := handlers.NewWebhookHandler(models.GetDB(), &cfg.OpenAI)
-	r.POST("/webhook", webhookHandler.HandleUnifiedWebhook)
-	r.POST("/review/webhook", webhookHandler.HandleUnifiedWebhook)
-	r.POST("/review/sync", webhookHandler.HandleSyncReview)
-	r.GET("/review/score", webhookHandler.GetReviewScore)
+	rootWebhook := r.Group("", webhookLimiter.Middleware())
+	{
+		rootWebhook.POST("/webhook", webhookHandler.HandleUnifiedWebhook)
+		rootWebhook.POST("/review/webhook", webhookHandler.HandleUnifiedWebhook)
+		rootWebhook.POST("/review/sync", webhookHandler.HandleSyncReview)
+		rootWebhook.GET("/review/score", webhookHandler.GetReviewScore)
+	}
 
 	// API routes
 	api := r.Group("/api")
@@ -282,18 +298,20 @@ func main() {
 			admin.POST("/daily-reports/:id/resend", dailyReportHandler.Resend)
 		}
 
-		// Webhook routes (public with signature verification)
-		webhookHandler := handlers.NewWebhookHandler(models.GetDB(), &cfg.OpenAI)
-		api.POST("/webhook/gitlab/:project_id", webhookHandler.HandleGitLabWebhook)
-		api.POST("/webhook/github/:project_id", webhookHandler.HandleGitHubWebhook)
-		api.POST("/webhook/bitbucket/:project_id", webhookHandler.HandleBitbucketWebhook)
-		api.POST("/webhook/gitlab", webhookHandler.HandleGitLabWebhookGeneric)
-		api.POST("/webhook/github", webhookHandler.HandleGitHubWebhookGeneric)
-		api.POST("/webhook/bitbucket", webhookHandler.HandleBitbucketWebhookGeneric)
-		api.POST("/webhook", webhookHandler.HandleUnifiedWebhook)
-		api.POST("/review/webhook", webhookHandler.HandleUnifiedWebhook)
-		api.POST("/review/sync", webhookHandler.HandleSyncReview)
-		api.GET("/review/score", webhookHandler.GetReviewScore)
+		// Webhook routes (public with signature verification, rate limited)
+		apiWebhook := api.Group("", webhookLimiter.Middleware())
+		{
+			apiWebhook.POST("/webhook/gitlab/:project_id", webhookHandler.HandleGitLabWebhook)
+			apiWebhook.POST("/webhook/github/:project_id", webhookHandler.HandleGitHubWebhook)
+			apiWebhook.POST("/webhook/bitbucket/:project_id", webhookHandler.HandleBitbucketWebhook)
+			apiWebhook.POST("/webhook/gitlab", webhookHandler.HandleGitLabWebhookGeneric)
+			apiWebhook.POST("/webhook/github", webhookHandler.HandleGitHubWebhookGeneric)
+			apiWebhook.POST("/webhook/bitbucket", webhookHandler.HandleBitbucketWebhookGeneric)
+			apiWebhook.POST("/webhook", webhookHandler.HandleUnifiedWebhook)
+			apiWebhook.POST("/review/webhook", webhookHandler.HandleUnifiedWebhook)
+			apiWebhook.POST("/review/sync", webhookHandler.HandleSyncReview)
+			apiWebhook.GET("/review/score", webhookHandler.GetReviewScore)
+		}
 	}
 
 	// Serve static files (embedded frontend)
@@ -323,25 +341,11 @@ func main() {
 				return
 			}
 
-			// Determine content type
-			contentType := "application/octet-stream"
-			if len(path) > 3 {
-				switch path[len(path)-3:] {
-				case ".js":
-					contentType = "application/javascript"
-				case "css":
-					contentType = "text/css"
-				case "tml":
-					contentType = "text/html"
-				case "son":
-					contentType = "application/json"
-				case "svg":
-					contentType = "image/svg+xml"
-				case "png":
-					contentType = "image/png"
-				case "ico":
-					contentType = "image/x-icon"
-				}
+			// Determine content type using standard library
+			ext := filepath.Ext(path)
+			contentType := mime.TypeByExtension(ext)
+			if contentType == "" {
+				contentType = "application/octet-stream"
 			}
 			c.Data(200, contentType, data)
 		})
@@ -355,9 +359,9 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("Server starting on %s", addr)
+		logger.Info().Str("addr", addr).Msg("Server starting")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", err)
+			logger.Fatalf("Failed to start server: %v", err)
 		}
 	}()
 
@@ -365,13 +369,13 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down server...")
+	logger.Info().Msg("Shutting down server...")
 
 	// Stop all schedulers
 	dailyReportService.StopScheduler()
 	services.StopLogCleanupScheduler()
 	services.StopRetryScheduler()
-	log.Println("All schedulers stopped")
+	logger.Info().Msg("All schedulers stopped")
 
 	// Stop async worker if running
 	if worker != nil {
@@ -387,14 +391,14 @@ func main() {
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		logger.Fatalf("Server forced to shutdown: %v", err)
 	}
 
 	// Close database connection
 	if sqlDB, err := models.GetDB().DB(); err == nil {
 		sqlDB.Close()
-		log.Println("Database connection closed")
+		logger.Info().Msg("Database connection closed")
 	}
 
-	log.Println("Server exited gracefully")
+	logger.Info().Msg("Server exited gracefully")
 }

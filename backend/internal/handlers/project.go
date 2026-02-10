@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"net/http"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
 	"github.com/huangang/codesentry/backend/internal/middleware"
 	"github.com/huangang/codesentry/backend/internal/services"
-	"github.com/gin-gonic/gin"
+	"github.com/huangang/codesentry/backend/pkg/response"
 	"gorm.io/gorm"
 )
 
@@ -25,17 +25,17 @@ func NewProjectHandler(db *gorm.DB) *ProjectHandler {
 func (h *ProjectHandler) List(c *gin.Context) {
 	var req services.ProjectListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
 	resp, err := h.projectService.List(&req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, resp)
+	response.Success(c, resp)
 }
 
 // GetByID returns a project by ID
@@ -43,17 +43,17 @@ func (h *ProjectHandler) List(c *gin.Context) {
 func (h *ProjectHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
+		response.BadRequest(c, "invalid project id")
 		return
 	}
 
 	project, err := h.projectService.GetByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "project not found"})
+		response.NotFound(c, "project not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, project)
+	response.Success(c, project)
 }
 
 // Create creates a new project
@@ -61,18 +61,18 @@ func (h *ProjectHandler) GetByID(c *gin.Context) {
 func (h *ProjectHandler) Create(c *gin.Context) {
 	var req services.CreateProjectRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
 	userID := middleware.GetUserID(c)
 	project, err := h.projectService.Create(&req, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusCreated, project)
+	response.Created(c, project)
 }
 
 // Update updates a project
@@ -80,23 +80,23 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 func (h *ProjectHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
+		response.BadRequest(c, "invalid project id")
 		return
 	}
 
 	var req services.UpdateProjectRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
 	project, err := h.projectService.Update(uint(id), &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, project)
+	response.Success(c, project)
 }
 
 // Delete deletes a project
@@ -104,21 +104,21 @@ func (h *ProjectHandler) Update(c *gin.Context) {
 func (h *ProjectHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid project id"})
+		response.BadRequest(c, "invalid project id")
 		return
 	}
 
 	if err := h.projectService.Delete(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		response.ServerError(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "project deleted successfully"})
+	response.Success(c, gin.H{"message": "project deleted successfully"})
 }
 
 // GetDefaultPrompt returns the default AI review prompt
 // GET /api/projects/default-prompt
 func (h *ProjectHandler) GetDefaultPrompt(c *gin.Context) {
 	prompt := h.projectService.GetDefaultPrompt()
-	c.JSON(http.StatusOK, gin.H{"prompt": prompt})
+	response.Success(c, gin.H{"prompt": prompt})
 }

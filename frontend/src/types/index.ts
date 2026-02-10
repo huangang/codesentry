@@ -18,7 +18,7 @@ export interface Project {
   id: number;
   name: string;
   url: string;
-  platform: 'github' | 'gitlab';
+  platform: 'github' | 'gitlab' | 'bitbucket';
   file_extensions: string;
   ignore_patterns: string;
   branch_filter: string;
@@ -120,7 +120,7 @@ export interface SystemLog {
 export interface GitCredential {
   id: number;
   name: string;
-  platform: 'github' | 'gitlab';
+  platform: 'github' | 'gitlab' | 'bitbucket';
   base_url: string;
   access_token_mask: string;
   webhook_secret_set: boolean;
