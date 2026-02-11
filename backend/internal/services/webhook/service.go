@@ -3,10 +3,11 @@ package webhook
 import (
 	"context"
 	"fmt"
-	"github.com/huangang/codesentry/backend/pkg/logger"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/huangang/codesentry/backend/pkg/logger"
 
 	"github.com/huangang/codesentry/backend/internal/config"
 	"github.com/huangang/codesentry/backend/internal/models"
@@ -218,6 +219,7 @@ func (s *Service) ProcessReviewTask(ctx context.Context, task *services.ReviewTa
 		reviewLog.ErrorMessage = err.Error()
 		s.reviewService.Update(reviewLog)
 		services.PublishReviewEvent(reviewLog.ID, reviewLog.ProjectID, reviewLog.CommitHash, "failed", nil, err.Error())
+		s.setCommitStatus(project, task.CommitSHA, "failed", "AI Review Failed", task.GitLabProjectID)
 		return err
 	}
 
@@ -236,25 +238,40 @@ func (s *Service) ProcessReviewTask(ctx context.Context, task *services.ReviewTa
 		Score:         result.Score,
 		ReviewResult:  result.Content,
 		EventType:     task.EventType,
+		MRURL:         task.MRURL,
 	})
 
-	if project.CommentEnabled && task.CommitSHA != "" {
+	if project.CommentEnabled {
 		comment := s.formatReviewComment(result.Score, result.Content)
-		switch project.Platform {
-		case "gitlab":
-			if err := s.postGitLabCommitComment(project, task.CommitSHA, comment); err != nil {
-				logger.Infof("[TaskQueue] Failed to post GitLab comment: %v", err)
-			} else {
-				reviewLog.CommentPosted = true
-				s.reviewService.Update(reviewLog)
+		var commentErr error
+
+		if task.MRNumber != nil {
+			// Post MR/PR comment for merge request events
+			switch project.Platform {
+			case "gitlab":
+				commentErr = s.postGitLabMRComment(project, *task.MRNumber, comment)
+			case "github":
+				commentErr = s.postGitHubPRComment(project, *task.MRNumber, comment)
+			case "bitbucket":
+				commentErr = s.postBitbucketPRComment(project, *task.MRNumber, comment)
 			}
-		case "github":
-			if err := s.postGitHubCommitComment(project, task.CommitSHA, comment); err != nil {
-				logger.Infof("[TaskQueue] Failed to post GitHub comment: %v", err)
-			} else {
-				reviewLog.CommentPosted = true
-				s.reviewService.Update(reviewLog)
+		} else if task.CommitSHA != "" {
+			// Post commit comment for push events
+			switch project.Platform {
+			case "gitlab":
+				commentErr = s.postGitLabCommitComment(project, task.CommitSHA, comment)
+			case "github":
+				commentErr = s.postGitHubCommitComment(project, task.CommitSHA, comment)
+			case "bitbucket":
+				commentErr = s.postBitbucketCommitComment(project, task.CommitSHA, comment)
 			}
+		}
+
+		if commentErr != nil {
+			logger.Infof("[TaskQueue] Failed to post comment: %v", commentErr)
+		} else {
+			reviewLog.CommentPosted = true
+			s.reviewService.Update(reviewLog)
 		}
 	}
 

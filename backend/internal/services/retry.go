@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/huangang/codesentry/backend/pkg/logger"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/huangang/codesentry/backend/pkg/logger"
 
 	"github.com/huangang/codesentry/backend/internal/config"
 	"github.com/huangang/codesentry/backend/internal/models"
@@ -44,6 +45,13 @@ func StartRetryScheduler(db *gorm.DB, aiCfg *config.OpenAIConfig) {
 	service := NewRetryService(db, aiCfg)
 	ticker := time.NewTicker(RetryInterval)
 	retryStopChan = make(chan struct{})
+
+	// Immediately process any stuck reviews from previous service restart
+	go func() {
+		logger.Infof("[Retry] Running startup recovery for stuck reviews...")
+		service.ProcessStuckReviews()
+		service.ProcessFailedReviews()
+	}()
 
 	go func() {
 		defer ticker.Stop()

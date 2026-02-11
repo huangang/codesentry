@@ -5,10 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/huangang/codesentry/backend/pkg/logger"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/huangang/codesentry/backend/pkg/logger"
 
 	"github.com/huangang/codesentry/backend/internal/models"
 	"github.com/huangang/codesentry/backend/internal/services"
@@ -158,89 +159,32 @@ func (s *Service) processGitLabPush(ctx context.Context, project *models.Project
 
 	logger.Infof("[Webhook] Starting AI review for project %d, commit %s", project.ID, commitSHA[:8])
 
-	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
-	if filteredDiff != diff {
-		logger.Infof("[Webhook] Filtered diff by extensions (%s) and ignore patterns (%s): %d -> %d bytes",
-			project.FileExtensions, project.IgnorePatterns, len(diff), len(filteredDiff))
+	// Enqueue review task for async processing
+	task := &services.ReviewTask{
+		ReviewLogID:     reviewLog.ID,
+		ProjectID:       project.ID,
+		CommitSHA:       commitSHA,
+		EventType:       "push",
+		Branch:          branch,
+		Author:          event.UserName,
+		AuthorEmail:     event.UserEmail,
+		AuthorAvatar:    event.UserAvatar,
+		CommitMessage:   strings.Join(commits, "\n"),
+		Diff:            diff,
+		CommitURL:       commitURL,
+		GitLabProjectID: event.ProjectID,
 	}
 
-	if IsEmptyDiff(filteredDiff) {
-		logger.Warnf("[Webhook] WARNING: Empty commit detected for project %d, commit %s - skipping AI review", project.ID, commitSHA[:8])
-		services.LogWarning("Webhook", "EmptyCommit", fmt.Sprintf("Empty commit %s detected, skipping AI review", commitSHA[:8]), nil, "", "", map[string]interface{}{
-			"project_id": project.ID,
-			"commit":     commitSHA,
-			"branch":     branch,
-		})
-		reviewLog.ReviewStatus = "skipped"
-		reviewLog.ReviewResult = "Empty commit - no code changes to review"
-		s.reviewService.Update(reviewLog)
-		s.setGitLabCommitStatus(project, commitSHA, "success", "AI Review Skipped: Empty commit", event.ProjectID)
-		return nil
-	}
-
-	var fileContext string
-	if s.fileContextService.IsEnabled() {
-		fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, commitSHA)
-		if fileContext != "" {
-			logger.Infof("[Webhook] Built file context: %d chars", len(fileContext))
-		}
-	}
-
-	result, err := s.aiService.ReviewChunked(ctx, &services.ReviewRequest{
-		ProjectID:   project.ID,
-		Diffs:       filteredDiff,
-		Commits:     strings.Join(commits, "\n"),
-		FileContext: fileContext,
-	})
-
-	if err != nil {
-		logger.Infof("[Webhook] AI review failed: %v", err)
-		services.LogError("AIReview", "ReviewFailed", err.Error(), nil, "", "", map[string]interface{}{
-			"project_id": project.ID,
-			"commit":     commitSHA,
-		})
+	if err := services.GetTaskQueue().Enqueue(task); err != nil {
+		logger.Infof("[Webhook] Failed to enqueue review task: %v", err)
 		reviewLog.ReviewStatus = "failed"
-		reviewLog.ErrorMessage = err.Error()
-		s.setGitLabCommitStatus(project, commitSHA, "failed", "AI Review Failed", event.ProjectID)
-	} else {
-		logger.Infof("[Webhook] AI review completed, score: %.1f, result length: %d", result.Score, len(result.Content))
-		services.LogInfo("AIReview", "ReviewCompleted", fmt.Sprintf("Review completed with score %.0f", result.Score), nil, "", "", map[string]interface{}{
-			"project_id": project.ID,
-			"commit":     commitSHA,
-			"score":      result.Score,
-		})
-		reviewLog.ReviewStatus = "completed"
-		reviewLog.ReviewResult = result.Content
-		reviewLog.Score = &result.Score
-
-		s.notificationService.SendReviewNotification(project, &services.ReviewNotification{
-			ProjectName:   project.Name,
-			Branch:        branch,
-			Author:        event.UserName,
-			CommitMessage: strings.Join(commits, "\n"),
-			Score:         result.Score,
-			ReviewResult:  result.Content,
-			EventType:     "push",
-		})
-
-		if project.CommentEnabled {
-			comment := s.formatReviewComment(result.Score, result.Content)
-			if err := s.postGitLabCommitComment(project, commitSHA, comment); err != nil {
-				logger.Infof("[Webhook] Failed to post GitLab commit comment: %v", err)
-			} else {
-				reviewLog.CommentPosted = true
-			}
-		}
-
-		minScore := s.getEffectiveMinScore(project)
-		if result.Score >= minScore {
-			s.setGitLabCommitStatus(project, commitSHA, "success", fmt.Sprintf("AI Review Passed: %.0f/%.0f", result.Score, minScore), event.ProjectID)
-		} else {
-			s.setGitLabCommitStatus(project, commitSHA, "failed", fmt.Sprintf("AI Review Failed: %.0f (Min: %.0f)", result.Score, minScore), event.ProjectID)
-		}
+		reviewLog.ErrorMessage = "Failed to enqueue: " + err.Error()
+		s.reviewService.Update(reviewLog)
+		return err
 	}
 
-	return s.reviewService.Update(reviewLog)
+	logger.Infof("[Webhook] Review task enqueued for project %d, commit %s", project.ID, commitSHA[:8])
+	return nil
 }
 
 func (s *Service) processGitLabMR(ctx context.Context, project *models.Project, event *GitLabMREvent) error {
@@ -287,75 +231,33 @@ func (s *Service) processGitLabMR(ctx context.Context, project *models.Project, 
 	}
 	s.reviewService.Create(reviewLog)
 
-	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
-
-	if IsEmptyDiff(filteredDiff) {
-		logger.Warnf("[Webhook] WARNING: Empty MR detected for project %d, MR #%d - skipping AI review", project.ID, mrIID)
-		services.LogWarning("Webhook", "EmptyMR", fmt.Sprintf("Empty MR #%d detected, skipping AI review", mrIID), nil, "", "", map[string]interface{}{
-			"project_id": project.ID,
-			"mr_iid":     mrIID,
-			"branch":     event.ObjectAttributes.SourceBranch,
-		})
-		reviewLog.ReviewStatus = "skipped"
-		reviewLog.ReviewResult = "Empty merge request - no code changes to review"
-		s.reviewService.Update(reviewLog)
-		s.setGitLabCommitStatus(project, commitSHA, "success", "AI Review Skipped: Empty MR", event.Project.ID)
-		return nil
+	// Enqueue review task for async processing
+	task := &services.ReviewTask{
+		ReviewLogID:     reviewLog.ID,
+		ProjectID:       project.ID,
+		CommitSHA:       commitSHA,
+		EventType:       "merge_request",
+		Branch:          event.ObjectAttributes.SourceBranch,
+		Author:          event.User.Username,
+		AuthorEmail:     event.User.Email,
+		AuthorAvatar:    event.User.AvatarURL,
+		CommitMessage:   event.ObjectAttributes.Title + "\n" + event.ObjectAttributes.Description,
+		Diff:            diff,
+		MRNumber:        &mrIID,
+		MRURL:           event.ObjectAttributes.URL,
+		GitLabProjectID: event.Project.ID,
 	}
 
-	var fileContext string
-	if s.fileContextService.IsEnabled() {
-		fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, commitSHA)
-		if fileContext != "" {
-			logger.Infof("[Webhook] Built file context for MR: %d chars", len(fileContext))
-		}
-	}
-
-	result, err := s.aiService.ReviewChunked(ctx, &services.ReviewRequest{
-		ProjectID:   project.ID,
-		Diffs:       filteredDiff,
-		Commits:     event.ObjectAttributes.Title + "\n" + event.ObjectAttributes.Description,
-		FileContext: fileContext,
-	})
-
-	if err != nil {
+	if err := services.GetTaskQueue().Enqueue(task); err != nil {
+		logger.Infof("[Webhook] Failed to enqueue MR review task: %v", err)
 		reviewLog.ReviewStatus = "failed"
-		reviewLog.ErrorMessage = err.Error()
-		s.setGitLabCommitStatus(project, commitSHA, "failed", "AI Review Failed", event.Project.ID)
-	} else {
-		reviewLog.ReviewStatus = "completed"
-		reviewLog.ReviewResult = result.Content
-		reviewLog.Score = &result.Score
-
-		s.notificationService.SendReviewNotification(project, &services.ReviewNotification{
-			ProjectName:   project.Name,
-			Branch:        event.ObjectAttributes.SourceBranch,
-			Author:        event.User.Username,
-			CommitMessage: event.ObjectAttributes.Title,
-			Score:         result.Score,
-			ReviewResult:  result.Content,
-			EventType:     "merge_request",
-			MRURL:         event.ObjectAttributes.URL,
-		})
-
-		if project.CommentEnabled {
-			comment := s.formatReviewComment(result.Score, result.Content)
-			if err := s.postGitLabMRComment(project, mrIID, comment); err != nil {
-				logger.Infof("[Webhook] Failed to post GitLab MR comment: %v", err)
-			} else {
-				reviewLog.CommentPosted = true
-			}
-		}
-
-		minScore := s.getEffectiveMinScore(project)
-		if result.Score >= minScore {
-			s.setGitLabCommitStatus(project, commitSHA, "success", fmt.Sprintf("AI Review Passed: %.0f/%.0f", result.Score, minScore), event.Project.ID)
-		} else {
-			s.setGitLabCommitStatus(project, commitSHA, "failed", fmt.Sprintf("AI Review Failed: %.0f (Min: %.0f)", result.Score, minScore), event.Project.ID)
-		}
+		reviewLog.ErrorMessage = "Failed to enqueue: " + err.Error()
+		s.reviewService.Update(reviewLog)
+		return err
 	}
 
-	return s.reviewService.Update(reviewLog)
+	logger.Infof("[Webhook] MR review task enqueued for project %d, MR #%d", project.ID, mrIID)
+	return nil
 }
 
 func (s *Service) getGitLabDiff(project *models.Project, commitSHA string) (string, error) {

@@ -5,10 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/huangang/codesentry/backend/pkg/logger"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/huangang/codesentry/backend/pkg/logger"
 
 	"github.com/huangang/codesentry/backend/internal/models"
 	"github.com/huangang/codesentry/backend/internal/services"
@@ -115,63 +116,31 @@ func (s *Service) processGitHubPush(ctx context.Context, project *models.Project
 	}
 	s.reviewService.Create(reviewLog)
 
-	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
-
-	if IsEmptyDiff(filteredDiff) {
-		reviewLog.ReviewStatus = "skipped"
-		reviewLog.ReviewResult = "Empty commit - no code changes to review"
-		s.reviewService.Update(reviewLog)
-		return nil
+	// Enqueue review task for async processing
+	task := &services.ReviewTask{
+		ReviewLogID:   reviewLog.ID,
+		ProjectID:     project.ID,
+		CommitSHA:     event.After,
+		EventType:     "push",
+		Branch:        branch,
+		Author:        event.Sender.Login,
+		AuthorEmail:   event.Pusher.Email,
+		AuthorAvatar:  event.Sender.AvatarURL,
+		CommitMessage: strings.Join(commits, "\n"),
+		Diff:          diff,
+		CommitURL:     commitURL,
 	}
 
-	var fileContext string
-	if s.fileContextService.IsEnabled() {
-		fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, event.After)
-	}
-
-	result, err := s.aiService.ReviewChunked(ctx, &services.ReviewRequest{
-		ProjectID:   project.ID,
-		Diffs:       filteredDiff,
-		Commits:     strings.Join(commits, "\n"),
-		FileContext: fileContext,
-	})
-
-	if err != nil {
+	if err := services.GetTaskQueue().Enqueue(task); err != nil {
+		logger.Infof("[Webhook] Failed to enqueue GitHub push review task: %v", err)
 		reviewLog.ReviewStatus = "failed"
-		reviewLog.ErrorMessage = err.Error()
-	} else {
-		reviewLog.ReviewStatus = "completed"
-		reviewLog.ReviewResult = result.Content
-		reviewLog.Score = &result.Score
-
-		s.notificationService.SendReviewNotification(project, &services.ReviewNotification{
-			ProjectName:   project.Name,
-			Branch:        branch,
-			Author:        event.Pusher.Name,
-			CommitMessage: strings.Join(commits, "\n"),
-			Score:         result.Score,
-			ReviewResult:  result.Content,
-			EventType:     "push",
-		})
-
-		if project.CommentEnabled {
-			comment := s.formatReviewComment(result.Score, result.Content)
-			if err := s.postGitHubCommitComment(project, event.After, comment); err != nil {
-				logger.Infof("[Webhook] Failed to post GitHub commit comment: %v", err)
-			} else {
-				reviewLog.CommentPosted = true
-			}
-		}
-
-		minScore := s.getEffectiveMinScore(project)
-		if result.Score >= minScore {
-			s.setCommitStatus(project, event.After, "success", fmt.Sprintf("AI Review Passed: %.0f/%.0f", result.Score, minScore), 0)
-		} else {
-			s.setCommitStatus(project, event.After, "failed", fmt.Sprintf("AI Review Failed: %.0f (Min: %.0f)", result.Score, minScore), 0)
-		}
+		reviewLog.ErrorMessage = "Failed to enqueue: " + err.Error()
+		s.reviewService.Update(reviewLog)
+		return err
 	}
 
-	return s.reviewService.Update(reviewLog)
+	logger.Infof("[Webhook] GitHub push review task enqueued for project %d, commit %s", project.ID, event.After[:8])
+	return nil
 }
 
 func (s *Service) processGitHubPR(ctx context.Context, project *models.Project, event *GitHubPREvent) error {
@@ -210,60 +179,31 @@ func (s *Service) processGitHubPR(ctx context.Context, project *models.Project, 
 	}
 	s.reviewService.Create(reviewLog)
 
-	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
-
-	if IsEmptyDiff(filteredDiff) {
-		reviewLog.ReviewStatus = "skipped"
-		reviewLog.ReviewResult = "Empty pull request - no code changes to review"
-		s.reviewService.Update(reviewLog)
-		return nil
+	// Enqueue review task for async processing
+	task := &services.ReviewTask{
+		ReviewLogID:   reviewLog.ID,
+		ProjectID:     project.ID,
+		CommitSHA:     event.PullRequest.Head.SHA,
+		EventType:     "merge_request",
+		Branch:        event.PullRequest.Head.Ref,
+		Author:        event.PullRequest.User.Login,
+		AuthorAvatar:  event.PullRequest.User.AvatarURL,
+		CommitMessage: event.PullRequest.Title + "\n" + event.PullRequest.Body,
+		Diff:          diff,
+		MRNumber:      &mrNumber,
+		MRURL:         event.PullRequest.HTMLURL,
 	}
 
-	var fileContext string
-	if s.fileContextService.IsEnabled() {
-		fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, event.PullRequest.Head.SHA)
-	}
-
-	result, err := s.aiService.ReviewChunked(ctx, &services.ReviewRequest{
-		ProjectID:   project.ID,
-		Diffs:       filteredDiff,
-		Commits:     event.PullRequest.Title + "\n" + event.PullRequest.Body,
-		FileContext: fileContext,
-	})
-
-	if err != nil {
+	if err := services.GetTaskQueue().Enqueue(task); err != nil {
+		logger.Infof("[Webhook] Failed to enqueue GitHub PR review task: %v", err)
 		reviewLog.ReviewStatus = "failed"
-		reviewLog.ErrorMessage = err.Error()
-	} else {
-		reviewLog.ReviewStatus = "completed"
-		reviewLog.ReviewResult = result.Content
-		reviewLog.Score = &result.Score
-
-		s.notificationService.SendReviewNotification(project, &services.ReviewNotification{
-			ProjectName:   project.Name,
-			Branch:        event.PullRequest.Head.Ref,
-			Author:        event.PullRequest.User.Login,
-			CommitMessage: event.PullRequest.Title,
-			Score:         result.Score,
-			ReviewResult:  result.Content,
-			EventType:     "merge_request",
-			MRURL:         event.PullRequest.HTMLURL,
-		})
-
-		if project.CommentEnabled {
-			comment := s.formatReviewComment(result.Score, result.Content)
-			s.postGitHubPRComment(project, mrNumber, comment)
-		}
-
-		minScore := s.getEffectiveMinScore(project)
-		if result.Score >= minScore {
-			s.setCommitStatus(project, event.PullRequest.Head.SHA, "success", fmt.Sprintf("AI Review Passed: %.0f/%.0f", result.Score, minScore), 0)
-		} else {
-			s.setCommitStatus(project, event.PullRequest.Head.SHA, "failed", fmt.Sprintf("AI Review Failed: %.0f (Min: %.0f)", result.Score, minScore), 0)
-		}
+		reviewLog.ErrorMessage = "Failed to enqueue: " + err.Error()
+		s.reviewService.Update(reviewLog)
+		return err
 	}
 
-	return s.reviewService.Update(reviewLog)
+	logger.Infof("[Webhook] GitHub PR review task enqueued for project %d, PR #%d", project.ID, mrNumber)
+	return nil
 }
 
 func (s *Service) getGitHubDiff(project *models.Project, commitSHA string) (string, error) {

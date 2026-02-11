@@ -5,10 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/huangang/codesentry/backend/pkg/logger"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/huangang/codesentry/backend/pkg/logger"
 
 	"github.com/huangang/codesentry/backend/internal/models"
 	"github.com/huangang/codesentry/backend/internal/services"
@@ -119,60 +120,29 @@ func (s *Service) processBitbucketPush(ctx context.Context, project *models.Proj
 		}
 		s.reviewService.Create(reviewLog)
 
-		filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
+		// Enqueue review task for async processing
+		task := &services.ReviewTask{
+			ReviewLogID:   reviewLog.ID,
+			ProjectID:     project.ID,
+			CommitSHA:     commitSHA,
+			EventType:     "push",
+			Branch:        branch,
+			Author:        event.Actor.DisplayName,
+			AuthorAvatar:  event.Actor.Links.Avatar.Href,
+			CommitMessage: strings.Join(commits, "\n"),
+			Diff:          diff,
+			CommitURL:     change.New.Target.Links.HTML.Href,
+		}
 
-		if IsEmptyDiff(filteredDiff) {
-			reviewLog.ReviewStatus = "skipped"
-			reviewLog.ReviewResult = "Empty commit - no code changes to review"
+		if err := services.GetTaskQueue().Enqueue(task); err != nil {
+			logger.Infof("[Webhook] Failed to enqueue Bitbucket push review task: %v", err)
+			reviewLog.ReviewStatus = "failed"
+			reviewLog.ErrorMessage = "Failed to enqueue: " + err.Error()
 			s.reviewService.Update(reviewLog)
-			s.setBitbucketCommitStatus(project, commitSHA, "SUCCESSFUL", "AI Review Skipped")
 			continue
 		}
 
-		var fileContext string
-		if s.fileContextService.IsEnabled() {
-			fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, commitSHA)
-		}
-
-		result, err := s.aiService.ReviewChunked(ctx, &services.ReviewRequest{
-			ProjectID:   project.ID,
-			Diffs:       filteredDiff,
-			Commits:     strings.Join(commits, "\n"),
-			FileContext: fileContext,
-		})
-
-		if err != nil {
-			reviewLog.ReviewStatus = "failed"
-			reviewLog.ErrorMessage = err.Error()
-			s.setBitbucketCommitStatus(project, commitSHA, "FAILED", "AI Review Failed")
-		} else {
-			reviewLog.ReviewStatus = "completed"
-			reviewLog.ReviewResult = result.Content
-			reviewLog.Score = &result.Score
-
-			s.notificationService.SendReviewNotification(project, &services.ReviewNotification{
-				ProjectName:   project.Name,
-				Branch:        branch,
-				Author:        event.Actor.DisplayName,
-				CommitMessage: strings.Join(commits, "\n"),
-				Score:         result.Score,
-				ReviewResult:  result.Content,
-				EventType:     "push",
-			})
-
-			if project.CommentEnabled {
-				s.postBitbucketCommitComment(project, commitSHA, s.formatReviewComment(result.Score, result.Content))
-			}
-
-			minScore := s.getEffectiveMinScore(project)
-			if result.Score >= minScore {
-				s.setBitbucketCommitStatus(project, commitSHA, "SUCCESSFUL", fmt.Sprintf("AI Review Passed: %.0f/%.0f", result.Score, minScore))
-			} else {
-				s.setBitbucketCommitStatus(project, commitSHA, "FAILED", fmt.Sprintf("AI Review Failed: %.0f (Min: %.0f)", result.Score, minScore))
-			}
-		}
-
-		s.reviewService.Update(reviewLog)
+		logger.Infof("[Webhook] Bitbucket push review task enqueued for project %d, commit %s", project.ID, commitSHA[:8])
 	}
 
 	return nil
@@ -210,61 +180,31 @@ func (s *Service) processBitbucketPR(ctx context.Context, project *models.Projec
 	}
 	s.reviewService.Create(reviewLog)
 
-	filteredDiff := s.filterDiff(diff, project.FileExtensions, project.IgnorePatterns)
-
-	if IsEmptyDiff(filteredDiff) {
-		reviewLog.ReviewStatus = "skipped"
-		reviewLog.ReviewResult = "Empty pull request - no code changes to review"
-		s.reviewService.Update(reviewLog)
-		s.setBitbucketCommitStatus(project, commitSHA, "SUCCESSFUL", "AI Review Skipped")
-		return nil
+	// Enqueue review task for async processing
+	task := &services.ReviewTask{
+		ReviewLogID:   reviewLog.ID,
+		ProjectID:     project.ID,
+		CommitSHA:     commitSHA,
+		EventType:     "merge_request",
+		Branch:        branch,
+		Author:        event.PullRequest.Author.DisplayName,
+		AuthorAvatar:  event.PullRequest.Author.Links.Avatar.Href,
+		CommitMessage: event.PullRequest.Title + "\n" + event.PullRequest.Description,
+		Diff:          diff,
+		MRNumber:      &prNumber,
+		MRURL:         event.PullRequest.Links.HTML.Href,
 	}
 
-	var fileContext string
-	if s.fileContextService.IsEnabled() {
-		fileContext, _ = s.fileContextService.BuildFileContext(project, filteredDiff, commitSHA)
-	}
-
-	result, err := s.aiService.ReviewChunked(ctx, &services.ReviewRequest{
-		ProjectID:   project.ID,
-		Diffs:       filteredDiff,
-		Commits:     event.PullRequest.Title + "\n" + event.PullRequest.Description,
-		FileContext: fileContext,
-	})
-
-	if err != nil {
+	if err := services.GetTaskQueue().Enqueue(task); err != nil {
+		logger.Infof("[Webhook] Failed to enqueue Bitbucket PR review task: %v", err)
 		reviewLog.ReviewStatus = "failed"
-		reviewLog.ErrorMessage = err.Error()
-		s.setBitbucketCommitStatus(project, commitSHA, "FAILED", "AI Review Failed")
-	} else {
-		reviewLog.ReviewStatus = "completed"
-		reviewLog.ReviewResult = result.Content
-		reviewLog.Score = &result.Score
-
-		s.notificationService.SendReviewNotification(project, &services.ReviewNotification{
-			ProjectName:   project.Name,
-			Branch:        branch,
-			Author:        event.PullRequest.Author.DisplayName,
-			CommitMessage: event.PullRequest.Title,
-			Score:         result.Score,
-			ReviewResult:  result.Content,
-			EventType:     "merge_request",
-			MRURL:         event.PullRequest.Links.HTML.Href,
-		})
-
-		if project.CommentEnabled {
-			s.postBitbucketPRComment(project, prNumber, s.formatReviewComment(result.Score, result.Content))
-		}
-
-		minScore := s.getEffectiveMinScore(project)
-		if result.Score >= minScore {
-			s.setBitbucketCommitStatus(project, commitSHA, "SUCCESSFUL", fmt.Sprintf("AI Review Passed: %.0f/%.0f", result.Score, minScore))
-		} else {
-			s.setBitbucketCommitStatus(project, commitSHA, "FAILED", fmt.Sprintf("AI Review Failed: %.0f (Min: %.0f)", result.Score, minScore))
-		}
+		reviewLog.ErrorMessage = "Failed to enqueue: " + err.Error()
+		s.reviewService.Update(reviewLog)
+		return err
 	}
 
-	return s.reviewService.Update(reviewLog)
+	logger.Infof("[Webhook] Bitbucket PR review task enqueued for project %d, PR #%d", project.ID, prNumber)
+	return nil
 }
 
 func (s *Service) getBitbucketDiff(project *models.Project, commitSHA string) (string, error) {
