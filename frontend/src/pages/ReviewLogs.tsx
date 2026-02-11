@@ -266,9 +266,8 @@ const ReviewLogs: React.FC = () => {
     }
   };
 
-  // Check if retry is available for a status
   const canRetry = (status: string) => {
-    return status === REVIEW_STATUS.FAILED || status === REVIEW_STATUS.PENDING || status === REVIEW_STATUS.ANALYZING;
+    return status === REVIEW_STATUS.FAILED;
   };
 
   const columns: ColumnsType<ReviewLog> = [
