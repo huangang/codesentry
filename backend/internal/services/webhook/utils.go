@@ -6,8 +6,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"github.com/huangang/codesentry/backend/pkg/logger"
+	"io"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -212,6 +212,48 @@ func (s *Service) matchIgnorePattern(filePath, pattern string) bool {
 	}
 
 	return strings.Contains(filePath, pattern)
+}
+
+// isNullSHA checks if a SHA is all zeros (initial push, branch creation, etc.)
+func isNullSHA(sha string) bool {
+	if sha == "" {
+		return true
+	}
+	for _, c := range sha {
+		if c != '0' {
+			return false
+		}
+	}
+	return true
+}
+
+// fetchRawDiff fetches a raw diff (non-JSON) from the given URL
+func (s *Service) fetchRawDiff(apiURL, token, tokenHeader string) (string, error) {
+	logger.Infof("[Webhook] Fetching raw diff from: %s", apiURL)
+
+	req, _ := http.NewRequest("GET", apiURL, nil)
+	if token != "" {
+		req.Header.Set(tokenHeader, token)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	logger.Infof("[Webhook] Raw diff API response status: %d, body length: %d", resp.StatusCode, len(body))
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return string(body), nil
 }
 
 func (s *Service) fetchDiff(apiURL, token, tokenHeader string) (string, error) {

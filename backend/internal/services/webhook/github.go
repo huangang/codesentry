@@ -5,8 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"github.com/huangang/codesentry/backend/pkg/logger"
+	"io"
 	"net/http"
 	"strings"
 
@@ -73,9 +73,26 @@ func (s *Service) processGitHubPush(ctx context.Context, project *models.Project
 		}
 	}
 
-	diff, err := s.getGitHubDiff(project, event.After)
-	if err != nil {
-		diff = "Failed to get diff: " + err.Error()
+	var diff string
+
+	if !isNullSHA(event.Before) && event.Before != "" {
+		compareDiff, err := s.getGitHubCompareDiff(project, event.Before, event.After)
+		if err != nil {
+			logger.Infof("[Webhook] GitHub compare API failed, falling back to single commit diff: %v", err)
+		} else if compareDiff != "" {
+			diff = compareDiff
+			logger.Infof("[Webhook] Got GitHub compare diff (before=%s, after=%s), length: %d bytes",
+				event.Before[:8], event.After[:8], len(diff))
+		}
+	}
+
+	if diff == "" {
+		d, err := s.getGitHubDiff(project, event.After)
+		if err != nil {
+			diff = "Failed to get diff: " + err.Error()
+		} else {
+			diff = d
+		}
 	}
 
 	additions, deletions, filesChanged := ParseDiffStats(diff)
@@ -255,6 +272,22 @@ func (s *Service) getGitHubDiff(project *models.Project, commitSHA string) (stri
 		return "", err
 	}
 	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits/%s", info.owner, info.repo, commitSHA)
+	return s.fetchGitHubDiff(apiURL, project.AccessToken)
+}
+
+func (s *Service) getGitHubCompareDiff(project *models.Project, before, after string) (string, error) {
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		return "", err
+	}
+
+	baseURL := "https://api.github.com"
+	if info.baseURL != "https://github.com" {
+		baseURL = info.baseURL + "/api/v3"
+	}
+
+	apiURL := fmt.Sprintf("%s/repos/%s/%s/compare/%s...%s", baseURL, info.owner, info.repo, before, after)
+	logger.Infof("[Webhook] Fetching GitHub compare diff: %s...%s", before[:8], after[:8])
 	return s.fetchGitHubDiff(apiURL, project.AccessToken)
 }
 

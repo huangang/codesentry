@@ -5,8 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"github.com/huangang/codesentry/backend/pkg/logger"
+	"io"
 	"net/http"
 	"strings"
 
@@ -73,14 +73,33 @@ func (s *Service) processBitbucketPush(ctx context.Context, project *models.Proj
 		s.setBitbucketCommitStatus(project, commitSHA, "INPROGRESS", "AI Review in progress...")
 
 		var commits []string
-		var allDiffs strings.Builder
 		for _, c := range change.Commits {
 			commits = append(commits, fmt.Sprintf("%s: %s", c.Hash[:8], c.Message))
-			diff, _ := s.getBitbucketDiff(project, c.Hash)
-			allDiffs.WriteString(fmt.Sprintf("\n### Commit: %s\n%s\n", c.Hash[:8], diff))
 		}
 
-		diff := allDiffs.String()
+		var diff string
+
+		beforeSHA := change.Old.Target.Hash
+		if !isNullSHA(beforeSHA) && beforeSHA != "" {
+			compareDiff, err := s.getBitbucketCompareDiff(project, beforeSHA, commitSHA)
+			if err != nil {
+				logger.Infof("[Webhook] Bitbucket compare API failed, falling back to per-commit diffs: %v", err)
+			} else if compareDiff != "" {
+				diff = compareDiff
+				logger.Infof("[Webhook] Got Bitbucket compare diff (before=%s, after=%s), length: %d bytes",
+					beforeSHA[:8], commitSHA[:8], len(diff))
+			}
+		}
+
+		if diff == "" {
+			var allDiffs strings.Builder
+			for _, c := range change.Commits {
+				d, _ := s.getBitbucketDiff(project, c.Hash)
+				allDiffs.WriteString(fmt.Sprintf("\n### Commit: %s\n%s\n", c.Hash[:8], d))
+			}
+			diff = allDiffs.String()
+		}
+
 		additions, deletions, filesChanged := ParseDiffStats(diff)
 
 		reviewLog := &models.ReviewLog{
@@ -260,6 +279,35 @@ func (s *Service) getBitbucketDiff(project *models.Project, commitSHA string) (s
 		return "", err
 	}
 	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	return string(body), nil
+}
+
+func (s *Service) getBitbucketCompareDiff(project *models.Project, from, to string) (string, error) {
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		return "", err
+	}
+
+	apiURL := fmt.Sprintf("https://api.bitbucket.org/2.0/repositories/%s/diff/%s..%s", info.projectPath, from, to)
+	logger.Infof("[Webhook] Fetching Bitbucket compare diff: %s...%s", from[:8], to[:8])
+
+	req, _ := http.NewRequest("GET", apiURL, nil)
+	if project.AccessToken != "" {
+		req.Header.Set("Authorization", "Bearer "+project.AccessToken)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("Bitbucket compare API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
 	body, _ := io.ReadAll(resp.Body)
 	return string(body), nil
 }

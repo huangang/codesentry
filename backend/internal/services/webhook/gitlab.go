@@ -5,8 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"github.com/huangang/codesentry/backend/pkg/logger"
+	"io"
 	"net/http"
 	"strings"
 
@@ -102,17 +102,34 @@ func (s *Service) processGitLabPush(ctx context.Context, project *models.Project
 
 	s.setGitLabCommitStatus(project, commitSHA, "pending", "AI Review in progress...", event.ProjectID)
 
-	var allDiffs strings.Builder
-	for _, c := range event.Commits {
-		diff, err := s.getGitLabDiff(project, c.ID)
+	var diff string
+
+	// Use compare API (before→after) for accurate diffs, especially for merge commits
+	if !isNullSHA(event.Before) && event.Before != "" {
+		compareDiff, err := s.getGitLabCompareDiff(project, event.Before, commitSHA)
 		if err != nil {
-			logger.Infof("[Webhook] Failed to get diff for commit %s: %v", c.ID[:8], err)
-			continue
+			logger.Infof("[Webhook] Compare API failed, falling back to per-commit diffs: %v", err)
+		} else if compareDiff != "" {
+			diff = compareDiff
+			logger.Infof("[Webhook] Got compare diff (before=%s, after=%s), length: %d bytes",
+				event.Before[:8], commitSHA[:8], len(diff))
 		}
-		allDiffs.WriteString(fmt.Sprintf("\n### Commit: %s\n%s\n", c.ID[:8], diff))
 	}
 
-	diff := allDiffs.String()
+	// Fallback: fetch diffs per commit (for initial push or compare API failure)
+	if diff == "" {
+		var allDiffs strings.Builder
+		for _, c := range event.Commits {
+			d, err := s.getGitLabDiff(project, c.ID)
+			if err != nil {
+				logger.Infof("[Webhook] Failed to get diff for commit %s: %v", c.ID[:8], err)
+				continue
+			}
+			allDiffs.WriteString(fmt.Sprintf("\n### Commit: %s\n%s\n", c.ID[:8], d))
+		}
+		diff = allDiffs.String()
+	}
+
 	if diff == "" {
 		diff = "Failed to get diff for all commits"
 		logger.Infof("[Webhook] No diffs retrieved for any commits")
@@ -351,6 +368,61 @@ func (s *Service) getGitLabDiff(project *models.Project, commitSHA string) (stri
 		info.baseURL, strings.ReplaceAll(info.projectPath, "/", "%2F"), commitSHA)
 
 	return s.fetchDiff(apiURL, project.AccessToken, "PRIVATE-TOKEN")
+}
+
+func (s *Service) getGitLabCompareDiff(project *models.Project, from, to string) (string, error) {
+	info, err := parseRepoInfo(project.URL)
+	if err != nil {
+		return "", err
+	}
+
+	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/repository/compare?from=%s&to=%s&straight=false",
+		info.baseURL, strings.ReplaceAll(info.projectPath, "/", "%2F"), from, to)
+
+	logger.Infof("[Webhook] Fetching GitLab compare diff: %s...%s", from[:8], to[:8])
+
+	req, _ := http.NewRequest("GET", apiURL, nil)
+	if project.AccessToken != "" {
+		req.Header.Set("PRIVATE-TOKEN", project.AccessToken)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("GitLab compare API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Diffs []struct {
+			Diff    string `json:"diff"`
+			OldPath string `json:"old_path"`
+			NewPath string `json:"new_path"`
+		} `json:"diffs"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("failed to parse compare response: %w", err)
+	}
+
+	var diffBuilder strings.Builder
+	for _, d := range result.Diffs {
+		diffBuilder.WriteString(fmt.Sprintf("diff --git a/%s b/%s\n", d.OldPath, d.NewPath))
+		diffBuilder.WriteString(fmt.Sprintf("--- a/%s\n+++ b/%s\n", d.OldPath, d.NewPath))
+		diffBuilder.WriteString(d.Diff)
+		if !strings.HasSuffix(d.Diff, "\n") {
+			diffBuilder.WriteString("\n")
+		}
+	}
+
+	return diffBuilder.String(), nil
 }
 
 func (s *Service) getGitLabMRDiff(project *models.Project, mrIID int) (string, error) {

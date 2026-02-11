@@ -4,6 +4,8 @@ package webhook
 type GitLabPushEvent struct {
 	ObjectKind  string `json:"object_kind"`
 	EventName   string `json:"event_name"`
+	Before      string `json:"before"`
+	After       string `json:"after"`
 	Ref         string `json:"ref"`
 	CheckoutSHA string `json:"checkout_sha"`
 	UserName    string `json:"user_name"`
@@ -63,6 +65,7 @@ type GitLabMREvent struct {
 // GitHubPushEvent represents a GitHub push webhook event
 type GitHubPushEvent struct {
 	Ref    string `json:"ref"`
+	Before string `json:"before"`
 	After  string `json:"after"`
 	Pusher struct {
 		Name  string `json:"name"`
