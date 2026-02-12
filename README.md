@@ -149,8 +149,32 @@ database:
 
 jwt:
   secret: your-secret-key-change-in-production
-  expire_hours: 24
+  expire_hour: 24
 ```
+
+### Session & Token Expiration
+
+CodeSentry uses a **short-lived access token** (JWT) plus a **long-lived refresh token** for silent re-login.
+
+- **Access token**: returned by `POST /api/auth/login`, stored by frontend in `localStorage` and sent as `Authorization: Bearer <token>`.
+- **Refresh token**: stored in a **httpOnly cookie** (not accessible from JavaScript), used by `POST /api/auth/refresh`.
+
+Default expirations (configurable via System Config in DB):
+
+- `auth_access_token_expire_hours` (default: `2`)
+- `auth_refresh_token_expire_hours` (default: `720` = 30 days)
+
+`jwt.expire_hour` in `config.yaml` is used as a fallback default for access token expiration.
+
+> **Note**: When the access token expires, the frontend will automatically call `/api/auth/refresh` and retry the original request. Only when refresh fails will it redirect to `/login`.
+
+### CORS (Important for Refresh Cookie)
+
+Because refresh token is stored in a cookie, deployments that serve frontend and backend on different origins must configure CORS correctly:
+
+- `Access-Control-Allow-Credentials: true` is required
+- `Access-Control-Allow-Origin` **cannot** be `*`
+- Prefer an explicit origin allowlist in production
 
 > **Note**: All business configurations (LLM models, LDAP, prompts, IM bots, Git credentials) are managed via the web UI and stored in the database.
 
@@ -195,9 +219,10 @@ The system automatically detects the platform via request headers.
 ### Authentication
 
 - `POST /api/auth/login` - Login
+- `POST /api/auth/refresh` - Refresh access token (uses httpOnly refresh cookie)
 - `GET /api/auth/config` - Get auth config
 - `GET /api/auth/me` - Get current user
-- `POST /api/auth/logout` - Logout
+- `POST /api/auth/logout` - Logout (revokes refresh token and clears cookie)
 - `POST /api/auth/change-password` - Change password (local users only)
 
 ### Projects

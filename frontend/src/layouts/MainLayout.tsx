@@ -87,9 +87,14 @@ const MainLayout: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } catch {
+    } finally {
+      logout();
+      navigate('/login');
+    }
   };
 
   const handleLanguageChange = (lang: string) => {

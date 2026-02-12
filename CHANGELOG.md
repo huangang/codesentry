@@ -34,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Responsive Design**: Mobile-friendly interface
 - **Dark Mode**: Light and dark theme toggle
 
+- **Auth Refresh**: Refresh-token based session renewal (`POST /api/auth/refresh`) with httpOnly cookie storage
+- **Refresh Token Rotation**: Server-side refresh token storage with rotation and revocation support
+
 ### Changed
 
 - **Unified API Response**: All handlers migrated to `pkg/response` package with standardized `{code, data, message}` envelope
@@ -50,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - JWT-based authentication
+- Refresh-token based session renewal with httpOnly cookie
 - LDAP integration support
 - Webhook secret validation
 - Duplicate review prevention for same commit across branches

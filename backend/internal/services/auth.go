@@ -1,7 +1,11 @@
 package services
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/huangang/codesentry/backend/internal/config"
@@ -14,6 +18,7 @@ type AuthService struct {
 	db          *gorm.DB
 	ldapService *LDAPService
 	jwtConfig   *config.JWTConfig
+	configSvc   *SystemConfigService
 }
 
 func NewAuthService(db *gorm.DB, jwtCfg *config.JWTConfig) *AuthService {
@@ -21,6 +26,7 @@ func NewAuthService(db *gorm.DB, jwtCfg *config.JWTConfig) *AuthService {
 		db:          db,
 		ldapService: NewLDAPService(db),
 		jwtConfig:   jwtCfg,
+		configSvc:   NewSystemConfigService(db),
 	}
 }
 
@@ -36,8 +42,23 @@ type LoginResponse struct {
 	ExpireAt time.Time    `json:"expire_at"`
 }
 
+type LoginResult struct {
+	AccessToken     string
+	AccessExpireAt  time.Time
+	RefreshToken    string
+	RefreshExpireAt time.Time
+	User            *models.User
+}
+
+type RefreshResult struct {
+	AccessToken     string
+	AccessExpireAt  time.Time
+	RefreshToken    string
+	RefreshExpireAt time.Time
+}
+
 // Login authenticates a user and returns a JWT token
-func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
+func (s *AuthService) Login(req *LoginRequest, clientIP, userAgent string) (*LoginResult, error) {
 	var user *models.User
 	var err error
 
@@ -59,9 +80,32 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 		return nil, err
 	}
 
-	// Generate JWT token
-	token, err := utils.GenerateToken(user.ID, user.Username, user.Role, s.jwtConfig.ExpireHour)
+	accessHours := s.getAccessTokenExpireHours()
+	refreshHours := s.getRefreshTokenExpireHours()
+
+	token, err := utils.GenerateToken(user.ID, user.Username, user.Role, accessHours)
 	if err != nil {
+		return nil, err
+	}
+
+	refreshToken, refreshHash, err := generateRefreshToken()
+	if err != nil {
+		return nil, err
+	}
+
+	refreshExpireAt := time.Now().Add(time.Duration(refreshHours) * time.Hour)
+	refreshRecord := models.RefreshToken{
+		UserID:    user.ID,
+		TokenHash: refreshHash,
+		ExpiresAt: refreshExpireAt,
+	}
+	if clientIP != "" {
+		refreshRecord.CreatedByIP = clientIP
+	}
+	if userAgent != "" {
+		refreshRecord.UserAgent = userAgent
+	}
+	if err := s.db.Create(&refreshRecord).Error; err != nil {
 		return nil, err
 	}
 
@@ -70,11 +114,145 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 	user.LastLogin = &now
 	s.db.Save(user)
 
-	return &LoginResponse{
-		Token:    token,
-		User:     user,
-		ExpireAt: time.Now().Add(time.Duration(s.jwtConfig.ExpireHour) * time.Hour),
+	return &LoginResult{
+		AccessToken:     token,
+		AccessExpireAt:  time.Now().Add(time.Duration(accessHours) * time.Hour),
+		RefreshToken:    refreshToken,
+		RefreshExpireAt: refreshExpireAt,
+		User:            user,
 	}, nil
+}
+
+func (s *AuthService) Refresh(refreshToken string, clientIP, userAgent string) (*RefreshResult, error) {
+	if refreshToken == "" {
+		return nil, errors.New("refresh token required")
+	}
+
+	hash := hashRefreshToken(refreshToken)
+
+	var stored models.RefreshToken
+	if err := s.db.Where("token_hash = ?", hash).First(&stored).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("invalid refresh token")
+		}
+		return nil, err
+	}
+
+	if stored.RevokedAt != nil {
+		return nil, errors.New("refresh token revoked")
+	}
+	if time.Now().After(stored.ExpiresAt) {
+		return nil, errors.New("refresh token expired")
+	}
+
+	var user models.User
+	if err := s.db.First(&user, stored.UserID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("user not found")
+		}
+		return nil, err
+	}
+	if !user.IsActive {
+		return nil, errors.New("user is disabled")
+	}
+
+	accessHours := s.getAccessTokenExpireHours()
+	refreshHours := s.getRefreshTokenExpireHours()
+
+	newAccessToken, err := utils.GenerateToken(user.ID, user.Username, user.Role, accessHours)
+	if err != nil {
+		return nil, err
+	}
+
+	newRefreshToken, newRefreshHash, err := generateRefreshToken()
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	newRefresh := models.RefreshToken{
+		UserID:    user.ID,
+		TokenHash: newRefreshHash,
+		ExpiresAt: now.Add(time.Duration(refreshHours) * time.Hour),
+	}
+	if clientIP != "" {
+		newRefresh.CreatedByIP = clientIP
+	}
+	if userAgent != "" {
+		newRefresh.UserAgent = userAgent
+	}
+
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&newRefresh).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&stored).Updates(map[string]interface{}{
+			"revoked_at":           now,
+			"replaced_by_token_id": newRefresh.ID,
+		}).Error; err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return &RefreshResult{
+		AccessToken:     newAccessToken,
+		AccessExpireAt:  time.Now().Add(time.Duration(accessHours) * time.Hour),
+		RefreshToken:    newRefreshToken,
+		RefreshExpireAt: newRefresh.ExpiresAt,
+	}, nil
+}
+
+func (s *AuthService) RevokeRefreshToken(refreshToken string) error {
+	if refreshToken == "" {
+		return nil
+	}
+
+	hash := hashRefreshToken(refreshToken)
+	now := time.Now()
+	if err := s.db.Model(&models.RefreshToken{}).
+		Where("token_hash = ? AND revoked_at IS NULL", hash).
+		Update("revoked_at", now).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *AuthService) getAccessTokenExpireHours() int {
+	defaultHours := s.jwtConfig.ExpireHour
+	value := s.configSvc.GetWithDefault("auth_access_token_expire_hours", strconv.Itoa(defaultHours))
+	hours, err := strconv.Atoi(value)
+	if err != nil || hours <= 0 {
+		return defaultHours
+	}
+	return hours
+}
+
+func (s *AuthService) getRefreshTokenExpireHours() int {
+	value := s.configSvc.GetWithDefault("auth_refresh_token_expire_hours", "720")
+	hours, err := strconv.Atoi(value)
+	if err != nil || hours <= 0 {
+		return 720
+	}
+	return hours
+}
+
+func generateRefreshToken() (token string, tokenHash string, err error) {
+	randomBytes := make([]byte, 32)
+	if _, err = rand.Read(randomBytes); err != nil {
+		return "", "", err
+	}
+	token = hex.EncodeToString(randomBytes)
+	tokenHash = hashRefreshToken(token)
+	return token, tokenHash, nil
+}
+
+func hashRefreshToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }
 
 func (s *AuthService) localAuth(username, password string) (*models.User, error) {

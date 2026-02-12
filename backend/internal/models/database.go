@@ -43,6 +43,7 @@ func InitDB(cfg *config.DatabaseConfig) error {
 func AutoMigrate() error {
 	return DB.AutoMigrate(
 		&User{},
+		&RefreshToken{},
 		&Project{},
 		&ReviewLog{},
 		&LLMConfig{},
@@ -171,6 +172,8 @@ Please strictly follow this structure:
 		{Key: "daily_report_enabled", Value: "false", Type: "bool", Group: "daily_report", Label: "Enable Daily Report"},
 		{Key: "daily_report_time", Value: "18:00", Type: "string", Group: "daily_report", Label: "Daily Report Time"},
 		{Key: "daily_report_low_score", Value: "60", Type: "int", Group: "daily_report", Label: "Low Score Threshold"},
+		{Key: "auth_access_token_expire_hours", Value: "2", Type: "int", Group: "auth", Label: "Access Token Expire Hours"},
+		{Key: "auth_refresh_token_expire_hours", Value: "720", Type: "int", Group: "auth", Label: "Refresh Token Expire Hours"},
 	}
 
 	for _, cfg := range defaultConfigs {

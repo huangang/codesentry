@@ -149,8 +149,32 @@ database:
 
 jwt:
   secret: your-secret-key-change-in-production
-  expire_hours: 24
+  expire_hour: 24
 ```
+
+### 会话与 Token 过期机制
+
+CodeSentry 使用 **短期 access token（JWT）+ 长期 refresh token** 的会话机制，支持静默续期。
+
+- **Access Token**：由 `POST /api/auth/login` 返回，前端存储在 `localStorage`，请求时通过 `Authorization: Bearer <token>` 发送。
+- **Refresh Token**：保存在 **httpOnly Cookie** 中（JavaScript 无法读取），由 `POST /api/auth/refresh` 使用。
+
+默认过期时间（可通过数据库中的系统配置调整）：
+
+- `auth_access_token_expire_hours`（默认：`2`）
+- `auth_refresh_token_expire_hours`（默认：`720`，即 30 天）
+
+`config.yaml` 中的 `jwt.expire_hour` 作为 access token 过期时间的兜底默认值。
+
+> **说明**：当 access token 过期时，前端会自动调用 `/api/auth/refresh` 并重试原请求；仅在 refresh 失败时才跳转登录页。
+
+### CORS 配置（Refresh Cookie 相关）
+
+由于 refresh token 使用 Cookie，在前后端跨域部署时需要正确配置 CORS：
+
+- 必须开启 `Access-Control-Allow-Credentials: true`
+- `Access-Control-Allow-Origin` **不能** 为 `*`
+- 生产环境建议使用明确的域名白名单
 
 > **注意**: 所有业务配置(大模型、LDAP、提示词、IM 机器人、Git 凭证)均通过 Web 界面管理,存储在数据库中。
 
@@ -195,9 +219,10 @@ https://你的域名/review/webhook
 ### 认证
 
 - `POST /api/auth/login` - 登录
+- `POST /api/auth/refresh` - 刷新 access token（使用 httpOnly refresh cookie）
 - `GET /api/auth/config` - 获取认证配置
 - `GET /api/auth/me` - 获取当前用户
-- `POST /api/auth/logout` - 退出登录
+- `POST /api/auth/logout` - 退出登录（撤销 refresh token 并清除 cookie）
 - `POST /api/auth/change-password` - 修改密码（仅本地用户）
 
 ### 项目管理

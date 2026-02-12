@@ -10,7 +10,9 @@ import (
 // CORS returns a CORS middleware
 func CORS() gin.HandlerFunc {
 	return cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
+		AllowOriginFunc: func(origin string) bool {
+			return origin != ""
+		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With", "X-Gitlab-Token", "X-Gitlab-Event", "X-GitHub-Event", "X-Hub-Signature", "X-Hub-Signature-256"},
 		ExposeHeaders:    []string{"Content-Length"},

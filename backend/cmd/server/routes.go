@@ -41,6 +41,7 @@ func registerRoutes(r *gin.Engine, svc *appServices) {
 		auth := api.Group("/auth")
 		{
 			auth.POST("/login", svc.authHandler.Login)
+			auth.POST("/refresh", svc.authHandler.Refresh)
 			auth.GET("/config", svc.authHandler.GetAuthConfig)
 		}
 
