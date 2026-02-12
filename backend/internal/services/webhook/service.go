@@ -167,9 +167,25 @@ func (s *Service) SyncReview(ctx context.Context, project *models.Project, req *
 }
 
 // ProcessReviewTask processes a review task from the async queue
-func (s *Service) ProcessReviewTask(ctx context.Context, task *services.ReviewTask) error {
+func (s *Service) ProcessReviewTask(ctx context.Context, task *services.ReviewTask) (retErr error) {
 	logger.Infof("[TaskQueue] Processing review task: review_log_id=%d, project=%d, commit=%s",
 		task.ReviewLogID, task.ProjectID, task.CommitSHA)
+
+	// Recover from panic to ensure review status is updated to "failed"
+	defer func() {
+		if r := recover(); r != nil {
+			panicMsg := fmt.Sprintf("panic: %v", r)
+			logger.Infof("[TaskQueue] Recovered from panic in review task %d: %s", task.ReviewLogID, panicMsg)
+			// Update review status to failed
+			if reviewLog, err := s.reviewService.GetByID(task.ReviewLogID); err == nil {
+				reviewLog.ReviewStatus = "failed"
+				reviewLog.ErrorMessage = panicMsg
+				s.reviewService.Update(reviewLog)
+				services.PublishReviewEvent(reviewLog.ID, reviewLog.ProjectID, reviewLog.CommitHash, "failed", nil, panicMsg)
+			}
+			retErr = fmt.Errorf("panic recovered: %s", panicMsg)
+		}
+	}()
 
 	reviewLog, err := s.reviewService.GetByID(task.ReviewLogID)
 	if err != nil {
