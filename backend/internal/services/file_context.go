@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"github.com/huangang/codesentry/backend/pkg/logger"
 	"net/http"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/huangang/codesentry/backend/pkg/logger"
 
 	"github.com/huangang/codesentry/backend/internal/models"
 )
@@ -503,7 +504,19 @@ func extractGoFunctions(lines []string, modifiedRanges []LineRange) []FunctionDe
 			if r.Start <= fb.endLine && r.End >= fb.startLine {
 				if !seen[fb.name] {
 					seen[fb.name] = true
-					content := strings.Join(lines[fb.startLine-1:fb.endLine], "\n")
+					// Bounds check to prevent slice out of range
+					startIdx := fb.startLine - 1
+					endIdx := fb.endLine
+					if startIdx < 0 {
+						startIdx = 0
+					}
+					if endIdx > len(lines) {
+						endIdx = len(lines)
+					}
+					if startIdx >= endIdx {
+						continue
+					}
+					content := strings.Join(lines[startIdx:endIdx], "\n")
 					functions = append(functions, FunctionDefinition{
 						Name:      fb.name,
 						StartLine: fb.startLine,
@@ -576,7 +589,19 @@ func extractJSFunctions(lines []string, modifiedRanges []LineRange) []FunctionDe
 			if r.Start <= fb.endLine && r.End >= fb.startLine {
 				if !seen[fb.name] {
 					seen[fb.name] = true
-					content := strings.Join(lines[fb.startLine-1:fb.endLine], "\n")
+					// Bounds check to prevent slice out of range
+					startIdx := fb.startLine - 1
+					endIdx := fb.endLine
+					if startIdx < 0 {
+						startIdx = 0
+					}
+					if endIdx > len(lines) {
+						endIdx = len(lines)
+					}
+					if startIdx >= endIdx {
+						continue
+					}
+					content := strings.Join(lines[startIdx:endIdx], "\n")
 					functions = append(functions, FunctionDefinition{
 						Name:      fb.name,
 						StartLine: fb.startLine,
@@ -644,7 +669,19 @@ func extractPythonFunctions(lines []string, modifiedRanges []LineRange) []Functi
 			if r.Start <= fb.endLine && r.End >= fb.startLine {
 				if !seen[fb.name] {
 					seen[fb.name] = true
-					content := strings.Join(lines[fb.startLine-1:fb.endLine], "\n")
+					// Bounds check to prevent slice out of range
+					startIdx := fb.startLine - 1
+					endIdx := fb.endLine
+					if startIdx < 0 {
+						startIdx = 0
+					}
+					if endIdx > len(lines) {
+						endIdx = len(lines)
+					}
+					if startIdx >= endIdx {
+						continue
+					}
+					content := strings.Join(lines[startIdx:endIdx], "\n")
 					functions = append(functions, FunctionDefinition{
 						Name:      fb.name,
 						StartLine: fb.startLine,
@@ -709,7 +746,19 @@ func extractJavaStyleFunctions(lines []string, modifiedRanges []LineRange) []Fun
 			if r.Start <= fb.endLine && r.End >= fb.startLine {
 				if !seen[fb.name] {
 					seen[fb.name] = true
-					content := strings.Join(lines[fb.startLine-1:fb.endLine], "\n")
+					// Bounds check to prevent slice out of range
+					startIdx := fb.startLine - 1
+					endIdx := fb.endLine
+					if startIdx < 0 {
+						startIdx = 0
+					}
+					if endIdx > len(lines) {
+						endIdx = len(lines)
+					}
+					if startIdx >= endIdx {
+						continue
+					}
+					content := strings.Join(lines[startIdx:endIdx], "\n")
 					functions = append(functions, FunctionDefinition{
 						Name:      fb.name,
 						StartLine: fb.startLine,
@@ -731,7 +780,16 @@ func extractGenericContext(lines []string, modifiedRanges []LineRange) []Functio
 	var functions []FunctionDefinition
 	contextLines := 15 // Lines of context before/after
 
+	if len(lines) == 0 {
+		return functions
+	}
+
 	for _, r := range modifiedRanges {
+		// Skip ranges that are entirely beyond the file content
+		if r.Start > len(lines) {
+			continue
+		}
+
 		start := r.Start - contextLines
 		if start < 1 {
 			start = 1
@@ -739,6 +797,11 @@ func extractGenericContext(lines []string, modifiedRanges []LineRange) []Functio
 		end := r.End + contextLines
 		if end > len(lines) {
 			end = len(lines)
+		}
+
+		// Ensure start doesn't exceed end after clamping
+		if start > end {
+			start = end
 		}
 
 		content := strings.Join(lines[start-1:end], "\n")
