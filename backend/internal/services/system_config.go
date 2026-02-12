@@ -56,6 +56,39 @@ func (s *SystemConfigService) GetByGroup(group string) ([]models.SystemConfig, e
 	return configs, nil
 }
 
+type AuthSessionConfigResponse struct {
+	AccessTokenExpireHours  int `json:"access_token_expire_hours"`
+	RefreshTokenExpireHours int `json:"refresh_token_expire_hours"`
+}
+
+func (s *SystemConfigService) GetAuthSessionConfig() *AuthSessionConfigResponse {
+	accessHours, _ := strconv.Atoi(s.GetWithDefault("auth_access_token_expire_hours", "2"))
+	refreshHours, _ := strconv.Atoi(s.GetWithDefault("auth_refresh_token_expire_hours", "720"))
+	return &AuthSessionConfigResponse{
+		AccessTokenExpireHours:  accessHours,
+		RefreshTokenExpireHours: refreshHours,
+	}
+}
+
+type UpdateAuthSessionConfigRequest struct {
+	AccessTokenExpireHours  *int `json:"access_token_expire_hours"`
+	RefreshTokenExpireHours *int `json:"refresh_token_expire_hours"`
+}
+
+func (s *SystemConfigService) UpdateAuthSessionConfig(req *UpdateAuthSessionConfigRequest) error {
+	if req.AccessTokenExpireHours != nil {
+		if err := s.Set("auth_access_token_expire_hours", strconv.Itoa(*req.AccessTokenExpireHours)); err != nil {
+			return err
+		}
+	}
+	if req.RefreshTokenExpireHours != nil {
+		if err := s.Set("auth_refresh_token_expire_hours", strconv.Itoa(*req.RefreshTokenExpireHours)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type LDAPConfigResponse struct {
 	Enabled     bool   `json:"enabled"`
 	Host        string `json:"host"`

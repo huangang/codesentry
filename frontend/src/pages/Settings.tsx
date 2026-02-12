@@ -24,12 +24,14 @@ import {
   useDailyReportConfig,
   useChunkedReviewConfig,
   useFileContextConfig,
+  useAuthSessionConfig,
   useActiveLLMConfigs,
   useActiveImBots,
   useUpdateLDAPConfig,
   useUpdateDailyReportConfig,
   useUpdateChunkedReviewConfig,
   useUpdateFileContextConfig,
+  useUpdateAuthSessionConfig,
   useHolidayCountries,
 } from '../hooks/queries';
 
@@ -39,6 +41,7 @@ const Settings: React.FC = () => {
   const [dailyReportForm] = Form.useForm();
   const [chunkedReviewForm] = Form.useForm();
   const [fileContextForm] = Form.useForm();
+  const [authSessionForm] = Form.useForm();
   const [ldapEnabled, setLdapEnabled] = useState(false);
   const [dailyReportEnabled, setDailyReportEnabled] = useState(false);
   const [chunkedReviewEnabled, setChunkedReviewEnabled] = useState(false);
@@ -49,6 +52,7 @@ const Settings: React.FC = () => {
   const { data: dailyReportConfig, isLoading: dailyReportLoading } = useDailyReportConfig();
   const { data: chunkedReviewConfig, isLoading: chunkedReviewLoading } = useChunkedReviewConfig();
   const { data: fileContextConfig, isLoading: fileContextLoading } = useFileContextConfig();
+  const { data: authSessionConfig, isLoading: authSessionLoading } = useAuthSessionConfig();
   const { data: llmConfigs } = useActiveLLMConfigs();
   const { data: imBots } = useActiveImBots();
   const { data: holidayCountries } = useHolidayCountries();
@@ -59,8 +63,9 @@ const Settings: React.FC = () => {
   const updateDailyReport = useUpdateDailyReportConfig();
   const updateChunkedReview = useUpdateChunkedReviewConfig();
   const updateFileContext = useUpdateFileContextConfig();
+  const updateAuthSession = useUpdateAuthSessionConfig();
 
-  const isLoading = ldapLoading || dailyReportLoading || chunkedReviewLoading || fileContextLoading;
+  const isLoading = ldapLoading || dailyReportLoading || chunkedReviewLoading || fileContextLoading || authSessionLoading;
 
   // Set form values when data loads
   useEffect(() => {
@@ -100,6 +105,15 @@ const Settings: React.FC = () => {
       setFileContextEnabled(fileContextConfig.enabled);
     }
   }, [fileContextConfig, fileContextForm]);
+
+  useEffect(() => {
+    if (authSessionConfig) {
+      authSessionForm.setFieldsValue({
+        access_token_expire_hours: authSessionConfig.access_token_expire_hours,
+        refresh_token_expire_hours: authSessionConfig.refresh_token_expire_hours,
+      });
+    }
+  }, [authSessionConfig, authSessionForm]);
 
   const handleLdapSave = async () => {
     try {
@@ -169,6 +183,20 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleAuthSessionSave = async () => {
+    try {
+      const values = await authSessionForm.validateFields();
+      await updateAuthSession.mutateAsync({
+        access_token_expire_hours: values.access_token_expire_hours,
+        refresh_token_expire_hours: values.refresh_token_expire_hours,
+      });
+      message.success(t('settings.authSession.saveSuccess'));
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { error?: string } } };
+      message.error(err.response?.data?.error || t('common.error'));
+    }
+  };
+
   if (isLoading) {
     return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}><Spin size="large" /></div>;
   }
@@ -228,6 +256,33 @@ const Settings: React.FC = () => {
           <Row gutter={16}>
             <Col xs={24} sm={12}><Form.Item name="max_file_size" label={t('settings.fileContext.maxFileSize')} extra={t('settings.fileContext.maxFileSizeHint')}><InputNumber min={1024} max={1048576} step={1024} style={{ width: '100%' }} disabled={!fileContextEnabled} addonAfter="bytes" /></Form.Item></Col>
             <Col xs={24} sm={12}><Form.Item name="max_files" label={t('settings.fileContext.maxFiles')} extra={t('settings.fileContext.maxFilesHint')}><InputNumber min={1} max={50} style={{ width: '100%' }} disabled={!fileContextEnabled} /></Form.Item></Col>
+          </Row>
+        </Form>
+      </Card>
+
+      <Card title={t('settings.authSession.title')} extra={<Button type="primary" icon={<SaveOutlined />} loading={updateAuthSession.isPending} onClick={handleAuthSessionSave}>{t('common.save')}</Button>}>
+        <Form form={authSessionForm} layout="vertical" style={{ maxWidth: 600 }}>
+          <Row gutter={16}>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="access_token_expire_hours"
+                label={t('settings.authSession.accessTokenExpireHours')}
+                extra={t('settings.authSession.accessTokenExpireHoursHint')}
+                rules={[{ required: true, message: t('settings.authSession.accessTokenRequired') }]}
+              >
+                <InputNumber min={1} max={168} style={{ width: '100%' }} addonAfter="hours" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item
+                name="refresh_token_expire_hours"
+                label={t('settings.authSession.refreshTokenExpireHours')}
+                extra={t('settings.authSession.refreshTokenExpireHoursHint')}
+                rules={[{ required: true, message: t('settings.authSession.refreshTokenRequired') }]}
+              >
+                <InputNumber min={24} max={8760} style={{ width: '100%' }} addonAfter="hours" />
+              </Form.Item>
+            </Col>
           </Row>
         </Form>
       </Card>

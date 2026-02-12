@@ -175,6 +175,8 @@ func registerRoutes(r *gin.Engine, svc *appServices) {
 			systemConfigHandler := handlers.NewSystemConfigHandler(models.GetDB())
 			admin.GET("/system-config/ldap", systemConfigHandler.GetLDAPConfig)
 			admin.PUT("/system-config/ldap", systemConfigHandler.UpdateLDAPConfig)
+			admin.GET("/system-config/auth-session", systemConfigHandler.GetAuthSessionConfig)
+			admin.PUT("/system-config/auth-session", systemConfigHandler.UpdateAuthSessionConfig)
 			admin.GET("/system-config/daily-report", systemConfigHandler.GetDailyReportConfig)
 			admin.PUT("/system-config/daily-report", systemConfigHandler.UpdateDailyReportConfig)
 			admin.GET("/system-config/chunked-review", systemConfigHandler.GetChunkedReviewConfig)

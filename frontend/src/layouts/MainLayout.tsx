@@ -28,6 +28,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useThemeStore } from '../stores/themeStore';
 import { usePermission } from '../hooks';
 import { authApi } from '../services';
+import { stopProactiveRefresh } from '../services/api';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -92,6 +93,7 @@ const MainLayout: React.FC = () => {
       await authApi.logout();
     } catch {
     } finally {
+      stopProactiveRefresh();
       logout();
       navigate('/login');
     }

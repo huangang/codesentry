@@ -446,6 +446,16 @@
       "maxFiles": "Max Files",
       "maxFilesHint": "Maximum number of files to fetch context for (default 10)",
       "saveSuccess": "File context settings saved successfully"
+    },
+    "authSession": {
+      "title": "Auth Session Settings",
+      "accessTokenExpireHours": "Access Token Expiration (hours)",
+      "accessTokenExpireHoursHint": "Short-lived access token lifetime (recommended: 1-2 hours)",
+      "accessTokenRequired": "Please input access token expiration",
+      "refreshTokenExpireHours": "Refresh Token Expiration (hours)",
+      "refreshTokenExpireHoursHint": "Long-lived refresh token lifetime (recommended: 720 hours = 30 days)",
+      "refreshTokenRequired": "Please input refresh token expiration",
+      "saveSuccess": "Auth session settings saved successfully"
     }
   },
   "users": {

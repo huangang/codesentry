@@ -7,8 +7,10 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  expireAt: string | null;
   setAuth: (token: string, user: User) => void;
   setToken: (token: string) => void;
+  setExpireAt: (expireAt: string | null) => void;
   logout: () => void;
 }
 
@@ -19,6 +21,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       isAdmin: false,
+      expireAt: null,
       setAuth: (token, user) => {
         localStorage.setItem('token', token);
         set({ token, user, isAuthenticated: true, isAdmin: user.role === 'admin' });
@@ -27,14 +30,17 @@ export const useAuthStore = create<AuthState>()(
         localStorage.setItem('token', token);
         set({ token });
       },
+      setExpireAt: (expireAt) => {
+        set({ expireAt });
+      },
       logout: () => {
         localStorage.removeItem('token');
-        set({ token: null, user: null, isAuthenticated: false, isAdmin: false });
+        set({ token: null, user: null, isAuthenticated: false, isAdmin: false, expireAt: null });
       },
     }),
     {
       name: 'auth-storage',
-      partialize: (state) => ({ token: state.token, user: state.user, isAuthenticated: state.isAuthenticated, isAdmin: state.isAdmin }),
+      partialize: (state) => ({ token: state.token, user: state.user, isAuthenticated: state.isAuthenticated, isAdmin: state.isAdmin, expireAt: state.expireAt }),
     }
   )
 );

@@ -446,6 +446,16 @@
       "maxFiles": "最大文件数",
       "maxFilesHint": "获取上下文的最大文件数量（默认 10 个）",
       "saveSuccess": "文件上下文设置保存成功"
+    },
+    "authSession": {
+      "title": "会话设置",
+      "accessTokenExpireHours": "Access Token 过期时间（小时）",
+      "accessTokenExpireHoursHint": "短期 access token 有效期（建议 1-2 小时）",
+      "accessTokenRequired": "请输入 Access Token 过期时间",
+      "refreshTokenExpireHours": "Refresh Token 过期时间（小时）",
+      "refreshTokenExpireHoursHint": "长期 refresh token 有效期（建议 720 小时=30 天）",
+      "refreshTokenRequired": "请输入 Refresh Token 过期时间",
+      "saveSuccess": "会话设置保存成功"
     }
   },
   "users": {

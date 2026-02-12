@@ -168,6 +168,8 @@ Default expirations (configurable via System Config in DB):
 
 > **Note**: When the access token expires, the frontend will automatically call `/api/auth/refresh` and retry the original request. Only when refresh fails will it redirect to `/login`.
 
+The frontend also performs **proactive refresh** before token expiration (default: refresh 5 minutes before access token expires) to reduce user-visible 401 interruptions.
+
 ### CORS (Important for Refresh Cookie)
 
 Because refresh token is stored in a cookie, deployments that serve frontend and backend on different origins must configure CORS correctly:
@@ -224,6 +226,11 @@ The system automatically detects the platform via request headers.
 - `GET /api/auth/me` - Get current user
 - `POST /api/auth/logout` - Logout (revokes refresh token and clears cookie)
 - `POST /api/auth/change-password` - Change password (local users only)
+
+### System Config (Admin)
+
+- `GET /api/system-config/auth-session` - Get auth session config
+- `PUT /api/system-config/auth-session` - Update auth session config
 
 ### Projects
 

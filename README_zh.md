@@ -168,6 +168,8 @@ CodeSentry 使用 **短期 access token（JWT）+ 长期 refresh token** 的会�
 
 > **说明**：当 access token 过期时，前端会自动调用 `/api/auth/refresh` 并重试原请求；仅在 refresh 失败时才跳转登录页。
 
+前端还会在 access token 即将过期前进行**提前续期**（默认：过期前 5 分钟刷新），以减少用户遇到 401 中断的概率。
+
 ### CORS 配置（Refresh Cookie 相关）
 
 由于 refresh token 使用 Cookie，在前后端跨域部署时需要正确配置 CORS：
@@ -224,6 +226,11 @@ https://你的域名/review/webhook
 - `GET /api/auth/me` - 获取当前用户
 - `POST /api/auth/logout` - 退出登录（撤销 refresh token 并清除 cookie）
 - `POST /api/auth/change-password` - 修改密码（仅本地用户）
+
+### 系统配置（管理员）
+
+- `GET /api/system-config/auth-session` - 获取会话配置
+- `PUT /api/system-config/auth-session` - 更新会话配置
 
 ### 项目管理
 

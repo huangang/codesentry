@@ -5,13 +5,14 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { authApi } from '../services';
 import { useAuthStore } from '../stores/authStore';
+import { startProactiveRefresh } from '../services/api';
 
 const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [ldapEnabled, setLdapEnabled] = useState(false);
   const [authType, setAuthType] = useState('local');
   const navigate = useNavigate();
-  const { isAuthenticated, setAuth } = useAuthStore();
+  const { isAuthenticated, setAuth, setExpireAt } = useAuthStore();
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -30,6 +31,8 @@ const Login: React.FC = () => {
     try {
       const res = await authApi.login(values.username, values.password, authType);
       setAuth(res.data.token, res.data.user);
+      setExpireAt(res.data.expire_at || null);
+      startProactiveRefresh(res.data.expire_at || null);
       message.success(t('auth.loginSuccess'));
       navigate('/admin/dashboard');
     } catch (error: any) {

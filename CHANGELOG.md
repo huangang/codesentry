@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Auth Refresh**: Refresh-token based session renewal (`POST /api/auth/refresh`) with httpOnly cookie storage
 - **Refresh Token Rotation**: Server-side refresh token storage with rotation and revocation support
+- **Proactive Session Refresh**: Frontend proactively refreshes access token before expiration to reduce 401 interruptions
+- **Auth Session Settings UI**: Admin settings page now supports configuring access/refresh token expiration
 
 ### Changed
 

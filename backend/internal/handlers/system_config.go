@@ -103,3 +103,23 @@ func (h *SystemConfigHandler) GetHolidayCountries(c *gin.Context) {
 	countries := h.holidayService.GetSupportedCountries()
 	response.Success(c, countries)
 }
+
+func (h *SystemConfigHandler) GetAuthSessionConfig(c *gin.Context) {
+	config := h.configService.GetAuthSessionConfig()
+	response.Success(c, config)
+}
+
+func (h *SystemConfigHandler) UpdateAuthSessionConfig(c *gin.Context) {
+	var req services.UpdateAuthSessionConfigRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	if err := h.configService.UpdateAuthSessionConfig(&req); err != nil {
+		response.ServerError(c, err.Error())
+		return
+	}
+
+	response.Success(c, h.configService.GetAuthSessionConfig())
+}

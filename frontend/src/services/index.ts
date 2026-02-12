@@ -273,6 +273,11 @@ export const systemConfigApi = {
   updateFileContextConfig: (data: Partial<FileContextConfig>) =>
     api.put<FileContextConfig>('/system-config/file-context', data),
 
+  getAuthSessionConfig: () => api.get<AuthSessionConfig>('/system-config/auth-session'),
+
+  updateAuthSessionConfig: (data: Partial<AuthSessionConfig>) =>
+    api.put<AuthSessionConfig>('/system-config/auth-session', data),
+
   getHolidayCountries: () => api.get<HolidayCountry[]>('/system-config/holiday-countries'),
 };
 
@@ -304,6 +309,11 @@ export interface FileContextConfig {
   max_file_size: number;
   max_files: number;
   extract_functions: boolean;
+}
+
+export interface AuthSessionConfig {
+  access_token_expire_hours: number;
+  refresh_token_expire_hours: number;
 }
 
 export const userApi = {

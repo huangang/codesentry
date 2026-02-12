@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { systemConfigApi, type DailyReportConfig, type ChunkedReviewConfig, type FileContextConfig, type HolidayCountry } from '../../services';
+import { systemConfigApi, type DailyReportConfig, type ChunkedReviewConfig, type FileContextConfig, type HolidayCountry, type AuthSessionConfig } from '../../services';
 import type { LDAPConfig } from '../../types';
 
 // Query keys
@@ -9,6 +9,7 @@ export const settingsKeys = {
     dailyReport: () => [...settingsKeys.all, 'dailyReport'] as const,
     chunkedReview: () => [...settingsKeys.all, 'chunkedReview'] as const,
     fileContext: () => [...settingsKeys.all, 'fileContext'] as const,
+    authSession: () => [...settingsKeys.all, 'authSession'] as const,
     activeLLMs: () => [...settingsKeys.all, 'activeLLMs'] as const,
     activeIMBots: () => [...settingsKeys.all, 'activeIMBots'] as const,
     holidayCountries: () => [...settingsKeys.all, 'holidayCountries'] as const,
@@ -50,6 +51,16 @@ export function useFileContextConfig() {
         queryKey: settingsKeys.fileContext(),
         queryFn: async () => {
             const res = await systemConfigApi.getFileContextConfig();
+            return res.data;
+        },
+    });
+}
+
+export function useAuthSessionConfig() {
+    return useQuery({
+        queryKey: settingsKeys.authSession(),
+        queryFn: async () => {
+            const res = await systemConfigApi.getAuthSessionConfig();
             return res.data;
         },
     });
@@ -117,6 +128,19 @@ export function useUpdateFileContextConfig() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: settingsKeys.fileContext() });
+        },
+    });
+}
+
+export function useUpdateAuthSessionConfig() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (data: Partial<AuthSessionConfig>) => {
+            const res = await systemConfigApi.updateAuthSessionConfig(data);
+            return res.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: settingsKeys.authSession() });
         },
     });
 }
