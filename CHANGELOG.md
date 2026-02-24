@@ -46,6 +46,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Models Split**: Decomposed monolithic `models.go` (290 lines) into 13 individual model files for better maintainability
 - **Main Entry Split**: Split `main.go` into `bootstrap.go` (initialization) and `routes.go` (routing)
 - **Frontend API Layer**: Added automatic response envelope unwrapping in axios interceptor
+- **Notification Refactor**: Refactored notification service using Strategy Pattern with `NotificationAdapter` interface, reducing ~600 lines to ~90 lines + 8 platform adapters
+- **DB Query Optimization**: Consolidated 9 separate DB queries in daily report stats collection into a single aggregate SQL query
+- **Regex Pre-compilation**: Moved regex patterns in `ai.go` and `file_context.go` to package-level pre-compiled variables
+- **Function Extraction Dedup**: Extracted shared `matchBoundariesToRanges` helper to eliminate ~80 lines of duplicated code across 4 language extractors
+- **HTTP Timeout**: Added 10-second timeout to notification HTTP client to prevent goroutine leaks
+- **Dockerfile Hardening**: Upgraded to Node 22 & Alpine 3.21, added non-root user, added `-ldflags="-s -w"` for ~30% smaller binary
+- **Vite Code Splitting**: Added `manualChunks` configuration to split vendor dependencies (antd, react, recharts, utils) into separate cacheable bundles
+- **Dependency Upgrades**: Updated `anthropic-sdk-go` (v1.19→v1.26), `genai` (v1.43→v1.47), `ollama` (v0.15→v0.17), `asynq` (v0.25→v0.26)
 
 ### Fixed
 

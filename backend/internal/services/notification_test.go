@@ -6,7 +6,6 @@ import (
 )
 
 func TestBuildMessage(t *testing.T) {
-	service := &NotificationService{}
 
 	tests := []struct {
 		name          string
@@ -80,7 +79,7 @@ func TestBuildMessage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := service.buildMessage(tt.notification)
+			result := buildMessage(tt.notification)
 			for _, expected := range tt.shouldContain {
 				if !strings.Contains(result, expected) {
 					t.Errorf("buildMessage() should contain %q, got:\n%s", expected, result)
@@ -91,7 +90,6 @@ func TestBuildMessage(t *testing.T) {
 }
 
 func TestSplitMessage(t *testing.T) {
-	service := &NotificationService{}
 
 	tests := []struct {
 		name          string
@@ -127,7 +125,7 @@ func TestSplitMessage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			parts := service.splitMessage(tt.msg, tt.maxLen)
+			parts := splitMessage(tt.msg, tt.maxLen)
 			if len(parts) != tt.expectedParts {
 				t.Errorf("splitMessage() returned %d parts, expected %d", len(parts), tt.expectedParts)
 			}
@@ -141,11 +139,10 @@ func TestSplitMessage(t *testing.T) {
 }
 
 func TestSplitMessage_PreservesContent(t *testing.T) {
-	service := &NotificationService{}
 	original := "This is a test message that should be split into multiple parts for testing purposes."
 	maxLen := 30
 
-	parts := service.splitMessage(original, maxLen)
+	parts := splitMessage(original, maxLen)
 
 	reconstructed := strings.Join(parts, "")
 	if reconstructed != original {
@@ -192,12 +189,10 @@ func TestReviewNotification_Structure(t *testing.T) {
 }
 
 func TestDingTalkSign(t *testing.T) {
-	service := &NotificationService{}
-
 	timestamp := int64(1699999999999)
 	secret := "testsecret"
 
-	sign := service.dingTalkSign(timestamp, secret)
+	sign := dingTalkSign(timestamp, secret)
 
 	if sign == "" {
 		t.Error("dingTalkSign should not return empty string")
@@ -206,35 +201,33 @@ func TestDingTalkSign(t *testing.T) {
 		t.Errorf("dingTalkSign result seems too short: %s", sign)
 	}
 
-	sign2 := service.dingTalkSign(timestamp, secret)
+	sign2 := dingTalkSign(timestamp, secret)
 	if sign != sign2 {
 		t.Error("dingTalkSign should be deterministic")
 	}
 
-	sign3 := service.dingTalkSign(timestamp, "different")
+	sign3 := dingTalkSign(timestamp, "different")
 	if sign == sign3 {
 		t.Error("different secrets should produce different signatures")
 	}
 }
 
 func TestFeishuSign(t *testing.T) {
-	service := &NotificationService{}
-
 	timestamp := int64(1699999999)
 	secret := "testsecret"
 
-	sign := service.feishuSign(timestamp, secret)
+	sign := feishuSign(timestamp, secret)
 
 	if sign == "" {
 		t.Error("feishuSign should not return empty string")
 	}
 
-	sign2 := service.feishuSign(timestamp, secret)
+	sign2 := feishuSign(timestamp, secret)
 	if sign != sign2 {
 		t.Error("feishuSign should be deterministic")
 	}
 
-	sign3 := service.feishuSign(timestamp, "different")
+	sign3 := feishuSign(timestamp, "different")
 	if sign == sign3 {
 		t.Error("different secrets should produce different signatures")
 	}

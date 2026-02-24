@@ -3,13 +3,14 @@ package services
 import (
 	"context"
 	"fmt"
-	"github.com/huangang/codesentry/backend/pkg/logger"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/huangang/codesentry/backend/pkg/logger"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -19,6 +20,18 @@ import (
 	"github.com/sashabaranov/go-openai"
 	"google.golang.org/genai"
 	"gorm.io/gorm"
+)
+
+// Pre-compiled regex patterns for score extraction and file context processing
+var (
+	scorePatterns = []*regexp.Regexp{
+		regexp.MustCompile(`总分[:：]\s*(\d+)分?`),
+		regexp.MustCompile(`[Tt]otal\s*[Ss]core[:：]?\s*(\d+)`),
+		regexp.MustCompile(`[Ss]core[:：]?\s*(\d+)\s*/\s*100`),
+		regexp.MustCompile(`(\d+)\s*/\s*100\s*分?`),
+		regexp.MustCompile(`评分[:：]\s*(\d+)`),
+	}
+	ifBlockRegex = regexp.MustCompile(`(?s)\{\{#if_file_context\}\}(.*?)\{\{/if_file_context\}\}`)
 )
 
 type AIService struct {
@@ -423,8 +436,6 @@ Score breakdown (adjust based on your review focus):
 }
 
 func (s *AIService) processFileContextBlock(prompt string, fileContext string) string {
-	ifBlockRegex := regexp.MustCompile(`(?s)\{\{#if_file_context\}\}(.*?)\{\{/if_file_context\}\}`)
-
 	if strings.TrimSpace(fileContext) != "" {
 		prompt = ifBlockRegex.ReplaceAllString(prompt, "$1")
 		prompt = strings.ReplaceAll(prompt, "{{file_context}}", fileContext)
@@ -438,16 +449,7 @@ func (s *AIService) processFileContextBlock(prompt string, fileContext string) s
 
 // extractScore extracts the score from review content
 func extractScore(content string) float64 {
-	patterns := []string{
-		`总分[:：]\s*(\d+)分?`,
-		`[Tt]otal\s*[Ss]core[:：]?\s*(\d+)`,
-		`[Ss]core[:：]?\s*(\d+)\s*/\s*100`,
-		`(\d+)\s*/\s*100\s*分?`,
-		`评分[:：]\s*(\d+)`,
-	}
-
-	for _, pattern := range patterns {
-		re := regexp.MustCompile(pattern)
+	for _, re := range scorePatterns {
 		matches := re.FindStringSubmatch(content)
 		if len(matches) >= 2 {
 			if score, err := strconv.ParseFloat(matches[1], 64); err == nil {

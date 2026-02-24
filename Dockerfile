@@ -1,5 +1,5 @@
 # Frontend builder
-FROM node:20-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 
 WORKDIR /app
 
@@ -27,22 +27,28 @@ COPY backend/ ./
 # Copy frontend build to static folder (before go build, so go:embed works)
 COPY --from=frontend-builder /app/dist ./cmd/server/static/
 
-# Build with embedded frontend
-RUN CGO_ENABLED=1 GOOS=linux go build -o codesentry ./cmd/server/
+# Build with embedded frontend (stripped binary for smaller size)
+RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o codesentry ./cmd/server/
 
 # Final stage
-FROM alpine:3.19
+FROM alpine:3.21
 
 WORKDIR /app
 
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates tzdata
 
+# Create non-root user for security
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
 # Copy backend binary (with embedded frontend)
 COPY --from=backend-builder /app/codesentry ./
 
-# Create data directory
-RUN mkdir -p /app/data
+# Create data directory with correct ownership
+RUN mkdir -p /app/data && chown -R appuser:appgroup /app/data
+
+# Switch to non-root user
+USER appuser
 
 # Environment
 ENV SERVER_PORT=8080

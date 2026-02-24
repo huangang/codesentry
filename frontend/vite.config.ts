@@ -12,4 +12,17 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Split large vendor dependencies into separate chunks for better caching
+          'vendor-antd': ['antd', '@ant-design/icons', '@ant-design/pro-components'],
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-charts': ['recharts'],
+          'vendor-utils': ['axios', 'dayjs', 'zustand', 'i18next', 'react-i18next'],
+        },
+      },
+    },
+  },
 })

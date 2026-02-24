@@ -312,10 +312,12 @@ func (s *FileContextService) fetchBitbucketFile(project *models.Project, filePat
 	return string(body), nil
 }
 
+// Pre-compiled regex patterns for diff parsing
+var hunkPattern = regexp.MustCompile(`@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@`)
+
 func extractModifiedRanges(diffContent string) []LineRange {
 	var ranges []LineRange
 
-	hunkPattern := regexp.MustCompile(`@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@`)
 	matches := hunkPattern.FindAllStringSubmatch(diffContent, -1)
 
 	for _, match := range matches {
@@ -449,62 +451,36 @@ func ExtractFunctionsFromContext(content string, modifiedRanges []LineRange, lan
 	return functions
 }
 
-// extractGoFunctions extracts Go function/method definitions
-func extractGoFunctions(lines []string, modifiedRanges []LineRange) []FunctionDefinition {
+// Pre-compiled regex patterns for function extraction
+var (
+	goFuncPattern  = regexp.MustCompile(`^func\s+(\([^)]+\)\s+)?(\w+)\s*\(`)
+	jsFuncPatterns = []*regexp.Regexp{
+		regexp.MustCompile(`^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)`),
+		regexp.MustCompile(`^\s*(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?(?:function|\([^)]*\)\s*=>|\w+\s*=>)`),
+		regexp.MustCompile(`^\s*(?:async\s+)?(\w+)\s*\([^)]*\)\s*{`),
+	}
+	pyFuncPattern     = regexp.MustCompile(`^(\s*)(?:async\s+)?def\s+(\w+)\s*\(`)
+	javaMethodPattern = regexp.MustCompile(`^\s*(?:public|private|protected|internal|static|final|override|suspend|async)?\s*(?:public|private|protected|internal|static|final|override|suspend|async)?\s*(?:\w+(?:<[^>]+>)?)\s+(\w+)\s*\(`)
+)
+
+// funcBoundary represents the location of a function/method in source code
+type funcBoundary struct {
+	name      string
+	startLine int
+	endLine   int
+}
+
+// matchBoundariesToRanges matches function boundaries to modified line ranges
+// and returns FunctionDefinitions for functions that overlap with modifications.
+// This is the shared logic that was previously duplicated across 4 language extractors.
+func matchBoundariesToRanges(lines []string, boundaries []funcBoundary, modifiedRanges []LineRange, language string) []FunctionDefinition {
 	var functions []FunctionDefinition
-	funcPattern := regexp.MustCompile(`^func\s+(\([^)]+\)\s+)?(\w+)\s*\(`)
-
-	type funcBoundary struct {
-		name      string
-		startLine int
-		endLine   int
-	}
-	var boundaries []funcBoundary
-
-	// Find all function boundaries
-	braceCount := 0
-	var currentFunc *funcBoundary
-	for i, line := range lines {
-		lineNum := i + 1
-		trimmed := strings.TrimSpace(line)
-
-		// Check for function start
-		if matches := funcPattern.FindStringSubmatch(trimmed); len(matches) > 0 {
-			if currentFunc != nil && braceCount == 0 {
-				currentFunc.endLine = lineNum - 1
-				boundaries = append(boundaries, *currentFunc)
-			}
-			funcName := matches[2]
-			currentFunc = &funcBoundary{name: funcName, startLine: lineNum}
-			braceCount = 0
-		}
-
-		// Track braces
-		braceCount += strings.Count(line, "{") - strings.Count(line, "}")
-
-		// Check for function end
-		if currentFunc != nil && braceCount == 0 && strings.Contains(line, "}") {
-			currentFunc.endLine = lineNum
-			boundaries = append(boundaries, *currentFunc)
-			currentFunc = nil
-		}
-	}
-
-	// Close last function if still open
-	if currentFunc != nil {
-		currentFunc.endLine = len(lines)
-		boundaries = append(boundaries, *currentFunc)
-	}
-
-	// Find functions that contain modified lines
 	seen := make(map[string]bool)
 	for _, fb := range boundaries {
 		for _, r := range modifiedRanges {
-			// Check if modified range overlaps with function
 			if r.Start <= fb.endLine && r.End >= fb.startLine {
 				if !seen[fb.name] {
 					seen[fb.name] = true
-					// Bounds check to prevent slice out of range
 					startIdx := fb.startLine - 1
 					endIdx := fb.endLine
 					if startIdx < 0 {
@@ -522,32 +498,55 @@ func extractGoFunctions(lines []string, modifiedRanges []LineRange) []FunctionDe
 						StartLine: fb.startLine,
 						EndLine:   fb.endLine,
 						Content:   content,
-						Language:  "go",
+						Language:  language,
 					})
 				}
 				break
 			}
 		}
 	}
-
 	return functions
+}
+
+// extractGoFunctions extracts Go function/method definitions
+func extractGoFunctions(lines []string, modifiedRanges []LineRange) []FunctionDefinition {
+	var boundaries []funcBoundary
+
+	braceCount := 0
+	var currentFunc *funcBoundary
+	for i, line := range lines {
+		lineNum := i + 1
+		trimmed := strings.TrimSpace(line)
+
+		if matches := goFuncPattern.FindStringSubmatch(trimmed); len(matches) > 0 {
+			if currentFunc != nil && braceCount == 0 {
+				currentFunc.endLine = lineNum - 1
+				boundaries = append(boundaries, *currentFunc)
+			}
+			funcName := matches[2]
+			currentFunc = &funcBoundary{name: funcName, startLine: lineNum}
+			braceCount = 0
+		}
+
+		braceCount += strings.Count(line, "{") - strings.Count(line, "}")
+
+		if currentFunc != nil && braceCount == 0 && strings.Contains(line, "}") {
+			currentFunc.endLine = lineNum
+			boundaries = append(boundaries, *currentFunc)
+			currentFunc = nil
+		}
+	}
+
+	if currentFunc != nil {
+		currentFunc.endLine = len(lines)
+		boundaries = append(boundaries, *currentFunc)
+	}
+
+	return matchBoundariesToRanges(lines, boundaries, modifiedRanges, "go")
 }
 
 // extractJSFunctions extracts JavaScript/TypeScript function definitions
 func extractJSFunctions(lines []string, modifiedRanges []LineRange) []FunctionDefinition {
-	var functions []FunctionDefinition
-	// Match: function name, const name = function, const name = () =>, export function, etc.
-	funcPatterns := []*regexp.Regexp{
-		regexp.MustCompile(`^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)`),
-		regexp.MustCompile(`^\s*(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?(?:function|\([^)]*\)\s*=>|\w+\s*=>)`),
-		regexp.MustCompile(`^\s*(?:async\s+)?(\w+)\s*\([^)]*\)\s*{`), // method shorthand
-	}
-
-	type funcBoundary struct {
-		name      string
-		startLine int
-		endLine   int
-	}
 	var boundaries []funcBoundary
 
 	braceCount := 0
@@ -555,8 +554,7 @@ func extractJSFunctions(lines []string, modifiedRanges []LineRange) []FunctionDe
 	for i, line := range lines {
 		lineNum := i + 1
 
-		// Check for function start
-		for _, pattern := range funcPatterns {
+		for _, pattern := range jsFuncPatterns {
 			if matches := pattern.FindStringSubmatch(line); len(matches) > 0 {
 				if currentFunc != nil && braceCount == 0 {
 					currentFunc.endLine = lineNum - 1
@@ -582,76 +580,38 @@ func extractJSFunctions(lines []string, modifiedRanges []LineRange) []FunctionDe
 		boundaries = append(boundaries, *currentFunc)
 	}
 
-	// Find functions that contain modified lines
-	seen := make(map[string]bool)
-	for _, fb := range boundaries {
-		for _, r := range modifiedRanges {
-			if r.Start <= fb.endLine && r.End >= fb.startLine {
-				if !seen[fb.name] {
-					seen[fb.name] = true
-					// Bounds check to prevent slice out of range
-					startIdx := fb.startLine - 1
-					endIdx := fb.endLine
-					if startIdx < 0 {
-						startIdx = 0
-					}
-					if endIdx > len(lines) {
-						endIdx = len(lines)
-					}
-					if startIdx >= endIdx {
-						continue
-					}
-					content := strings.Join(lines[startIdx:endIdx], "\n")
-					functions = append(functions, FunctionDefinition{
-						Name:      fb.name,
-						StartLine: fb.startLine,
-						EndLine:   fb.endLine,
-						Content:   content,
-						Language:  "javascript",
-					})
-				}
-				break
-			}
-		}
-	}
-
-	return functions
+	return matchBoundariesToRanges(lines, boundaries, modifiedRanges, "javascript")
 }
 
 // extractPythonFunctions extracts Python function/method definitions
 func extractPythonFunctions(lines []string, modifiedRanges []LineRange) []FunctionDefinition {
-	var functions []FunctionDefinition
-	funcPattern := regexp.MustCompile(`^(\s*)(?:async\s+)?def\s+(\w+)\s*\(`)
-
-	type funcBoundary struct {
-		name      string
-		startLine int
-		endLine   int
-		indent    int
-	}
 	var boundaries []funcBoundary
-	var currentFunc *funcBoundary
+	var currentFunc *struct {
+		funcBoundary
+		indent int
+	}
 
 	for i, line := range lines {
 		lineNum := i + 1
 
-		if matches := funcPattern.FindStringSubmatch(line); len(matches) > 0 {
+		if matches := pyFuncPattern.FindStringSubmatch(line); len(matches) > 0 {
 			indent := len(matches[1])
 			if currentFunc != nil {
 				currentFunc.endLine = lineNum - 1
-				boundaries = append(boundaries, *currentFunc)
+				boundaries = append(boundaries, currentFunc.funcBoundary)
 			}
-			currentFunc = &funcBoundary{
-				name:      matches[2],
-				startLine: lineNum,
-				indent:    indent,
+			currentFunc = &struct {
+				funcBoundary
+				indent int
+			}{
+				funcBoundary: funcBoundary{name: matches[2], startLine: lineNum},
+				indent:       indent,
 			}
 		} else if currentFunc != nil && len(strings.TrimSpace(line)) > 0 {
-			// Check if we've dedented past the function
 			currentIndent := len(line) - len(strings.TrimLeft(line, " \t"))
 			if currentIndent <= currentFunc.indent && !strings.HasPrefix(strings.TrimSpace(line), "#") {
 				currentFunc.endLine = lineNum - 1
-				boundaries = append(boundaries, *currentFunc)
+				boundaries = append(boundaries, currentFunc.funcBoundary)
 				currentFunc = nil
 			}
 		}
@@ -659,56 +619,14 @@ func extractPythonFunctions(lines []string, modifiedRanges []LineRange) []Functi
 
 	if currentFunc != nil {
 		currentFunc.endLine = len(lines)
-		boundaries = append(boundaries, *currentFunc)
+		boundaries = append(boundaries, currentFunc.funcBoundary)
 	}
 
-	// Find functions that contain modified lines
-	seen := make(map[string]bool)
-	for _, fb := range boundaries {
-		for _, r := range modifiedRanges {
-			if r.Start <= fb.endLine && r.End >= fb.startLine {
-				if !seen[fb.name] {
-					seen[fb.name] = true
-					// Bounds check to prevent slice out of range
-					startIdx := fb.startLine - 1
-					endIdx := fb.endLine
-					if startIdx < 0 {
-						startIdx = 0
-					}
-					if endIdx > len(lines) {
-						endIdx = len(lines)
-					}
-					if startIdx >= endIdx {
-						continue
-					}
-					content := strings.Join(lines[startIdx:endIdx], "\n")
-					functions = append(functions, FunctionDefinition{
-						Name:      fb.name,
-						StartLine: fb.startLine,
-						EndLine:   fb.endLine,
-						Content:   content,
-						Language:  "python",
-					})
-				}
-				break
-			}
-		}
-	}
-
-	return functions
+	return matchBoundariesToRanges(lines, boundaries, modifiedRanges, "python")
 }
 
 // extractJavaStyleFunctions extracts Java/Kotlin/C# method definitions
 func extractJavaStyleFunctions(lines []string, modifiedRanges []LineRange) []FunctionDefinition {
-	var functions []FunctionDefinition
-	// Match method definitions
-	methodPattern := regexp.MustCompile(`^\s*(?:public|private|protected|internal|static|final|override|suspend|async)?\s*(?:public|private|protected|internal|static|final|override|suspend|async)?\s*(?:\w+(?:<[^>]+>)?)\s+(\w+)\s*\(`)
-
-	type funcBoundary struct {
-		name      string
-		startLine int
-		endLine   int
-	}
 	var boundaries []funcBoundary
 
 	braceCount := 0
@@ -716,7 +634,7 @@ func extractJavaStyleFunctions(lines []string, modifiedRanges []LineRange) []Fun
 	for i, line := range lines {
 		lineNum := i + 1
 
-		if matches := methodPattern.FindStringSubmatch(line); len(matches) > 0 {
+		if matches := javaMethodPattern.FindStringSubmatch(line); len(matches) > 0 {
 			if currentFunc != nil && braceCount == 0 {
 				currentFunc.endLine = lineNum - 1
 				boundaries = append(boundaries, *currentFunc)
@@ -739,40 +657,7 @@ func extractJavaStyleFunctions(lines []string, modifiedRanges []LineRange) []Fun
 		boundaries = append(boundaries, *currentFunc)
 	}
 
-	// Find functions that contain modified lines
-	seen := make(map[string]bool)
-	for _, fb := range boundaries {
-		for _, r := range modifiedRanges {
-			if r.Start <= fb.endLine && r.End >= fb.startLine {
-				if !seen[fb.name] {
-					seen[fb.name] = true
-					// Bounds check to prevent slice out of range
-					startIdx := fb.startLine - 1
-					endIdx := fb.endLine
-					if startIdx < 0 {
-						startIdx = 0
-					}
-					if endIdx > len(lines) {
-						endIdx = len(lines)
-					}
-					if startIdx >= endIdx {
-						continue
-					}
-					content := strings.Join(lines[startIdx:endIdx], "\n")
-					functions = append(functions, FunctionDefinition{
-						Name:      fb.name,
-						StartLine: fb.startLine,
-						EndLine:   fb.endLine,
-						Content:   content,
-						Language:  "java",
-					})
-				}
-				break
-			}
-		}
-	}
-
-	return functions
+	return matchBoundariesToRanges(lines, boundaries, modifiedRanges, "java")
 }
 
 // extractGenericContext extracts surrounding context for unknown languages

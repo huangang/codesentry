@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/huangang/codesentry/backend/pkg/logger"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/huangang/codesentry/backend/pkg/logger"
 
 	"github.com/huangang/codesentry/backend/internal/models"
 	"github.com/robfig/cron/v3"
@@ -291,61 +292,45 @@ func (s *DailyReportService) generateReport(startTime, endTime time.Time) (*mode
 
 func (s *DailyReportService) collectStats(startTime, endTime time.Time) ReportStats {
 	var stats ReportStats
-
-	var totalProjects int64
-	s.db.Model(&models.ReviewLog{}).
-		Where("created_at BETWEEN ? AND ?", startTime, endTime).
-		Distinct("project_id").
-		Count(&totalProjects)
-	stats.TotalProjects = int(totalProjects)
-
-	var totalCommits int64
-	s.db.Model(&models.ReviewLog{}).
-		Where("created_at BETWEEN ? AND ?", startTime, endTime).
-		Count(&totalCommits)
-	stats.TotalCommits = int(totalCommits)
-
-	var totalAuthors int64
-	s.db.Model(&models.ReviewLog{}).
-		Where("created_at BETWEEN ? AND ?", startTime, endTime).
-		Distinct("author").
-		Count(&totalAuthors)
-	stats.TotalAuthors = int(totalAuthors)
-
-	s.db.Model(&models.ReviewLog{}).
-		Where("created_at BETWEEN ? AND ?", startTime, endTime).
-		Select("COALESCE(SUM(additions), 0)").
-		Scan(&stats.TotalAdditions)
-
-	s.db.Model(&models.ReviewLog{}).
-		Where("created_at BETWEEN ? AND ?", startTime, endTime).
-		Select("COALESCE(SUM(deletions), 0)").
-		Scan(&stats.TotalDeletions)
-
-	s.db.Model(&models.ReviewLog{}).
-		Where("created_at BETWEEN ? AND ? AND score IS NOT NULL AND is_manual = false", startTime, endTime).
-		Select("COALESCE(AVG(score), 0)").
-		Scan(&stats.AverageScore)
-
 	threshold := s.getLowScoreThreshold()
 
-	var passedCount int64
-	s.db.Model(&models.ReviewLog{}).
-		Where("created_at BETWEEN ? AND ? AND score IS NOT NULL AND is_manual = false AND score >= ?", startTime, endTime, threshold).
-		Count(&passedCount)
-	stats.PassedCount = int(passedCount)
+	// Consolidated single query for all aggregate stats (was 9 separate queries)
+	var result struct {
+		TotalProjects  int64   `gorm:"column:total_projects"`
+		TotalCommits   int64   `gorm:"column:total_commits"`
+		TotalAuthors   int64   `gorm:"column:total_authors"`
+		TotalAdditions int     `gorm:"column:total_additions"`
+		TotalDeletions int     `gorm:"column:total_deletions"`
+		AverageScore   float64 `gorm:"column:average_score"`
+		PassedCount    int64   `gorm:"column:passed_count"`
+		FailedCount    int64   `gorm:"column:failed_count"`
+		PendingCount   int64   `gorm:"column:pending_count"`
+	}
 
-	var failedCount int64
 	s.db.Model(&models.ReviewLog{}).
-		Where("created_at BETWEEN ? AND ? AND score IS NOT NULL AND is_manual = false AND score < ?", startTime, endTime, threshold).
-		Count(&failedCount)
-	stats.FailedCount = int(failedCount)
+		Where("created_at BETWEEN ? AND ?", startTime, endTime).
+		Select(`
+			COUNT(DISTINCT project_id) AS total_projects,
+			COUNT(*) AS total_commits,
+			COUNT(DISTINCT author) AS total_authors,
+			COALESCE(SUM(additions), 0) AS total_additions,
+			COALESCE(SUM(deletions), 0) AS total_deletions,
+			COALESCE(AVG(CASE WHEN is_manual = false AND score IS NOT NULL THEN score END), 0) AS average_score,
+			COUNT(CASE WHEN is_manual = false AND score IS NOT NULL AND score >= ? THEN 1 END) AS passed_count,
+			COUNT(CASE WHEN is_manual = false AND score IS NOT NULL AND score < ? THEN 1 END) AS failed_count,
+			COUNT(CASE WHEN review_status = 'pending' THEN 1 END) AS pending_count
+		`, threshold, threshold).
+		Scan(&result)
 
-	var pendingCount int64
-	s.db.Model(&models.ReviewLog{}).
-		Where("created_at BETWEEN ? AND ? AND review_status = ?", startTime, endTime, "pending").
-		Count(&pendingCount)
-	stats.PendingCount = int(pendingCount)
+	stats.TotalProjects = int(result.TotalProjects)
+	stats.TotalCommits = int(result.TotalCommits)
+	stats.TotalAuthors = int(result.TotalAuthors)
+	stats.TotalAdditions = result.TotalAdditions
+	stats.TotalDeletions = result.TotalDeletions
+	stats.AverageScore = result.AverageScore
+	stats.PassedCount = int(result.PassedCount)
+	stats.FailedCount = int(result.FailedCount)
+	stats.PendingCount = int(result.PendingCount)
 
 	return stats
 }
