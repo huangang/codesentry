@@ -3,8 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -28,8 +28,7 @@ func NewSSEHandler(hub *services.SSEHub) *SSEHandler {
 	}
 }
 
-// StreamReviewEvents handles SSE connections for review status updates
-func (h *SSEHandler) StreamReviewEvents(c *gin.Context) {
+func extractToken(c *gin.Context) string {
 	token := c.Query("token")
 	if token == "" {
 		authHeader := c.GetHeader("Authorization")
@@ -37,76 +36,83 @@ func (h *SSEHandler) StreamReviewEvents(c *gin.Context) {
 			token = strings.TrimPrefix(authHeader, "Bearer ")
 		}
 	}
+	return token
+}
 
-	if token == "" {
-		response.Unauthorized(c, "Unauthorized")
-		return
-	}
-
-	if _, err := utils.ParseToken(token); err != nil {
-		response.Unauthorized(c, "Invalid token")
-		return
-	}
-
-	// Set SSE headers
+func setSSEHeaders(c *gin.Context) {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
 	c.Header("X-Accel-Buffering", "no")
 	c.Header("Access-Control-Allow-Origin", "*")
+}
+
+// StreamReviewEvents handles SSE connections for review status updates
+func (h *SSEHandler) StreamReviewEvents(c *gin.Context) {
+	token := extractToken(c)
+	if token == "" {
+		response.Unauthorized(c, "Unauthorized")
+		return
+	}
+	if _, err := utils.ParseToken(token); err != nil {
+		response.Unauthorized(c, "Invalid token")
+		return
+	}
+
+	setSSEHeaders(c)
 
 	clientID := uuid.New().String()
-
 	events := h.hub.Subscribe(clientID)
 	defer h.hub.Unsubscribe(clientID)
 
 	logger.Info().Str("client_id", clientID).Int("total", h.hub.ClientCount()).Msg("SSE client connected")
 
-	c.Stream(func(w io.Writer) bool {
+	// Heartbeat ticker to prevent proxy timeouts (30s interval)
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	ctx := c.Request.Context()
+
+	// Send initial connection event
+	fmt.Fprintf(c.Writer, ": connected\n\n")
+	c.Writer.Flush()
+
+	for {
 		select {
 		case event, ok := <-events:
 			if !ok {
-				return false
+				return
 			}
 			data, err := json.Marshal(event)
 			if err != nil {
 				logger.Error().Err(err).Msg("SSE marshal error")
-				return true
+				continue
 			}
-			fmt.Fprintf(w, "data: %s\n\n", data)
+			fmt.Fprintf(c.Writer, "data: %s\n\n", data)
 			c.Writer.Flush()
-			return true
-		case <-c.Request.Context().Done():
+		case <-ticker.C:
+			// Send heartbeat comment to keep connection alive
+			fmt.Fprintf(c.Writer, ": ping\n\n")
+			c.Writer.Flush()
+		case <-ctx.Done():
 			logger.Info().Str("client_id", clientID).Msg("SSE client disconnected")
-			return false
+			return
 		}
-	})
+	}
 }
 
 func (h *SSEHandler) StreamImportEvents(c *gin.Context) {
-	token := c.Query("token")
-	if token == "" {
-		authHeader := c.GetHeader("Authorization")
-		if strings.HasPrefix(authHeader, "Bearer ") {
-			token = strings.TrimPrefix(authHeader, "Bearer ")
-		}
-	}
-
+	token := extractToken(c)
 	if token == "" {
 		response.Unauthorized(c, "Unauthorized")
 		return
 	}
-
 	if _, err := utils.ParseToken(token); err != nil {
 		response.Unauthorized(c, "Invalid token")
 		return
 	}
 
-	c.Header("Content-Type", "text/event-stream")
-	c.Header("Cache-Control", "no-cache")
-	c.Header("Connection", "keep-alive")
-	c.Header("X-Accel-Buffering", "no")
-	c.Header("Access-Control-Allow-Origin", "*")
+	setSSEHeaders(c)
 
 	clientID := uuid.New().String()
 	events := h.importHub.Subscribe(clientID)
@@ -114,23 +120,33 @@ func (h *SSEHandler) StreamImportEvents(c *gin.Context) {
 
 	logger.Info().Str("client_id", clientID).Msg("Import SSE client connected")
 
-	c.Stream(func(w io.Writer) bool {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	ctx := c.Request.Context()
+
+	fmt.Fprintf(c.Writer, ": connected\n\n")
+	c.Writer.Flush()
+
+	for {
 		select {
 		case event, ok := <-events:
 			if !ok {
-				return false
+				return
 			}
 			data, err := json.Marshal(event)
 			if err != nil {
 				logger.Error().Err(err).Msg("Import SSE marshal error")
-				return true
+				continue
 			}
-			fmt.Fprintf(w, "data: %s\n\n", data)
+			fmt.Fprintf(c.Writer, "data: %s\n\n", data)
 			c.Writer.Flush()
-			return true
-		case <-c.Request.Context().Done():
+		case <-ticker.C:
+			fmt.Fprintf(c.Writer, ": ping\n\n")
+			c.Writer.Flush()
+		case <-ctx.Done():
 			logger.Info().Str("client_id", clientID).Msg("Import SSE client disconnected")
-			return false
+			return
 		}
-	})
+	}
 }

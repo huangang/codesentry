@@ -58,6 +58,8 @@ func AutoMigrate() error {
 		&ReviewFeedback{},
 		&AIUsageLog{},
 		&ProjectMember{},
+		&IssueTracker{},
+		&ReviewRule{},
 	)
 }
 

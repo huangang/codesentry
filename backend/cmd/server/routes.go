@@ -69,6 +69,10 @@ func registerRoutes(r *gin.Engine, svc *appServices) {
 			searchHandler := handlers.NewSearchHandler(models.GetDB())
 			protected.GET("/search", searchHandler.Search)
 
+			// Reports
+			reportHandler := handlers.NewReportHandler(models.GetDB())
+			protected.GET("/reports", reportHandler.GetReport)
+
 			// Projects (read for all users)
 			projectHandler := handlers.NewProjectHandler(models.GetDB())
 			protected.GET("/projects", projectHandler.List)
@@ -169,6 +173,21 @@ func registerRoutes(r *gin.Engine, svc *appServices) {
 			admin.POST("/review-templates", reviewTemplateHandler.Create)
 			admin.PUT("/review-templates/:id", reviewTemplateHandler.Update)
 			admin.DELETE("/review-templates/:id", reviewTemplateHandler.Delete)
+
+			// Issue Trackers (Jira/Linear/GitHub)
+			issueTrackerHandler := handlers.NewIssueTrackerHandler(models.GetDB())
+			admin.GET("/issue-trackers", issueTrackerHandler.List)
+			admin.POST("/issue-trackers", issueTrackerHandler.Create)
+			admin.PUT("/issue-trackers/:id", issueTrackerHandler.Update)
+			admin.DELETE("/issue-trackers/:id", issueTrackerHandler.Delete)
+
+			// Review Rules (CI/CD gating policies)
+			reviewRuleHandler := handlers.NewReviewRuleHandler(models.GetDB())
+			admin.GET("/review-rules", reviewRuleHandler.List)
+			admin.POST("/review-rules", reviewRuleHandler.Create)
+			admin.PUT("/review-rules/:id", reviewRuleHandler.Update)
+			admin.DELETE("/review-rules/:id", reviewRuleHandler.Delete)
+			admin.POST("/review-rules/evaluate/:id", reviewRuleHandler.Evaluate)
 
 			// System Logs
 			systemLogHandler := handlers.NewSystemLogHandler(models.GetDB())
