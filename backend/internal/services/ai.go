@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/huangang/codesentry/backend/pkg/logger"
 
@@ -38,6 +39,7 @@ type AIService struct {
 	db            *gorm.DB
 	config        *config.OpenAIConfig
 	configService *SystemConfigService
+	usageService  *AIUsageService
 }
 
 func NewAIService(db *gorm.DB, cfg *config.OpenAIConfig) *AIService {
@@ -45,6 +47,7 @@ func NewAIService(db *gorm.DB, cfg *config.OpenAIConfig) *AIService {
 		db:            db,
 		config:        cfg,
 		configService: NewSystemConfigService(db),
+		usageService:  NewAIUsageService(db),
 	}
 }
 
@@ -57,8 +60,11 @@ type ReviewRequest struct {
 }
 
 type ReviewResult struct {
-	Content string
-	Score   float64
+	Content          string
+	Score            float64
+	PromptTokens     int
+	CompletionTokens int
+	TotalTokens      int
 }
 
 func (s *AIService) Review(ctx context.Context, req *ReviewRequest) (*ReviewResult, error) {
@@ -147,22 +153,54 @@ func (s *AIService) getOrderedLLMConfigs(project *models.Project) []models.LLMCo
 }
 
 // callLLM dispatches to the appropriate provider-specific function based on Provider field
+// and records usage metrics (tokens, latency, success/failure).
 func (s *AIService) callLLM(ctx context.Context, llmConfig *models.LLMConfig, prompt string) (*ReviewResult, error) {
 	logger.Infof("[AI] Using provider: %s, model: %s, baseURL: %s", llmConfig.Provider, llmConfig.Model, llmConfig.BaseURL)
 
+	start := time.Now()
+	var result *ReviewResult
+	var err error
+
 	switch llmConfig.Provider {
 	case "anthropic":
-		return s.callAnthropic(ctx, llmConfig, prompt)
+		result, err = s.callAnthropic(ctx, llmConfig, prompt)
 	case "ollama":
-		return s.callOllama(ctx, llmConfig, prompt)
+		result, err = s.callOllama(ctx, llmConfig, prompt)
 	case "gemini":
-		return s.callGemini(ctx, llmConfig, prompt)
+		result, err = s.callGemini(ctx, llmConfig, prompt)
 	case "azure":
-		return s.callAzure(ctx, llmConfig, prompt)
+		result, err = s.callAzure(ctx, llmConfig, prompt)
 	default:
-		// openai and other OpenAI-compatible services
-		return s.callOpenAI(ctx, llmConfig, prompt)
+		result, err = s.callOpenAI(ctx, llmConfig, prompt)
 	}
+
+	latencyMs := time.Since(start).Milliseconds()
+
+	// Record usage asynchronously
+	if s.usageService != nil {
+		usageLog := &models.AIUsageLog{
+			LLMConfigID: llmConfig.ID,
+			Provider:    llmConfig.Provider,
+			Model:       llmConfig.Model,
+			LatencyMs:   latencyMs,
+			Success:     err == nil,
+		}
+		if err != nil {
+			errMsg := err.Error()
+			if len(errMsg) > 500 {
+				errMsg = errMsg[:500]
+			}
+			usageLog.ErrorMessage = errMsg
+		}
+		if result != nil {
+			usageLog.PromptTokens = result.PromptTokens
+			usageLog.CompletionTokens = result.CompletionTokens
+			usageLog.TotalTokens = result.TotalTokens
+		}
+		s.usageService.Record(usageLog)
+	}
+
+	return result, err
 }
 
 // callOpenAI handles OpenAI and OpenAI-compatible APIs (including custom endpoints)
@@ -199,11 +237,14 @@ func (s *AIService) callOpenAI(ctx context.Context, llmConfig *models.LLMConfig,
 	}
 
 	content := resp.Choices[0].Message.Content
-	logger.Infof("[AI] OpenAI response length: %d chars", len(content))
+	logger.Infof("[AI] OpenAI response length: %d chars, tokens: %d", len(content), resp.Usage.TotalTokens)
 
 	return &ReviewResult{
-		Content: content,
-		Score:   extractScore(content),
+		Content:          content,
+		Score:            extractScore(content),
+		PromptTokens:     resp.Usage.PromptTokens,
+		CompletionTokens: resp.Usage.CompletionTokens,
+		TotalTokens:      resp.Usage.TotalTokens,
 	}, nil
 }
 
@@ -243,11 +284,15 @@ func (s *AIService) callAnthropic(ctx context.Context, llmConfig *models.LLMConf
 		}
 	}
 
-	logger.Infof("[AI] Anthropic response length: %d chars", len(content))
+	logger.Infof("[AI] Anthropic response length: %d chars, input_tokens: %d, output_tokens: %d",
+		len(content), resp.Usage.InputTokens, resp.Usage.OutputTokens)
 
 	return &ReviewResult{
-		Content: content,
-		Score:   extractScore(content),
+		Content:          content,
+		Score:            extractScore(content),
+		PromptTokens:     int(resp.Usage.InputTokens),
+		CompletionTokens: int(resp.Usage.OutputTokens),
+		TotalTokens:      int(resp.Usage.InputTokens + resp.Usage.OutputTokens),
 	}, nil
 }
 
@@ -357,11 +402,14 @@ func (s *AIService) callAzure(ctx context.Context, llmConfig *models.LLMConfig, 
 	}
 
 	content := resp.Choices[0].Message.Content
-	logger.Infof("[AI] Azure OpenAI response length: %d chars", len(content))
+	logger.Infof("[AI] Azure OpenAI response length: %d chars, tokens: %d", len(content), resp.Usage.TotalTokens)
 
 	return &ReviewResult{
-		Content: content,
-		Score:   extractScore(content),
+		Content:          content,
+		Score:            extractScore(content),
+		PromptTokens:     resp.Usage.PromptTokens,
+		CompletionTokens: resp.Usage.CompletionTokens,
+		TotalTokens:      resp.Usage.TotalTokens,
 	}, nil
 }
 

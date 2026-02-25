@@ -120,6 +120,22 @@
     "showMore": "展开更多",
     "showLess": "收起"
   },
+  "aiUsage": {
+    "title": "AI 使用量",
+    "totalCalls": "总调用次数",
+    "totalTokens": "总 Token 数",
+    "avgLatency": "平均延迟",
+    "successRate": "成功率",
+    "promptTokens": "输入 Token",
+    "completionTokens": "输出 Token",
+    "ms": "毫秒",
+    "calls": "调用次数",
+    "tokens": "Token",
+    "provider": "服务商",
+    "model": "模型",
+    "dailyTrend": "每日趋势",
+    "providerBreakdown": "服务商分布"
+  },
   "projects": {
     "title": "项目管理",
     "createProject": "创建项目",

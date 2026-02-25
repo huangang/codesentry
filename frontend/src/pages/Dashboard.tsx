@@ -6,6 +6,10 @@ import {
   CodeOutlined,
   TrophyOutlined,
   FullscreenOutlined,
+  RobotOutlined,
+  ThunderboltOutlined,
+  DashboardOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons';
 import {
   BarChart,
@@ -19,8 +23,9 @@ import {
 } from 'recharts';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
-import { useDashboardStats, type DashboardFilters } from '../hooks/queries';
+import { useDashboardStats, useAIUsageStats, type DashboardFilters } from '../hooks/queries';
 import type { DashboardResponse } from '../types';
+import { useAuthStore } from '../stores/authStore';
 
 const { RangePicker } = DatePicker;
 
@@ -70,6 +75,11 @@ const Dashboard: React.FC = () => {
 
   const filters = useMemo(() => getDateParams(), [getDateParams]);
   const { data, isLoading } = useDashboardStats(filters);
+  const { isAdmin } = useAuthStore();
+  const { data: aiUsageData } = useAIUsageStats({
+    start_date: filters.start_date,
+    end_date: filters.end_date,
+  });
 
   const expandedFilters = useMemo((): DashboardFilters => {
     if (!expandedChart) return {};
@@ -247,6 +257,47 @@ const Dashboard: React.FC = () => {
           </Col>
         ))}
       </Row>
+
+      {isAdmin && aiUsageData && (
+        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+          <Col span={24}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', marginBottom: 8 }}>{t('aiUsage.title')}</div>
+          </Col>
+          {[
+            { title: t('aiUsage.totalCalls'), value: aiUsageData.total_calls || 0, icon: <RobotOutlined />, color: '#6366f1', bg: 'rgba(99,102,241,0.1)' },
+            { title: t('aiUsage.totalTokens'), value: (aiUsageData.total_tokens || 0).toLocaleString(), icon: <ThunderboltOutlined />, color: '#ec4899', bg: 'rgba(236,72,153,0.1)' },
+            { title: t('aiUsage.avgLatency'), value: `${Math.round(aiUsageData.avg_latency_ms || 0)}${t('aiUsage.ms')}`, icon: <DashboardOutlined />, color: '#14b8a6', bg: 'rgba(20,184,166,0.1)' },
+            { title: t('aiUsage.successRate'), value: `${(aiUsageData.success_rate || 0).toFixed(1)}%`, icon: <CheckCircleOutlined />, color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
+          ].map((card, index) => (
+            <Col xs={12} sm={12} lg={6} key={`ai-${index}`}>
+              <Card
+                hoverable
+                bordered={false}
+                style={{ height: '100%', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}
+                className="dashboard-stats-card"
+                styles={{ body: { padding: '16px 12px' } }}
+              >
+                <Statistic
+                  title={<span style={{ color: '#64748b', fontSize: 12 }}>{card.title}</span>}
+                  value={card.value}
+                  prefix={
+                    <div style={{
+                      backgroundColor: card.bg,
+                      padding: 6,
+                      borderRadius: 8,
+                      display: 'flex',
+                      marginRight: 8
+                    }}>
+                      {React.cloneElement(card.icon, { style: { color: card.color, fontSize: 16 } })}
+                    </div>
+                  }
+                  valueStyle={{ color: '#0f172a', fontWeight: 600, fontSize: 20 }}
+                />
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      )}
 
       <Row gutter={[16, 16]}>
         {chartConfigs.map((config) => (

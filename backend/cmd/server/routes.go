@@ -20,10 +20,9 @@ func registerRoutes(r *gin.Engine, svc *appServices) {
 	// Rate limiter for webhook routes
 	webhookLimiter := middleware.NewRateLimiter(10, 20)
 
-	// Health check
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok", "service": "codesentry"})
-	})
+	// Health check (enhanced)
+	healthHandler := handlers.NewHealthHandler()
+	r.GET("/health", healthHandler.CheckHealth)
 
 	// Root-level webhook routes (without /api prefix for compatibility)
 	rootWebhook := r.Group("", webhookLimiter.Middleware())
@@ -191,6 +190,12 @@ func registerRoutes(r *gin.Engine, svc *appServices) {
 			admin.GET("/daily-reports/:id", dailyReportHandler.Get)
 			admin.POST("/daily-reports/generate", dailyReportHandler.Generate)
 			admin.POST("/daily-reports/:id/resend", dailyReportHandler.Resend)
+
+			// AI Usage
+			aiUsageHandler := handlers.NewAIUsageHandler(models.GetDB())
+			admin.GET("/ai-usage/stats", aiUsageHandler.GetStats)
+			admin.GET("/ai-usage/trend", aiUsageHandler.GetDailyTrend)
+			admin.GET("/ai-usage/providers", aiUsageHandler.GetProviderBreakdown)
 		}
 
 		// Webhook routes (public with signature verification, rate limited)

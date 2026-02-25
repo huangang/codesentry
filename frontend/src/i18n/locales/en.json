@@ -120,6 +120,22 @@
     "showMore": "Show More",
     "showLess": "Show Less"
   },
+  "aiUsage": {
+    "title": "AI Usage",
+    "totalCalls": "Total Calls",
+    "totalTokens": "Total Tokens",
+    "avgLatency": "Avg Latency",
+    "successRate": "Success Rate",
+    "promptTokens": "Prompt Tokens",
+    "completionTokens": "Completion Tokens",
+    "ms": "ms",
+    "calls": "Calls",
+    "tokens": "Tokens",
+    "provider": "Provider",
+    "model": "Model",
+    "dailyTrend": "Daily Trend",
+    "providerBreakdown": "Provider Breakdown"
+  },
   "projects": {
     "title": "Projects",
     "createProject": "Create Project",

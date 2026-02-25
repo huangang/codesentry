@@ -421,3 +421,42 @@ export const reviewFeedbackApi = {
   create: (data: { review_log_id: number; feedback_type: string; user_message: string }) =>
     api.post<ReviewFeedback>('/review-feedbacks', data),
 };
+
+// AI Usage
+export interface AIUsageStats {
+  total_calls: number;
+  total_tokens: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  avg_latency_ms: number;
+  success_rate: number;
+  success_count: number;
+  failure_count: number;
+}
+
+export interface DailyUsage {
+  date: string;
+  calls: number;
+  total_tokens: number;
+  avg_latency_ms: number;
+}
+
+export interface ProviderUsage {
+  provider: string;
+  model: string;
+  calls: number;
+  total_tokens: number;
+  avg_latency_ms: number;
+  success_rate: number;
+}
+
+export const aiUsageApi = {
+  getStats: (params?: { start_date?: string; end_date?: string; project_id?: number }) =>
+    api.get<AIUsageStats>('/ai-usage/stats', { params }),
+
+  getDailyTrend: (params?: { start_date?: string; end_date?: string; project_id?: number }) =>
+    api.get<DailyUsage[]>('/ai-usage/trend', { params }),
+
+  getProviderBreakdown: (params?: { start_date?: string; end_date?: string }) =>
+    api.get<ProviderUsage[]>('/ai-usage/providers', { params }),
+};

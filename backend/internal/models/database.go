@@ -56,6 +56,7 @@ func AutoMigrate() error {
 		&SchedulerLock{},
 		&ReviewTemplate{},
 		&ReviewFeedback{},
+		&AIUsageLog{},
 	)
 }
 
