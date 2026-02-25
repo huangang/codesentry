@@ -118,6 +118,7 @@ func registerRoutes(r *gin.Engine, svc *appServices) {
 			admin.POST("/review-logs/manual", reviewLogHandler.CreateManualCommit)
 			admin.POST("/review-logs/import", reviewLogHandler.ImportCommits)
 			admin.DELETE("/review-logs/:id", reviewLogHandler.Delete)
+			admin.GET("/review-logs/export", reviewLogHandler.Export)
 
 			// Users
 			userHandler := handlers.NewUserHandler(models.GetDB())

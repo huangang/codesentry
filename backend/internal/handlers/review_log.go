@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"encoding/csv"
+	"fmt"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -118,4 +120,58 @@ func (h *ReviewLogHandler) ImportCommits(c *gin.Context) {
 	}
 
 	response.Success(c, resp)
+}
+
+// Export exports review logs as CSV with the same filters as List.
+func (h *ReviewLogHandler) Export(c *gin.Context) {
+	var req services.ReviewLogListRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	// Override pagination to fetch all matching records
+	req.Page = 1
+	req.PageSize = 10000
+
+	resp, err := h.reviewLogService.List(&req)
+	if err != nil {
+		response.ServerError(c, err.Error())
+		return
+	}
+
+	c.Header("Content-Type", "text/csv")
+	c.Header("Content-Disposition", "attachment; filename=review_logs.csv")
+
+	w := csv.NewWriter(c.Writer)
+	// Header
+	w.Write([]string{"ID", "Project", "Author", "Branch", "Event Type", "Commit Hash", "Commit Message", "Score", "Status", "Files Changed", "Additions", "Deletions", "Created At"})
+
+	for _, log := range resp.Items {
+		projectName := ""
+		if log.Project != nil {
+			projectName = log.Project.Name
+		}
+		score := ""
+		if log.Score != nil {
+			score = fmt.Sprintf("%.0f", *log.Score)
+		}
+		w.Write([]string{
+			strconv.FormatUint(uint64(log.ID), 10),
+			projectName,
+			log.Author,
+			log.Branch,
+			log.EventType,
+			log.CommitHash,
+			log.CommitMessage,
+			score,
+			log.ReviewStatus,
+			strconv.Itoa(log.FilesChanged),
+			strconv.Itoa(log.Additions),
+			strconv.Itoa(log.Deletions),
+			log.CreatedAt.Format("2006-01-02 15:04:05"),
+		})
+	}
+
+	w.Flush()
 }

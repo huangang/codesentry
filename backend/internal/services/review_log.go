@@ -16,14 +16,17 @@ func NewReviewLogService(db *gorm.DB) *ReviewLogService {
 }
 
 type ReviewLogListRequest struct {
-	Page       int       `form:"page" binding:"omitempty,min=1"`
-	PageSize   int       `form:"page_size" binding:"omitempty,min=1,max=100"`
-	EventType  string    `form:"event_type"`
-	ProjectID  uint      `form:"project_id"`
-	Author     string    `form:"author"`
-	StartDate  time.Time `form:"start_date"`
-	EndDate    time.Time `form:"end_date"`
-	SearchText string    `form:"search_text"`
+	Page         int       `form:"page" binding:"omitempty,min=1"`
+	PageSize     int       `form:"page_size" binding:"omitempty,min=1,max=100"`
+	EventType    string    `form:"event_type"`
+	ProjectID    uint      `form:"project_id"`
+	Author       string    `form:"author"`
+	StartDate    time.Time `form:"start_date"`
+	EndDate      time.Time `form:"end_date"`
+	SearchText   string    `form:"search_text"`
+	ReviewStatus string    `form:"review_status"`
+	MinScore     *float64  `form:"min_score"`
+	MaxScore     *float64  `form:"max_score"`
 }
 
 type ReviewLogListResponse struct {
@@ -64,6 +67,15 @@ func (s *ReviewLogService) List(req *ReviewLogListRequest) (*ReviewLogListRespon
 	}
 	if req.SearchText != "" {
 		query = query.Where("commit_message LIKE ?", "%"+req.SearchText+"%")
+	}
+	if req.ReviewStatus != "" {
+		query = query.Where("review_status = ?", req.ReviewStatus)
+	}
+	if req.MinScore != nil {
+		query = query.Where("score >= ?", *req.MinScore)
+	}
+	if req.MaxScore != nil {
+		query = query.Where("score <= ?", *req.MaxScore)
 	}
 
 	query.Count(&total)
