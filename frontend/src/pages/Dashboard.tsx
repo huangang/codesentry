@@ -10,6 +10,7 @@ import {
   ThunderboltOutlined,
   DashboardOutlined,
   CheckCircleOutlined,
+  CopyOutlined,
 } from '@ant-design/icons';
 import {
   BarChart,
@@ -263,39 +264,44 @@ const Dashboard: React.FC = () => {
           <Col span={24}>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', marginBottom: 8 }}>{t('aiUsage.title')}</div>
           </Col>
-          {[
-            { title: t('aiUsage.totalCalls'), value: aiUsageData.total_calls || 0, icon: <RobotOutlined />, color: '#6366f1', bg: 'rgba(99,102,241,0.1)' },
-            { title: t('aiUsage.totalTokens'), value: (aiUsageData.total_tokens || 0).toLocaleString(), icon: <ThunderboltOutlined />, color: '#ec4899', bg: 'rgba(236,72,153,0.1)' },
-            { title: t('aiUsage.avgLatency'), value: `${Math.round(aiUsageData.avg_latency_ms || 0)}${t('aiUsage.ms')}`, icon: <DashboardOutlined />, color: '#14b8a6', bg: 'rgba(20,184,166,0.1)' },
-            { title: t('aiUsage.successRate'), value: `${(aiUsageData.success_rate || 0).toFixed(1)}%`, icon: <CheckCircleOutlined />, color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
-          ].map((card, index) => (
-            <Col xs={12} sm={12} lg={6} key={`ai-${index}`}>
-              <Card
-                hoverable
-                bordered={false}
-                style={{ height: '100%', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}
-                className="dashboard-stats-card"
-                styles={{ body: { padding: '16px 12px' } }}
-              >
-                <Statistic
-                  title={<span style={{ color: '#64748b', fontSize: 12 }}>{card.title}</span>}
-                  value={card.value}
-                  prefix={
-                    <div style={{
-                      backgroundColor: card.bg,
-                      padding: 6,
-                      borderRadius: 8,
-                      display: 'flex',
-                      marginRight: 8
-                    }}>
-                      {React.cloneElement(card.icon, { style: { color: card.color, fontSize: 16 } })}
-                    </div>
-                  }
-                  valueStyle={{ color: '#0f172a', fontWeight: 600, fontSize: 20 }}
-                />
-              </Card>
-            </Col>
-          ))}
+          <Col xs={24} sm={24} lg={24}>
+            <Row gutter={[16, 16]}>
+              {[
+                { title: t('aiUsage.totalCalls'), value: aiUsageData.total_calls || 0, icon: <RobotOutlined />, color: '#6366f1', bg: 'rgba(99,102,241,0.1)' },
+                { title: t('aiUsage.totalTokens'), value: (aiUsageData.total_tokens || 0).toLocaleString(), icon: <ThunderboltOutlined />, color: '#ec4899', bg: 'rgba(236,72,153,0.1)' },
+                { title: t('aiUsage.avgLatency'), value: `${Math.round(aiUsageData.avg_latency_ms || 0)}${t('aiUsage.ms')}`, icon: <DashboardOutlined />, color: '#14b8a6', bg: 'rgba(20,184,166,0.1)' },
+                { title: t('aiUsage.successRate'), value: `${(aiUsageData.success_rate || 0).toFixed(1)}%`, icon: <CheckCircleOutlined />, color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
+                { title: t('aiUsage.cacheHits'), value: aiUsageData.cache_hits || 0, icon: <CopyOutlined />, color: '#f97316', bg: 'rgba(249,115,22,0.1)' },
+              ].map((card, index) => (
+                <Col xs={12} sm={8} lg={4} key={`ai-${index}`}>
+                  <Card
+                    hoverable
+                    bordered={false}
+                    style={{ height: '100%', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}
+                    className="dashboard-stats-card"
+                    styles={{ body: { padding: '16px 12px' } }}
+                  >
+                    <Statistic
+                      title={<span style={{ color: '#64748b', fontSize: 12 }}>{card.title}</span>}
+                      value={card.value}
+                      prefix={
+                        <div style={{
+                          backgroundColor: card.bg,
+                          padding: 6,
+                          borderRadius: 8,
+                          display: 'flex',
+                          marginRight: 8
+                        }}>
+                          {React.cloneElement(card.icon, { style: { color: card.color, fontSize: 16 } })}
+                        </div>
+                      }
+                      valueStyle={{ color: '#0f172a', fontWeight: 600, fontSize: 20 }}
+                    />
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          </Col>
         </Row>
       )}
 

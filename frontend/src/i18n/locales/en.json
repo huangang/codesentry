@@ -134,7 +134,8 @@
     "provider": "Provider",
     "model": "Model",
     "dailyTrend": "Daily Trend",
-    "providerBreakdown": "Provider Breakdown"
+    "providerBreakdown": "Provider Breakdown",
+    "cacheHits": "Cache Hits"
   },
   "projects": {
     "title": "Projects",

@@ -432,6 +432,7 @@ export interface AIUsageStats {
   success_rate: number;
   success_count: number;
   failure_count: number;
+  cache_hits: number;
 }
 
 export interface DailyUsage {

@@ -36,6 +36,7 @@ type UsageStats struct {
 	SuccessRate      float64 `json:"success_rate"`
 	SuccessCount     int64   `json:"success_count"`
 	FailureCount     int64   `json:"failure_count"`
+	CacheHits        int64   `json:"cache_hits"`
 }
 
 // GetStats returns aggregated usage statistics for the given time range.
@@ -68,6 +69,30 @@ func (s *AIUsageService) GetStats(startDate, endDate string, projectID *uint) (*
 	if stats.TotalCalls > 0 {
 		stats.SuccessRate = float64(stats.SuccessCount) / float64(stats.TotalCalls) * 100
 	}
+
+	// Count cache hits from review_logs (reviews with duplicate diff_hash in same project)
+	cacheQuery := s.db.Model(&models.ReviewLog{}).Where(
+		"diff_hash != '' AND review_status = 'completed' AND deleted_at IS NULL",
+	)
+	if startDate != "" {
+		cacheQuery = cacheQuery.Where("created_at >= ?", startDate)
+	}
+	if endDate != "" {
+		cacheQuery = cacheQuery.Where("created_at <= ?", endDate+" 23:59:59")
+	}
+	if projectID != nil && *projectID > 0 {
+		cacheQuery = cacheQuery.Where("project_id = ?", *projectID)
+	}
+	// A cache hit is a review where the same diff_hash+project_id appears more than once
+	// i.e. total reviews with non-empty diff_hash minus distinct diff_hash count
+	var totalWithHash, distinctHashes int64
+	cacheQuery.Count(&totalWithHash)
+	cacheQuery.Distinct("project_id", "diff_hash").Count(&distinctHashes)
+	stats.CacheHits = totalWithHash - distinctHashes
+	if stats.CacheHits < 0 {
+		stats.CacheHits = 0
+	}
+
 	return &stats, nil
 }
 

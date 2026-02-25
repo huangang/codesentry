@@ -134,7 +134,8 @@
     "provider": "服务商",
     "model": "模型",
     "dailyTrend": "每日趋势",
-    "providerBreakdown": "服务商分布"
+    "providerBreakdown": "服务商分布",
+    "cacheHits": "缓存命中"
   },
   "projects": {
     "title": "项目管理",

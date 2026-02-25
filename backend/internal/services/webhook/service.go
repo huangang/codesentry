@@ -24,6 +24,7 @@ type Service struct {
 	notificationService *services.NotificationService
 	configService       *services.SystemConfigService
 	fileContextService  *services.FileContextService
+	reviewCacheService  *services.ReviewCacheService
 	httpClient          *http.Client
 }
 
@@ -38,6 +39,7 @@ func NewService(db *gorm.DB, aiCfg *config.OpenAIConfig) *Service {
 		notificationService: services.NewNotificationService(db),
 		configService:       configService,
 		fileContextService:  services.NewFileContextService(configService),
+		reviewCacheService:  services.NewReviewCacheService(db),
 		httpClient:          &http.Client{Timeout: 30 * time.Second},
 	}
 }
@@ -122,6 +124,32 @@ func (s *Service) SyncReview(ctx context.Context, project *models.Project, req *
 
 	reviewLog.ReviewStatus = "processing"
 	s.reviewService.Update(reviewLog)
+
+	// Compute diff hash and check cache
+	diffHash := services.ComputeDiffHash(req.Diffs)
+	reviewLog.DiffHash = diffHash
+	s.reviewService.Update(reviewLog)
+
+	if cached := s.reviewCacheService.FindCachedReview(project.ID, diffHash); cached != nil {
+		reviewLog.ReviewStatus = "completed"
+		reviewLog.ReviewResult = cached.ReviewResult
+		reviewLog.Score = &cached.Score
+		s.reviewService.Update(reviewLog)
+
+		passed := cached.Score >= minScore
+		message := fmt.Sprintf("Score: %.0f/100 (min: %.0f) [cached]", cached.Score, minScore)
+		if !passed {
+			message = fmt.Sprintf("Review failed: %.0f/100 (min: %.0f required) [cached]", cached.Score, minScore)
+		}
+		return &SyncReviewResponse{
+			Passed:      passed,
+			Score:       cached.Score,
+			MinScore:    minScore,
+			Message:     message,
+			ReviewID:    reviewLog.ID,
+			FullContent: cached.ReviewResult,
+		}, nil
+	}
 
 	var fileContext string
 	if s.fileContextService.IsEnabled() {
@@ -214,6 +242,41 @@ func (s *Service) ProcessReviewTask(ctx context.Context, task *services.ReviewTa
 		reviewLog.ReviewResult = "Empty commit - no code changes to review"
 		s.reviewService.Update(reviewLog)
 		services.PublishReviewEvent(reviewLog.ID, reviewLog.ProjectID, reviewLog.CommitHash, "skipped", nil, "Empty commit - no code changes")
+		return nil
+	}
+
+	// Compute diff hash and check cache
+	diffHash := services.ComputeDiffHash(filteredDiff)
+	reviewLog.DiffHash = diffHash
+	s.reviewService.Update(reviewLog)
+
+	if cached := s.reviewCacheService.FindCachedReview(project.ID, diffHash); cached != nil {
+		reviewLog.ReviewStatus = "completed"
+		reviewLog.ReviewResult = cached.ReviewResult
+		reviewLog.Score = &cached.Score
+		s.reviewService.Update(reviewLog)
+		services.PublishReviewEvent(reviewLog.ID, reviewLog.ProjectID, reviewLog.CommitHash, "completed", &cached.Score, "")
+
+		// Still send notification and set commit status for cached results
+		s.notificationService.SendReviewNotification(project, &services.ReviewNotification{
+			ProjectName:   project.Name,
+			Branch:        task.Branch,
+			Author:        task.Author,
+			CommitMessage: task.CommitMessage,
+			Score:         cached.Score,
+			ReviewResult:  cached.ReviewResult,
+			EventType:     task.EventType,
+			MRURL:         task.MRURL,
+		})
+
+		minScore := s.getEffectiveMinScore(project)
+		statusState := "success"
+		statusDesc := fmt.Sprintf("AI Review Passed: %.0f/%.0f [cached]", cached.Score, minScore)
+		if cached.Score < minScore {
+			statusState = "failed"
+			statusDesc = fmt.Sprintf("AI Review Failed: %.0f (Min: %.0f) [cached]", cached.Score, minScore)
+		}
+		s.setCommitStatus(project, task.CommitSHA, statusState, statusDesc, task.GitLabProjectID)
 		return nil
 	}
 

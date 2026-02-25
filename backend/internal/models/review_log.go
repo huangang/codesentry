@@ -33,6 +33,7 @@ type ReviewLog struct {
 	LLMConfigID   *uint          `json:"llm_config_id"` // Which LLM was used
 	MRNumber      *int           `json:"mr_number"`     // Merge Request number
 	MRURL         string         `gorm:"size:500" json:"mr_url"`
+	DiffHash      string         `gorm:"size:64;index" json:"diff_hash"` // SHA-256 of filtered diff for cache dedup
 	CreatedAt     time.Time      `gorm:"index" json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
