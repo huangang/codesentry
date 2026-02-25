@@ -485,6 +485,8 @@
     "isActive": "Active",
     "lastLogin": "Last Login",
     "admin": "Admin",
+    "developer": "Developer",
+    "viewer": "Viewer",
     "user": "User",
     "local": "Local",
     "ldap": "LDAP",

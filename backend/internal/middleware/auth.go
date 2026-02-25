@@ -62,6 +62,29 @@ func AdminRequired() gin.HandlerFunc {
 	}
 }
 
+// RoleRequired is a middleware that checks if the user has one of the allowed roles.
+func RoleRequired(allowedRoles ...string) gin.HandlerFunc {
+	roleSet := make(map[string]bool, len(allowedRoles))
+	for _, r := range allowedRoles {
+		roleSet[r] = true
+	}
+	return func(c *gin.Context) {
+		role, exists := c.Get(ContextRole)
+		if !exists {
+			response.Forbidden(c, "access denied")
+			c.Abort()
+			return
+		}
+		roleStr, ok := role.(string)
+		if !ok || !roleSet[roleStr] {
+			response.Forbidden(c, "insufficient permissions")
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 // GetUserID gets the current user ID from context
 func GetUserID(c *gin.Context) uint {
 	if id, exists := c.Get(ContextUserID); exists {

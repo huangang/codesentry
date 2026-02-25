@@ -112,6 +112,13 @@ func registerRoutes(r *gin.Engine, svc *appServices) {
 			admin.PUT("/projects/:id", projectHandler.Update)
 			admin.DELETE("/projects/:id", projectHandler.Delete)
 
+			// Project Members
+			projectMemberHandler := handlers.NewProjectMemberHandler(models.GetDB())
+			admin.GET("/projects/:id/members", projectMemberHandler.List)
+			admin.POST("/projects/:id/members", projectMemberHandler.Add)
+			admin.PUT("/projects/:id/members/:memberID", projectMemberHandler.Update)
+			admin.DELETE("/projects/:id/members/:memberID", projectMemberHandler.Remove)
+
 			// Review Logs (write operations)
 			reviewLogHandler := handlers.NewReviewLogHandler(models.GetDB(), svc.openAICfg)
 			admin.POST("/review-logs/:id/retry", reviewLogHandler.Retry)

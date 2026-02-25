@@ -57,6 +57,7 @@ func AutoMigrate() error {
 		&ReviewTemplate{},
 		&ReviewFeedback{},
 		&AIUsageLog{},
+		&ProjectMember{},
 	)
 }
 

@@ -91,8 +91,8 @@ func (h *UserHandler) Update(c *gin.Context) {
 
 	updates := make(map[string]interface{})
 	if req.Role != nil {
-		if *req.Role != "admin" && *req.Role != "user" {
-			response.BadRequest(c, "invalid role, must be 'admin' or 'user'")
+		if *req.Role != "admin" && *req.Role != "developer" && *req.Role != "user" {
+			response.BadRequest(c, "invalid role, must be 'admin', 'developer', or 'user'")
 			return
 		}
 		updates["role"] = *req.Role

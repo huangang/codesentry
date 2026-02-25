@@ -99,7 +99,11 @@ const Users: React.FC = () => {
     { title: t('users.email'), dataIndex: 'email', key: 'email', width: 180, ellipsis: true },
     {
       title: t('users.role'), dataIndex: 'role', key: 'role', width: 100,
-      render: (role: string) => <Tag color={role === 'admin' ? 'red' : 'blue'}>{role === 'admin' ? t('users.admin') : t('users.user')}</Tag>,
+      render: (role: string) => {
+        const colorMap: Record<string, string> = { admin: 'red', developer: 'orange', viewer: 'cyan', user: 'blue' };
+        const labelKey = `users.${role}` as const;
+        return <Tag color={colorMap[role] || 'blue'}>{t(labelKey)}</Tag>;
+      },
     },
     {
       title: t('users.authType'), dataIndex: 'auth_type', key: 'auth_type', width: 100,
@@ -131,7 +135,7 @@ const Users: React.FC = () => {
       <Card>
         <Space style={{ marginBottom: 16 }} wrap>
           <Input placeholder={t('users.username')} style={{ width: 150 }} value={searchUsername} onChange={(e) => setSearchUsername(e.target.value)} onPressEnter={handleSearch} />
-          <Select placeholder={t('users.role')} allowClear style={{ width: 120 }} value={filterRole || undefined} onChange={setFilterRole} options={[{ value: 'admin', label: t('users.admin') }, { value: 'user', label: t('users.user') }]} />
+          <Select placeholder={t('users.role')} allowClear style={{ width: 120 }} value={filterRole || undefined} onChange={setFilterRole} options={[{ value: 'admin', label: t('users.admin') }, { value: 'developer', label: t('users.developer') }, { value: 'user', label: t('users.user') }]} />
           <Select placeholder={t('users.authType')} allowClear style={{ width: 120 }} value={filterAuthType || undefined} onChange={setFilterAuthType} options={[{ value: 'local', label: 'LOCAL' }, { value: 'ldap', label: 'LDAP' }]} />
           <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
           <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
@@ -146,7 +150,7 @@ const Users: React.FC = () => {
           <Form.Item label={t('users.username')}><Input value={modal.current?.username} disabled /></Form.Item>
           <Form.Item name="nickname" label={t('users.nickname')}><Input /></Form.Item>
           <Form.Item name="role" label={t('users.role')} rules={[{ required: true }]}>
-            <Select options={[{ value: 'admin', label: t('users.admin') }, { value: 'user', label: t('users.user') }]} />
+            <Select options={[{ value: 'admin', label: t('users.admin') }, { value: 'developer', label: t('users.developer') }, { value: 'user', label: t('users.user') }]} />
           </Form.Item>
           <Form.Item name="is_active" label={t('users.isActive')} valuePropName="checked"><Switch /></Form.Item>
         </Form>

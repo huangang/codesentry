@@ -14,7 +14,7 @@ type User struct {
 	Email     string         `gorm:"size:255" json:"email"`
 	Nickname  string         `gorm:"size:100" json:"nickname"`
 	Avatar    string         `gorm:"size:500" json:"avatar"`
-	Role      string         `gorm:"size:50;default:user" json:"role"`       // admin, user
+	Role      string         `gorm:"size:50;default:user" json:"role"`       // admin, developer, user
 	AuthType  string         `gorm:"size:20;default:local" json:"auth_type"` // local, ldap
 	IsActive  bool           `gorm:"default:true" json:"is_active"`
 	LastLogin *time.Time     `json:"last_login"`

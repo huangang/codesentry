@@ -485,6 +485,8 @@
     "isActive": "启用",
     "lastLogin": "最后登录",
     "admin": "管理员",
+    "developer": "开发者",
+    "viewer": "只读用户",
     "user": "普通用户",
     "local": "本地认证",
     "ldap": "LDAP",
