@@ -192,7 +192,17 @@
     "pleaseSelectDateRange": "请选择时间范围",
     "importSuccess": "已导入 {{imported}} 条提交，跳过 {{skipped}} 条已存在",
     "importStarted": "导入任务已启动，完成后将通知您",
-    "importFailed": "{{name}} 导入失败: {{error}}"
+    "importFailed": "{{name}} 导入失败: {{error}}",
+    "members": "项目成员",
+    "memberAdded": "成员添加成功",
+    "memberRemoved": "成员已移除",
+    "selectUser": "选择用户",
+    "roleOwner": "所有者",
+    "roleMaintainer": "维护者",
+    "roleViewer": "观察者",
+    "memberUser": "用户",
+    "memberRole": "角色",
+    "removeMemberConfirm": "确定要移除此成员吗？"
   },
   "reviewLogs": {
     "title": "审查记录",

@@ -602,3 +602,26 @@ export const reviewLogBatchApi = {
   batchRetry: (ids: number[]) => api.post<{ message: string }>('/review-logs/batch-retry', { ids }),
   batchDelete: (ids: number[]) => api.post<{ message: string }>('/review-logs/batch-delete', { ids }),
 };
+
+// ---- Project Members ----
+
+export interface ProjectMember {
+  id: number;
+  project_id: number;
+  user_id: number;
+  role: string;
+  user?: { id: number; username: string; nickname?: string; role?: string };
+  created_at: string;
+  updated_at: string;
+}
+
+export const projectMemberApi = {
+  list: (projectId: number) =>
+    api.get<ProjectMember[]>(`/projects/${projectId}/members`),
+  add: (projectId: number, data: { user_id: number; role: string }) =>
+    api.post<ProjectMember>(`/projects/${projectId}/members`, data),
+  update: (projectId: number, memberId: number, data: { role: string }) =>
+    api.put<ProjectMember>(`/projects/${projectId}/members/${memberId}`, data),
+  remove: (projectId: number, memberId: number) =>
+    api.delete(`/projects/${projectId}/members/${memberId}`),
+};

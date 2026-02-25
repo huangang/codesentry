@@ -28,6 +28,7 @@ import {
   SettingOutlined,
   CopyOutlined,
   UploadOutlined,
+  TeamOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useTranslation } from 'react-i18next';
@@ -45,7 +46,7 @@ import {
   type ProjectFilters,
 } from '../hooks/queries';
 import { PLATFORMS } from '../constants';
-import { reviewLogApi } from '../services';
+import { reviewLogApi, projectMemberApi, userApi, type ProjectMember } from '../services';
 
 const { TextArea } = Input;
 
@@ -79,6 +80,69 @@ const Projects: React.FC = () => {
   const [manualProjectId, setManualProjectId] = useState<number | null>(null);
   const [manualForm] = Form.useForm();
   const [manualLoading, setManualLoading] = useState(false);
+
+  // Project Members state
+  const [membersDrawerVisible, setMembersDrawerVisible] = useState(false);
+  const [membersProjectId, setMembersProjectId] = useState<number | null>(null);
+  const [members, setMembers] = useState<ProjectMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [addMemberForm] = Form.useForm();
+  const [allUsers, setAllUsers] = useState<{ id: number; username: string; nickname?: string }[]>([]);
+
+  const loadMembers = async (projectId: number) => {
+    setMembersLoading(true);
+    try {
+      const res = await projectMemberApi.list(projectId);
+      setMembers(res.data as any || []);
+    } catch { /* ignore */ }
+    setMembersLoading(false);
+  };
+
+  const showMembersDrawer = async (projectId: number) => {
+    setMembersProjectId(projectId);
+    setMembersDrawerVisible(true);
+    addMemberForm.resetFields();
+    loadMembers(projectId);
+    try {
+      const res = await userApi.list({ page: 1, page_size: 1000 });
+      setAllUsers((res.data as any)?.items || []);
+    } catch { /* ignore */ }
+  };
+
+  const handleAddMember = async () => {
+    if (!membersProjectId) return;
+    try {
+      const values = await addMemberForm.validateFields();
+      await projectMemberApi.add(membersProjectId, values);
+      message.success(t('projects.memberAdded', 'Member added'));
+      addMemberForm.resetFields();
+      loadMembers(membersProjectId);
+    } catch (error: any) {
+      message.error(error.response?.data?.error || t('common.error'));
+    }
+  };
+
+  const handleUpdateMemberRole = async (memberId: number, role: string) => {
+    if (!membersProjectId) return;
+    try {
+      await projectMemberApi.update(membersProjectId, memberId, { role });
+      message.success(t('common.success'));
+      loadMembers(membersProjectId);
+    } catch (error: any) {
+      message.error(error.response?.data?.error || t('common.error'));
+    }
+  };
+
+  const handleRemoveMember = async (memberId: number) => {
+    if (!membersProjectId) return;
+    try {
+      await projectMemberApi.remove(membersProjectId, memberId);
+      message.success(t('projects.memberRemoved', 'Member removed'));
+      loadMembers(membersProjectId);
+    } catch (error: any) {
+      message.error(error.response?.data?.error || t('common.error'));
+    }
+  };
 
   // SSE subscription for import events
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -334,6 +398,11 @@ const Projects: React.FC = () => {
           <Tooltip title={t('projects.copyWebhookUrl')}>
             <Button type="link" size="small" icon={<CopyOutlined />} onClick={() => copyWebhookUrl(record)} />
           </Tooltip>
+          {isAdmin && (
+            <Tooltip title={t('projects.members', 'Members')}>
+              <Button type="link" size="small" icon={<TeamOutlined />} onClick={() => showMembersDrawer(record.id)} />
+            </Tooltip>
+          )}
           {isAdmin && (
             <Tooltip title={t('projects.importCommits', 'Import Commits')}>
               <Button type="link" size="small" icon={<UploadOutlined />} onClick={() => showManualModal(record.id)} />
@@ -604,18 +673,98 @@ const Projects: React.FC = () => {
         width={getResponsiveWidth(450)}
       >
         <Form form={manualForm} layout="vertical">
-          <Form.Item 
-            name="date_range" 
-            label={t('projects.dateRange', 'Date Range')} 
+          <Form.Item
+            name="date_range"
+            label={t('projects.dateRange', 'Date Range')}
             rules={[{ required: true, message: t('projects.pleaseSelectDateRange', 'Please select date range') }]}
-            extra={i18n.language?.startsWith('zh') 
-              ? '系统将自动从 Git 平台拉取该时间范围内的所有提交' 
+            extra={i18n.language?.startsWith('zh')
+              ? '系统将自动从 Git 平台拉取该时间范围内的所有提交'
               : 'The system will fetch all commits within this date range from the Git platform'}
           >
             <DatePicker.RangePicker style={{ width: '100%' }} />
           </Form.Item>
         </Form>
       </Modal>
+
+      <Drawer
+        title={t('projects.members', 'Members')}
+        width={getResponsiveWidth(500)}
+        open={membersDrawerVisible}
+        onClose={() => setMembersDrawerVisible(false)}
+      >
+        {isAdmin && (
+          <div style={{ marginBottom: 16 }}>
+            <Form form={addMemberForm} layout="inline" onFinish={handleAddMember}>
+              <Form.Item name="user_id" rules={[{ required: true, message: t('projects.selectUser', 'Select user') }]}>
+                <Select
+                  showSearch
+                  style={{ width: 180 }}
+                  placeholder={t('projects.selectUser', 'Select user')}
+                  optionFilterProp="label"
+                  options={allUsers
+                    .filter(u => !members.some(m => m.user_id === u.id))
+                    .map(u => ({ value: u.id, label: u.nickname || u.username }))}
+                />
+              </Form.Item>
+              <Form.Item name="role" initialValue="viewer" rules={[{ required: true }]}>
+                <Select style={{ width: 120 }} options={[
+                  { value: 'owner', label: t('projects.roleOwner', 'Owner') },
+                  { value: 'maintainer', label: t('projects.roleMaintainer', 'Maintainer') },
+                  { value: 'viewer', label: t('projects.roleViewer', 'Viewer') },
+                ]} />
+              </Form.Item>
+              <Form.Item>
+                <Button type="primary" htmlType="submit" icon={<PlusOutlined />}>{t('common.add', 'Add')}</Button>
+              </Form.Item>
+            </Form>
+          </div>
+        )}
+        <Table
+          dataSource={members}
+          rowKey="id"
+          loading={membersLoading}
+          pagination={false}
+          size="small"
+          columns={[
+            {
+              title: t('projects.memberUser', 'User'),
+              key: 'user',
+              render: (_, record: ProjectMember) => record.user?.nickname || record.user?.username || '-',
+            },
+            {
+              title: t('projects.memberRole', 'Role'),
+              key: 'role',
+              render: (_, record: ProjectMember) => isAdmin ? (
+                <Select
+                  size="small"
+                  value={record.role}
+                  style={{ width: 110 }}
+                  onChange={(val) => handleUpdateMemberRole(record.id, val)}
+                  options={[
+                    { value: 'owner', label: t('projects.roleOwner', 'Owner') },
+                    { value: 'maintainer', label: t('projects.roleMaintainer', 'Maintainer') },
+                    { value: 'viewer', label: t('projects.roleViewer', 'Viewer') },
+                  ]}
+                />
+              ) : (
+                <Tag color={record.role === 'owner' ? 'red' : record.role === 'maintainer' ? 'blue' : 'default'}>
+                  {record.role}
+                </Tag>
+              ),
+            },
+            ...(isAdmin ? [{
+              title: t('common.actions'),
+              key: 'action',
+              width: 80,
+              render: (_: unknown, record: ProjectMember) => (
+                <Popconfirm title={t('projects.removeMemberConfirm', 'Remove this member?')} onConfirm={() => handleRemoveMember(record.id)}>
+                  <Button type="link" size="small" danger icon={<DeleteOutlined />} />
+                </Popconfirm>
+              ),
+            }] : []),
+          ]}
+        />
+      </Drawer>
     </>
   );
 };

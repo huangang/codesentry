@@ -192,7 +192,17 @@
     "pleaseSelectDateRange": "Please select date range",
     "importSuccess": "Imported {{imported}} commits, skipped {{skipped}} existing",
     "importStarted": "Import task started, you will be notified when complete",
-    "importFailed": "Import failed for {{name}}: {{error}}"
+    "importFailed": "Import failed for {{name}}: {{error}}",
+    "members": "Members",
+    "memberAdded": "Member added",
+    "memberRemoved": "Member removed",
+    "selectUser": "Select user",
+    "roleOwner": "Owner",
+    "roleMaintainer": "Maintainer",
+    "roleViewer": "Viewer",
+    "memberUser": "User",
+    "memberRole": "Role",
+    "removeMemberConfirm": "Remove this member?"
   },
   "reviewLogs": {
     "title": "Review Logs",
