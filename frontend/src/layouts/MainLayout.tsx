@@ -30,6 +30,7 @@ import { usePermission } from '../hooks';
 import { authApi } from '../services';
 import { stopProactiveRefresh } from '../services/api';
 import GlobalSearch from '../components/GlobalSearch';
+import NotificationBell from '../components/NotificationBell';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -337,6 +338,7 @@ const MainLayout: React.FC = () => {
           </Space>
           {!isMobile && <GlobalSearch />}
           <Space size={isMobile ? 'small' : 'large'}>
+            <NotificationBell />
             <Tooltip title="GitHub">
               <Button
                 type="text"
