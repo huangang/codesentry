@@ -57,7 +57,7 @@ const IssueTrackers: React.FC = () => {
         setModalVisible(true);
     };
 
-    const typeColors: Record<string, string> = { jira: 'blue', linear: 'purple', github_issues: 'green' };
+    const typeColors: Record<string, string> = { jira: 'blue', linear: 'purple', github_issues: 'green', gitlab_issues: 'volcano' };
 
     const columns = [
         { title: t('common.name', 'Name'), dataIndex: 'name', key: 'name' },
@@ -113,6 +113,7 @@ const IssueTrackers: React.FC = () => {
                             { value: 'jira', label: 'Jira' },
                             { value: 'linear', label: 'Linear' },
                             { value: 'github_issues', label: 'GitHub Issues' },
+                            { value: 'gitlab_issues', label: 'GitLab Issues' },
                         ]} />
                     </Form.Item>
                     <Form.Item name="base_url" label="Base URL" extra="Jira: https://company.atlassian.net | GitHub: https://api.github.com">

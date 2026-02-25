@@ -89,7 +89,10 @@
     "users": "Users",
     "systemLogs": "System Logs",
     "settings": "Settings",
-    "dailyReports": "Daily Reports"
+    "dailyReports": "Daily Reports",
+    "reports": "Reports",
+    "issueTrackers": "Issue Trackers",
+    "reviewRules": "Review Rules"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -224,7 +227,15 @@
     "deleteConfirm": "Are you sure you want to delete this review log?",
     "deleteSuccess": "Review log deleted successfully",
     "analyzing": "Analyzing",
-    "changes": "Changes"
+    "changes": "Changes",
+    "export": "CSV Export",
+    "selected": "Selected",
+    "batchRetry": "Batch Retry",
+    "batchDelete": "Batch Delete",
+    "batchRetryConfirm": "Retry selected items?",
+    "batchDeleteConfirm": "Delete selected items?",
+    "batchRetrySuccess": "Batch retry initiated",
+    "batchDeleteSuccess": "Batch delete completed"
   },
   "llmModels": {
     "title": "LLM Models",
@@ -558,5 +569,39 @@
     "create": "Create Template",
     "edit": "Edit Template",
     "filterByType": "Filter by type"
+  },
+  "reports": {
+    "title": "Reports",
+    "weekly": "Weekly",
+    "monthly": "Monthly",
+    "allProjects": "All Projects",
+    "totalReviews": "Total Reviews",
+    "completed": "Completed",
+    "failed": "Failed",
+    "avgScore": "Avg Score",
+    "activeAuthors": "Active Authors",
+    "codeChanges": "Code Changes",
+    "trend": "Trend",
+    "reviews": "Reviews",
+    "changes": "Changes",
+    "authorRankings": "Author Rankings"
+  },
+  "issueTrackers": {
+    "title": "Issue Tracker Integrations",
+    "type": "Type",
+    "projectKey": "Project Key",
+    "issueType": "Issue Type",
+    "threshold": "Score Threshold",
+    "labels": "Labels"
+  },
+  "reviewRules": {
+    "title": "Review Rules (CI/CD Policies)",
+    "condition": "Condition",
+    "action": "Action",
+    "scope": "Scope",
+    "priority": "Priority",
+    "keyword": "Keywords",
+    "threshold": "Threshold",
+    "actionValue": "Action Value"
   }
 }

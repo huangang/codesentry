@@ -17,22 +17,29 @@ const (
 // AuthRequired is a middleware that checks for a valid JWT token
 func AuthRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		var tokenString string
+
+		// Try Authorization header first
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			response.Unauthorized(c, "authorization header required")
+		if authHeader != "" {
+			// Extract token from "Bearer <token>"
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) != 2 || parts[0] != "Bearer" {
+				response.Unauthorized(c, "invalid authorization header format")
+				c.Abort()
+				return
+			}
+			tokenString = parts[1]
+		} else {
+			// Fallback: read token from query param (for browser downloads like CSV export)
+			tokenString = c.Query("token")
+		}
+
+		if tokenString == "" {
+			response.Unauthorized(c, "authorization required")
 			c.Abort()
 			return
 		}
-
-		// Extract token from "Bearer <token>"
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			response.Unauthorized(c, "invalid authorization header format")
-			c.Abort()
-			return
-		}
-
-		tokenString := parts[1]
 		claims, err := utils.ParseToken(tokenString)
 		if err != nil {
 			response.Unauthorized(c, "invalid or expired token")

@@ -89,7 +89,10 @@
     "users": "用户管理",
     "systemLogs": "系统日志",
     "settings": "系统设置",
-    "dailyReports": "日报"
+    "dailyReports": "日报",
+    "reports": "报表",
+    "issueTrackers": "Issue Tracker",
+    "reviewRules": "审查规则"
   },
   "dashboard": {
     "title": "仪表盘",
@@ -224,7 +227,15 @@
     "deleteConfirm": "确定要删除此审查记录吗？",
     "deleteSuccess": "审查记录删除成功",
     "analyzing": "分析中",
-    "changes": "变更"
+    "changes": "变更",
+    "export": "CSV 导出",
+    "selected": "已选择",
+    "batchRetry": "批量重试",
+    "batchDelete": "批量删除",
+    "batchRetryConfirm": "确定批量重试所选项？",
+    "batchDeleteConfirm": "确定批量删除所选项？",
+    "batchRetrySuccess": "批量重试已发起",
+    "batchDeleteSuccess": "批量删除成功"
   },
   "llmModels": {
     "title": "大模型管理",
@@ -558,5 +569,39 @@
     "create": "创建模板",
     "edit": "编辑模板",
     "filterByType": "按类型筛选"
+  },
+  "reports": {
+    "title": "报表",
+    "weekly": "周报",
+    "monthly": "月报",
+    "allProjects": "全部项目",
+    "totalReviews": "总审查数",
+    "completed": "已完成",
+    "failed": "失败",
+    "avgScore": "平均分",
+    "activeAuthors": "活跃作者",
+    "codeChanges": "代码变更",
+    "trend": "趋势",
+    "reviews": "审查数",
+    "changes": "变更量",
+    "authorRankings": "作者排行"
+  },
+  "issueTrackers": {
+    "title": "Issue Tracker 集成",
+    "type": "类型",
+    "projectKey": "项目标识",
+    "issueType": "Issue 类型",
+    "threshold": "分数阈值",
+    "labels": "标签"
+  },
+  "reviewRules": {
+    "title": "审查规则（CI/CD 策略）",
+    "condition": "条件",
+    "action": "动作",
+    "scope": "范围",
+    "priority": "优先级",
+    "keyword": "关键词",
+    "threshold": "阈值",
+    "actionValue": "动作参数"
   }
 }
