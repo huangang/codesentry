@@ -24,6 +24,9 @@ func registerRoutes(r *gin.Engine, svc *appServices) {
 	healthHandler := handlers.NewHealthHandler()
 	r.GET("/health", healthHandler.CheckHealth)
 
+	// Prometheus metrics
+	r.GET("/metrics", handlers.Metrics)
+
 	// Root-level webhook routes (without /api prefix for compatibility)
 	rootWebhook := r.Group("", webhookLimiter.Middleware())
 	{
