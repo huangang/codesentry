@@ -34,6 +34,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Responsive Design**: Mobile-friendly interface
 - **Dark Mode**: Light and dark theme toggle
 
+- **Global Search**: Cross-project search for reviews and projects from the header
+- **Multi-Language Review Prompts**: Auto-detect programming language from diffs and inject language-specific review guidelines (12+ languages)
+- **Batch Operations**: Batch retry and batch delete for review logs
+- **SSE Notification Bell**: Real-time notification bell with unread badge and live review events
+- **Reports API**: Weekly/monthly report with period comparison, daily trends, and author rankings
+- **Issue Tracker Integration**: Auto-create Jira, Linear, or GitHub Issues when review score is below threshold
+- **Rule Engine**: Automated CI/CD policies with conditions (score_below, files_changed_above, has_keyword) and actions (block, warn, notify)
+- **Prometheus Metrics**: `/metrics` endpoint for monitoring
+- **Audit Logging**: Automatic audit logging for all admin write operations
+- **Review Diff Cache**: SHA-256 hash deduplication to skip already-reviewed diffs
+- **CSV Export**: Export review logs as CSV for offline analysis
+- **RBAC Enhancement**: Three roles (admin, developer, user) with granular permissions
+- **Project Members**: Per-project user binding with owner/maintainer/viewer roles
+- **SSE Heartbeat**: 30-second heartbeat to prevent Nginx 504 timeouts on SSE connections
+
 - **Auth Refresh**: Refresh-token based session renewal (`POST /api/auth/refresh`) with httpOnly cookie storage
 - **Refresh Token Rotation**: Server-side refresh token storage with rotation and revocation support
 - **Proactive Session Refresh**: Frontend proactively refreshes access token before expiration to reduce 401 interruptions

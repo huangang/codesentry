@@ -37,12 +37,23 @@ AI-powered Code Review Platform for GitHub, GitLab, and Bitbucket.
 - **Git Credentials**: Auto-create projects from webhooks with credential management
 - **System Logging**: Comprehensive logging for webhook events, errors, and system operations
 - **Authentication**: Local authentication and LDAP support (configurable via web UI)
-- **Role-based Access Control**: Admin and User roles with different permission levels
+- **Role-based Access Control**: Admin, Developer, and User roles with granular permissions
 - **Multi-Database**: SQLite for development, MySQL/PostgreSQL for production
 - **Async Task Queue**: Optional Redis-based async processing for AI reviews (graceful fallback to sync mode)
 - **Internationalization**: Support for English and Chinese (including DatePicker localization)
 - **Responsive Design**: Mobile-friendly interface with adaptive layouts for phones and tablets
 - **Dark Mode**: Toggle between light and dark themes, with preference persistence
+- **Global Search**: Cross-project search for reviews and projects from the header
+- **Multi-Language Review Prompts**: Auto-detect programming language from diffs and inject language-specific review guidelines (Go, Python, JS/TS, Java, Rust, Ruby, PHP, Swift, Kotlin, C/C++)
+- **Batch Operations**: Batch retry and batch delete for review logs
+- **Real-time Notifications**: SSE-powered notification bell with unread badge and live review events
+- **Reports**: Weekly/monthly report API with period comparison, daily trends, and author rankings
+- **Issue Tracker Integration**: Auto-create Jira, Linear, or GitHub Issues when review score is below threshold
+- **Rule Engine**: Automated CI/CD policies with conditions (score_below, files_changed_above, has_keyword) and actions (block, warn, notify)
+- **Prometheus Metrics**: `/metrics` endpoint for monitoring
+- **Audit Logging**: Automatic audit logging for all admin write operations
+- **Review Diff Cache**: SHA-256 hash deduplication to skip already-reviewed diffs
+- **CSV Export**: Export review logs as CSV for offline analysis
 
 ## Quick Start
 
@@ -261,6 +272,39 @@ The system automatically detects the platform via request headers.
 
 - `GET /api/dashboard/stats` - Get statistics
 
+### Global Search
+
+- `GET /api/search?q=<query>&limit=<n>` - Search across reviews and projects
+
+### Reports
+
+- `GET /api/reports?period=weekly|monthly&project_id=N` - Period stats with trend and author rankings
+
+### Review Logs
+
+- `GET /api/review-logs` - List review logs (supports score range, status, author, date filters)
+- `GET /api/review-logs/:id` - Get review detail
+- `GET /api/review-logs/export` - Export review logs as CSV (admin only)
+- `POST /api/review-logs/:id/retry` - Retry failed review (admin only)
+- `POST /api/review-logs/batch-retry` - Batch retry (admin only)
+- `POST /api/review-logs/batch-delete` - Batch delete (admin only)
+- `DELETE /api/review-logs/:id` - Delete review log (admin only)
+
+### Issue Trackers
+
+- `GET /api/issue-trackers` - List issue tracker integrations (admin only)
+- `POST /api/issue-trackers` - Create integration (admin only)
+- `PUT /api/issue-trackers/:id` - Update integration (admin only)
+- `DELETE /api/issue-trackers/:id` - Delete integration (admin only)
+
+### Review Rules (CI/CD Policies)
+
+- `GET /api/review-rules` - List review rules (admin only)
+- `POST /api/review-rules` - Create rule (admin only)
+- `PUT /api/review-rules/:id` - Update rule (admin only)
+- `DELETE /api/review-rules/:id` - Delete rule (admin only)
+- `POST /api/review-rules/evaluate/:id` - Test rules against a review log (admin only)
+
 ### Member Analysis
 
 - `GET /api/members` - List member statistics
@@ -355,9 +399,10 @@ See `scripts/pre-receive-hook.sh` for GitLab pre-receive hook example.
 - `PUT /api/system-logs/retention` - Set log retention days
 - `POST /api/system-logs/cleanup` - Manually cleanup old logs
 
-### Health Check
+### Health Check & Metrics
 
 - `GET /health` - Service health check
+- `GET /metrics` - Prometheus metrics
 
 ## Project Structure
 

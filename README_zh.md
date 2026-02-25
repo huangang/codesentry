@@ -37,12 +37,23 @@
 - **Git 凭证**: 支持通过 Webhook 自动创建项目，统一管理凭证
 - **系统日志**: 完整记录 Webhook 事件、错误和系统操作
 - **认证支持**: 本地认证和 LDAP 登录（可在 Web 界面配置）
-- **权限管理**: 管理员和普通用户角色，不同权限级别
+- **权限管理**: Admin、Developer、User 三种角色，细粒度权限控制
 - **多数据库**: SQLite 开发环境，MySQL/PostgreSQL 生产环境
 - **异步任务队列**: 可选 Redis 异步处理 AI 审查（无 Redis 时自动降级为同步模式）
 - **国际化**: 支持中英文切换（包括日期选择器本地化）
 - **响应式设计**: 适配手机和平板的移动端友好界面
 - **暗黑模式**: 支持明暗主题切换，用户偏好自动保存
+- **全局搜索**: 从 Header 搜索框跨项目搜索审查记录和项目
+- **多语言审查提示**: 自动检测 Diff 中的编程语言，注入语言专属审查指引（Go、Python、JS/TS、Java、Rust、Ruby、PHP、Swift、Kotlin、C/C++）
+- **批量操作**: 审查记录批量重试和批量删除
+- **实时通知**: SSE 驱动的通知铃铛，未读徽标和实时审查事件
+- **报表**: 周/月报 API，支持同环比、每日趋势、作者排行
+- **Issue Tracker 集成**: 审查低分时自动创建 Jira、Linear 或 GitHub Issue
+- **规则引擎**: 自动化 CI/CD 策略，支持条件（分数低于阈值、文件变更过多、包含关键词）和动作（阻断、警告、通知）
+- **Prometheus 指标**: `/metrics` 端点用于监控
+- **审计日志**: 管理员写操作自动记录审计日志
+- **Diff 缓存**: SHA-256 哈希去重，跳过已审查的 Diff
+- **CSV 导出**: 审查记录导出为 CSV 离线分析
 
 ## 快速开始
 
@@ -261,6 +272,39 @@ https://你的域名/review/webhook
 
 - `GET /api/dashboard/stats` - 获取统计数据
 
+### 全局搜索
+
+- `GET /api/search?q=<关键词>&limit=<数量>` - 跨项目搜索审查记录和项目
+
+### 报表
+
+- `GET /api/reports?period=weekly|monthly&project_id=N` - 周期统计，含趋势和作者排行
+
+### 审查记录
+
+- `GET /api/review-logs` - 审查记录列表（支持分数范围、状态、作者、日期过滤）
+- `GET /api/review-logs/:id` - 审查详情
+- `GET /api/review-logs/export` - 导出审查记录为 CSV（仅管理员）
+- `POST /api/review-logs/:id/retry` - 重试失败的审查（仅管理员）
+- `POST /api/review-logs/batch-retry` - 批量重试（仅管理员）
+- `POST /api/review-logs/batch-delete` - 批量删除（仅管理员）
+- `DELETE /api/review-logs/:id` - 删除审查记录（仅管理员）
+
+### Issue Tracker
+
+- `GET /api/issue-trackers` - Issue Tracker 列表（仅管理员）
+- `POST /api/issue-trackers` - 创建 Issue Tracker（仅管理员）
+- `PUT /api/issue-trackers/:id` - 更新 Issue Tracker（仅管理员）
+- `DELETE /api/issue-trackers/:id` - 删除 Issue Tracker（仅管理员）
+
+### 审查规则（CI/CD 策略）
+
+- `GET /api/review-rules` - 审查规则列表（仅管理员）
+- `POST /api/review-rules` - 创建规则（仅管理员）
+- `PUT /api/review-rules/:id` - 更新规则（仅管理员）
+- `DELETE /api/review-rules/:id` - 删除规则（仅管理员）
+- `POST /api/review-rules/evaluate/:id` - 对审查记录测试规则（仅管理员）
+
 ### 成员分析
 
 - `GET /api/members` - 成员统计列表
@@ -355,9 +399,10 @@ https://你的域名/review/webhook
 - `PUT /api/system-logs/retention` - 设置日志保留天数
 - `POST /api/system-logs/cleanup` - 手动清理过期日志
 
-### 健康检查
+### 健康检查与监控
 
 - `GET /health` - 服务健康检查
+- `GET /metrics` - Prometheus 指标
 
 ## 项目结构
 
