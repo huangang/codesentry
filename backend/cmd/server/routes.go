@@ -101,7 +101,7 @@ func registerRoutes(r *gin.Engine, svc *appServices) {
 
 		// Admin only routes
 		admin := api.Group("")
-		admin.Use(middleware.AuthRequired(), middleware.AdminRequired())
+		admin.Use(middleware.AuthRequired(), middleware.AdminRequired(), middleware.AuditLog())
 		{
 			// Projects (write operations)
 			projectHandler := handlers.NewProjectHandler(models.GetDB())
