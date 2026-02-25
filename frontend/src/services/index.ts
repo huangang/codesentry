@@ -461,3 +461,36 @@ export const aiUsageApi = {
   getProviderBreakdown: (params?: { start_date?: string; end_date?: string }) =>
     api.get<ProviderUsage[]>('/ai-usage/providers', { params }),
 };
+
+// ---- Global Search ----
+
+export interface SearchReviewItem {
+  id: number;
+  project_id: number;
+  project_name: string;
+  commit_hash: string;
+  commit_message: string;
+  author: string;
+  branch: string;
+  score: number | null;
+  review_status: string;
+  created_at: string;
+}
+
+export interface SearchProjectItem {
+  id: number;
+  name: string;
+  url: string;
+  platform: string;
+}
+
+export interface SearchResult {
+  reviews: SearchReviewItem[] | null;
+  projects: SearchProjectItem[] | null;
+  total: number;
+}
+
+export const searchApi = {
+  search: (q: string, limit?: number) =>
+    api.get<SearchResult>('/search', { params: { q, limit } }),
+};

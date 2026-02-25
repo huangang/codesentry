@@ -29,6 +29,7 @@ import { useThemeStore } from '../stores/themeStore';
 import { usePermission } from '../hooks';
 import { authApi } from '../services';
 import { stopProactiveRefresh } from '../services/api';
+import GlobalSearch from '../components/GlobalSearch';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -334,6 +335,7 @@ const MainLayout: React.FC = () => {
               {currentPageTitle}
             </Text>
           </Space>
+          {!isMobile && <GlobalSearch />}
           <Space size={isMobile ? 'small' : 'large'}>
             <Tooltip title="GitHub">
               <Button

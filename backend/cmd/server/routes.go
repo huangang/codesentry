@@ -65,6 +65,10 @@ func registerRoutes(r *gin.Engine, svc *appServices) {
 			dashboardHandler := handlers.NewDashboardHandler(models.GetDB())
 			protected.GET("/dashboard/stats", dashboardHandler.GetStats)
 
+			// Global Search
+			searchHandler := handlers.NewSearchHandler(models.GetDB())
+			protected.GET("/search", searchHandler.Search)
+
 			// Projects (read for all users)
 			projectHandler := handlers.NewProjectHandler(models.GetDB())
 			protected.GET("/projects", projectHandler.List)
