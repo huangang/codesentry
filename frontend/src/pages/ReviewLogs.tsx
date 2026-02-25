@@ -19,7 +19,7 @@ import {
   Avatar,
   Spin,
 } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined, LinkOutlined, DeleteOutlined, SendOutlined, CommentOutlined, CheckCircleOutlined, CloseCircleOutlined, QuestionCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, EyeOutlined, LinkOutlined, DeleteOutlined, SendOutlined, CommentOutlined, CheckCircleOutlined, CloseCircleOutlined, QuestionCircleOutlined, InfoCircleOutlined, DownloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
@@ -35,6 +35,7 @@ import {
   useCreateReviewFeedback,
   type ReviewLogFilters,
 } from '../hooks/queries';
+import { reviewLogBatchApi } from '../services';
 import { MarkdownContent } from '../components';
 import { REVIEW_STATUS, EVENT_TYPES, getScoreColor, getStatusColor } from '../constants';
 
@@ -162,6 +163,7 @@ const ReviewLogs: React.FC = () => {
   const { isAdmin } = usePermission();
   const [selectedLog, setSelectedLog] = useState<ReviewLog | null>(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
 
   const [eventType, setEventType] = useState<string>('');
   const [projectId, setProjectId] = useState<number | undefined>();
@@ -254,6 +256,23 @@ const ReviewLogs: React.FC = () => {
     }
   };
 
+  const handleBatchRetry = async () => {
+    try {
+      await reviewLogBatchApi.batchRetry(selectedRowKeys as number[]);
+      message.success(t('reviewLogs.batchRetrySuccess', `Batch retry initiated for ${selectedRowKeys.length} items`));
+      setSelectedRowKeys([]);
+      queryClient.invalidateQueries({ queryKey: ['reviewLogs'] });
+    } catch { message.error(t('common.error')); }
+  };
+
+  const handleBatchDelete = async () => {
+    try {
+      await reviewLogBatchApi.batchDelete(selectedRowKeys as number[]);
+      message.success(t('reviewLogs.batchDeleteSuccess', `Deleted ${selectedRowKeys.length} items`));
+      setSelectedRowKeys([]);
+      queryClient.invalidateQueries({ queryKey: ['reviewLogs'] });
+    } catch { message.error(t('common.error')); }
+  };
   const getStatusText = (status: string) => {
     switch (status) {
       case REVIEW_STATUS.PENDING: return t('reviewLogs.pending');
@@ -431,7 +450,40 @@ const ReviewLogs: React.FC = () => {
           <Button icon={<ReloadOutlined />} onClick={handleReset}>
             {t('common.reset')}
           </Button>
+          {isAdmin && (
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={() => {
+                const params = new URLSearchParams();
+                if (eventType) params.set('event_type', eventType);
+                if (projectId) params.set('project_id', String(projectId));
+                if (author) params.set('author', author);
+                if (searchText) params.set('search_text', searchText);
+                if (dateRange) {
+                  params.set('start_date', dateRange[0].format('YYYY-MM-DD'));
+                  params.set('end_date', dateRange[1].format('YYYY-MM-DD'));
+                }
+                const token = localStorage.getItem('token');
+                window.open(`/api/review-logs/export?${params.toString()}&token=${token}`, '_blank');
+              }}
+            >
+              {t('reviewLogs.export', 'CSV Export')}
+            </Button>
+          )}
         </Space>
+
+        {isAdmin && selectedRowKeys.length > 0 && (
+          <Space style={{ marginBottom: 12 }}>
+            <span>{t('reviewLogs.selected', 'Selected')}: {selectedRowKeys.length}</span>
+            <Popconfirm title={t('reviewLogs.batchRetryConfirm', `Retry ${selectedRowKeys.length} items?`)} onConfirm={handleBatchRetry}>
+              <Button icon={<ReloadOutlined />} size="small">{t('reviewLogs.batchRetry', 'Batch Retry')}</Button>
+            </Popconfirm>
+            <Popconfirm title={t('reviewLogs.batchDeleteConfirm', `Delete ${selectedRowKeys.length} items?`)} onConfirm={handleBatchDelete}>
+              <Button danger icon={<DeleteOutlined />} size="small">{t('reviewLogs.batchDelete', 'Batch Delete')}</Button>
+            </Popconfirm>
+            <Button size="small" onClick={() => setSelectedRowKeys([])}>{t('common.cancel', 'Cancel')}</Button>
+          </Space>
+        )}
 
         <Table
           columns={columns}
@@ -440,6 +492,7 @@ const ReviewLogs: React.FC = () => {
           loading={isLoading}
           scroll={{ x: 900 }}
           size="middle"
+          rowSelection={isAdmin ? { selectedRowKeys, onChange: setSelectedRowKeys } : undefined}
           pagination={{
             current: filters.page,
             pageSize: filters.page_size,

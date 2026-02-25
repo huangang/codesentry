@@ -494,3 +494,111 @@ export const searchApi = {
   search: (q: string, limit?: number) =>
     api.get<SearchResult>('/search', { params: { q, limit } }),
 };
+
+// ---- Reports ----
+
+export interface PeriodStats {
+  period: string;
+  start_date: string;
+  end_date: string;
+  total_reviews: number;
+  completed: number;
+  failed: number;
+  avg_score: number;
+  total_files: number;
+  total_additions: number;
+  total_deletions: number;
+  active_authors: number;
+}
+
+export interface TrendItem {
+  date: string;
+  reviews: number;
+  avg_score: number;
+  additions: number;
+  deletions: number;
+}
+
+export interface AuthorRanking {
+  author: string;
+  review_count: number;
+  avg_score: number;
+  total_additions: number;
+  total_deletions: number;
+}
+
+export interface ReportResponse {
+  current: PeriodStats;
+  previous: PeriodStats;
+  trend: TrendItem[];
+  rankings: AuthorRanking[];
+}
+
+export const reportApi = {
+  getReport: (params?: { period?: string; project_id?: number }) =>
+    api.get<ReportResponse>('/reports', { params }),
+};
+
+// ---- Issue Trackers ----
+
+export interface IssueTracker {
+  id: number;
+  name: string;
+  type: string;
+  base_url: string;
+  api_token_mask: string;
+  project_key: string;
+  issue_type: string;
+  score_threshold: number;
+  is_active: boolean;
+  assignee_field: string;
+  labels: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export const issueTrackerApi = {
+  list: () => api.get<IssueTracker[]>('/issue-trackers'),
+  create: (data: Partial<IssueTracker> & { api_token?: string }) =>
+    api.post<IssueTracker>('/issue-trackers', data),
+  update: (id: number, data: Partial<IssueTracker> & { api_token?: string }) =>
+    api.put<IssueTracker>(`/issue-trackers/${id}`, data),
+  delete: (id: number) => api.delete(`/issue-trackers/${id}`),
+};
+
+// ---- Review Rules ----
+
+export interface ReviewRule {
+  id: number;
+  name: string;
+  description: string;
+  project_id: number | null;
+  is_active: boolean;
+  priority: number;
+  condition: string;
+  threshold: number;
+  keyword: string;
+  action: string;
+  action_value: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export const reviewRuleApi = {
+  list: (params?: { project_id?: number }) =>
+    api.get<ReviewRule[]>('/review-rules', { params }),
+  create: (data: Partial<ReviewRule>) =>
+    api.post<ReviewRule>('/review-rules', data),
+  update: (id: number, data: Partial<ReviewRule>) =>
+    api.put<ReviewRule>(`/review-rules/${id}`, data),
+  delete: (id: number) => api.delete(`/review-rules/${id}`),
+  evaluate: (reviewLogId: number) =>
+    api.post<{ blocked: boolean; warnings: string[]; results: any[] }>(`/review-rules/evaluate/${reviewLogId}`),
+};
+
+// ---- Batch Operations ----
+
+export const reviewLogBatchApi = {
+  batchRetry: (ids: number[]) => api.post<{ message: string }>('/review-logs/batch-retry', { ids }),
+  batchDelete: (ids: number[]) => api.post<{ message: string }>('/review-logs/batch-delete', { ids }),
+};
