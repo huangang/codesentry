@@ -90,6 +90,50 @@ func (h *ReviewLogHandler) Delete(c *gin.Context) {
 	response.Success(c, gin.H{"message": "review log deleted"})
 }
 
+type BatchIDsRequest struct {
+	IDs []uint `json:"ids" binding:"required,min=1"`
+}
+
+// BatchRetry retries multiple failed reviews.
+func (h *ReviewLogHandler) BatchRetry(c *gin.Context) {
+	var req BatchIDsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	success, failed := 0, 0
+	for _, id := range req.IDs {
+		if err := h.retryService.ManualRetry(id); err != nil {
+			failed++
+		} else {
+			success++
+		}
+	}
+
+	response.Success(c, gin.H{"success": success, "failed": failed})
+}
+
+// BatchDelete deletes multiple review logs.
+func (h *ReviewLogHandler) BatchDelete(c *gin.Context) {
+	var req BatchIDsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	success, failed := 0, 0
+	for _, id := range req.IDs {
+		if err := h.reviewLogService.Delete(id); err != nil {
+			failed++
+		} else {
+			success++
+		}
+	}
+
+	response.Success(c, gin.H{"success": success, "failed": failed})
+}
+
 func (h *ReviewLogHandler) CreateManualCommit(c *gin.Context) {
 	var req services.ManualCommitRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
