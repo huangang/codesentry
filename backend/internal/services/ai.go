@@ -80,6 +80,11 @@ func (s *AIService) Review(ctx context.Context, req *ReviewRequest) (*ReviewResu
 
 	prompt = s.processFileContextBlock(prompt, req.FileContext)
 
+	// Inject language-specific review hints based on diff file extensions
+	if langHints := GenerateLanguageHints(req.Diffs); langHints != "" {
+		prompt += langHints
+	}
+
 	logger.Infof("[AI] Prompt length: %d chars, Diffs length: %d chars, Commits length: %d chars, FileContext length: %d chars",
 		len(prompt), len(req.Diffs), len(req.Commits), len(req.FileContext))
 
