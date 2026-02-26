@@ -41,11 +41,11 @@ type TrendItem struct {
 }
 
 type AuthorRanking struct {
-	Author      string  `json:"author"`
-	ReviewCount int64   `json:"review_count"`
-	AvgScore    float64 `json:"avg_score"`
-	TotalAdds   int64   `json:"total_additions"`
-	TotalDels   int64   `json:"total_deletions"`
+	Author         string  `json:"author"`
+	ReviewCount    int64   `json:"review_count"`
+	AvgScore       float64 `json:"avg_score"`
+	TotalAdditions int64   `json:"total_additions"`
+	TotalDeletions int64   `json:"total_deletions"`
 }
 
 type ReportResponse struct {
