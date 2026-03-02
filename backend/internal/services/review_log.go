@@ -167,3 +167,33 @@ func (s *ReviewLogService) CreateManualCommit(req *ManualCommitRequest) (*models
 
 	return log, nil
 }
+
+// UpdateScoreRequest represents a manual score override request
+type UpdateScoreRequest struct {
+	Score  float64 `json:"score" binding:"required,min=0,max=100"`
+	Reason string  `json:"reason" binding:"required"`
+}
+
+// UpdateScore manually overrides the score of a review log
+func (s *ReviewLogService) UpdateScore(id uint, req *UpdateScoreRequest) (*models.ReviewLog, error) {
+	var log models.ReviewLog
+	if err := s.db.First(&log, id).Error; err != nil {
+		return nil, err
+	}
+
+	// Preserve the AI's original score on first override
+	if log.OriginalScore == nil && log.Score != nil {
+		originalScore := *log.Score
+		log.OriginalScore = &originalScore
+	}
+
+	log.Score = &req.Score
+	log.ScoreOverrideReason = req.Reason
+
+	if err := s.db.Save(&log).Error; err != nil {
+		return nil, err
+	}
+
+	// Reload with project association
+	return s.GetByID(id)
+}

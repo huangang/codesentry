@@ -54,6 +54,7 @@
 - **审计日志**: 管理员写操作自动记录审计日志
 - **Diff 缓存**: SHA-256 哈希去重，跳过已审查的 Diff
 - **CSV 导出**: 审查记录导出为 CSV 离线分析
+- **人工改分**: 管理员可手动修改 AI 评分，记录修改原因并保留原始分数
 
 ## 快速开始
 
@@ -289,6 +290,7 @@ https://你的域名/review/webhook
 - `POST /api/review-logs/batch-retry` - 批量重试（仅管理员）
 - `POST /api/review-logs/batch-delete` - 批量删除（仅管理员）
 - `DELETE /api/review-logs/:id` - 删除审查记录（仅管理员）
+- `PUT /api/review-logs/:id/score` - 手动修改审查分数（仅管理员）
 
 ### Issue Tracker
 

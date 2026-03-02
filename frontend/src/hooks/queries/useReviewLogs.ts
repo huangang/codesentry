@@ -68,3 +68,17 @@ export function useDeleteReviewLog() {
         },
     });
 }
+
+export function useUpdateScore() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (params: { id: number; score: number; reason: string }) => {
+            const res = await reviewLogApiExtra.updateScore(params.id, { score: params.score, reason: params.reason });
+            return res.data;
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: reviewLogKeys.lists() });
+            queryClient.invalidateQueries({ queryKey: reviewLogKeys.detail(variables.id) });
+        },
+    });
+}

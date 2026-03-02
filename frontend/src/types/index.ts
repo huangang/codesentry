@@ -53,6 +53,8 @@ export interface ReviewLog {
   additions: number;
   deletions: number;
   score: number | null;
+  original_score: number | null;
+  score_override_reason: string;
   review_result: string;
   review_status: 'pending' | 'processing' | 'analyzing' | 'completed' | 'failed' | 'skipped';
   error_message: string;

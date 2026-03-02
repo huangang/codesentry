@@ -6,6 +6,7 @@ import {
   Button,
   Space,
   Input,
+  InputNumber,
   Select,
   DatePicker,
   Tag,
@@ -18,8 +19,9 @@ import {
   List,
   Avatar,
   Spin,
+  Tooltip,
 } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined, LinkOutlined, DeleteOutlined, SendOutlined, CommentOutlined, CheckCircleOutlined, CloseCircleOutlined, QuestionCircleOutlined, InfoCircleOutlined, DownloadOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, EyeOutlined, LinkOutlined, DeleteOutlined, SendOutlined, CommentOutlined, CheckCircleOutlined, CloseCircleOutlined, QuestionCircleOutlined, InfoCircleOutlined, DownloadOutlined, EditOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
@@ -30,6 +32,7 @@ import {
   useReviewLogs,
   useRetryReview,
   useDeleteReviewLog,
+  useUpdateScore,
   useProjects,
   useReviewFeedbacks,
   useCreateReviewFeedback,
@@ -165,6 +168,11 @@ const ReviewLogs: React.FC = () => {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
 
+  // Score override state
+  const [editingScore, setEditingScore] = useState(false);
+  const [newScore, setNewScore] = useState<number | null>(null);
+  const [scoreReason, setScoreReason] = useState('');
+
   const [eventType, setEventType] = useState<string>('');
   const [projectId, setProjectId] = useState<number | undefined>();
   const [author, setAuthor] = useState('');
@@ -176,6 +184,7 @@ const ReviewLogs: React.FC = () => {
   const { data: projectsData } = useProjects({ page_size: 100 });
   const retryReview = useRetryReview();
   const deleteReviewLog = useDeleteReviewLog();
+  const updateScore = useUpdateScore();
   const queryClient = useQueryClient();
 
   // SSE real-time updates
@@ -252,6 +261,19 @@ const ReviewLogs: React.FC = () => {
       message.success(t('reviewLogs.deleteSuccess', 'Review log deleted successfully'));
       setDrawerVisible(false);
     } catch (error) {
+      message.error(t('common.error'));
+    }
+  };
+
+  const handleUpdateScore = async () => {
+    if (!selectedLog || newScore === null) return;
+    try {
+      const updated = await updateScore.mutateAsync({ id: selectedLog.id, score: newScore, reason: scoreReason });
+      message.success(t('reviewLogs.scoreUpdateSuccess', '分数修改成功'));
+      setSelectedLog({ ...selectedLog, score: updated.score, original_score: updated.original_score, score_override_reason: updated.score_override_reason });
+      setEditingScore(false);
+      setScoreReason('');
+    } catch {
       message.error(t('common.error'));
     }
   };
@@ -535,10 +557,63 @@ const ReviewLogs: React.FC = () => {
               </Descriptions.Item>
               <Descriptions.Item label={t('reviewLogs.author')}>{selectedLog.author}</Descriptions.Item>
               <Descriptions.Item label={t('reviewLogs.branch')}>{selectedLog.branch}</Descriptions.Item>
-              <Descriptions.Item label={t('reviewLogs.score')}>
-                <Tag color={getScoreColor(selectedLog.score)}>
-                  {selectedLog.score !== null ? selectedLog.score.toFixed(0) : '-'}
-                </Tag>
+              <Descriptions.Item label={t('reviewLogs.score')} span={2}>
+                {editingScore ? (
+                  <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                    <Space>
+                      <InputNumber
+                        min={0}
+                        max={100}
+                        value={newScore}
+                        onChange={(v) => setNewScore(v as number)}
+                        style={{ width: 80 }}
+                        placeholder="0-100"
+                      />
+                      <Button type="primary" size="small" onClick={handleUpdateScore} loading={updateScore.isPending} disabled={newScore === null || !scoreReason.trim()}>
+                        {t('common.confirm', '确认')}
+                      </Button>
+                      <Button size="small" onClick={() => { setEditingScore(false); setScoreReason(''); }}>
+                        {t('common.cancel', '取消')}
+                      </Button>
+                    </Space>
+                    <Input
+                      value={scoreReason}
+                      onChange={(e) => setScoreReason(e.target.value)}
+                      placeholder={t('reviewLogs.scoreOverrideReason', '请输入修改原因')}
+                      size="small"
+                    />
+                  </Space>
+                ) : (
+                  <Space>
+                    <Tag color={getScoreColor(selectedLog.score)}>
+                      {selectedLog.score !== null ? selectedLog.score.toFixed(0) : '-'}
+                    </Tag>
+                    {selectedLog.original_score !== null && selectedLog.original_score !== undefined && (
+                      <Tooltip title={t('reviewLogs.aiOriginalScore', 'AI 原始分')}>
+                        <Tag color="default" style={{ textDecoration: 'line-through', opacity: 0.7 }}>
+                          {selectedLog.original_score.toFixed(0)}
+                        </Tag>
+                      </Tooltip>
+                    )}
+                    {isAdmin && selectedLog.review_status === 'completed' && (
+                      <Button
+                        type="link"
+                        size="small"
+                        icon={<EditOutlined />}
+                        onClick={() => { setNewScore(selectedLog.score); setEditingScore(true); }}
+                      >
+                        {t('reviewLogs.overrideScore', '修改分数')}
+                      </Button>
+                    )}
+                  </Space>
+                )}
+                {selectedLog.score_override_reason && !editingScore && (
+                  <div style={{ marginTop: 4 }}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      {t('reviewLogs.overrideReason', '修改原因')}: {selectedLog.score_override_reason}
+                    </Text>
+                  </div>
+                )}
               </Descriptions.Item>
               <Descriptions.Item label={t('reviewLogs.reviewStatus')}>
                 <Tag color={getStatusColor(selectedLog.review_status)}>

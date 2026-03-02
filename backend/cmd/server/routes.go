@@ -136,6 +136,7 @@ func registerRoutes(r *gin.Engine, svc *appServices) {
 			admin.GET("/review-logs/export", reviewLogHandler.Export)
 			admin.POST("/review-logs/batch-retry", reviewLogHandler.BatchRetry)
 			admin.POST("/review-logs/batch-delete", reviewLogHandler.BatchDelete)
+			admin.PUT("/review-logs/:id/score", reviewLogHandler.UpdateScore)
 
 			// Users
 			userHandler := handlers.NewUserHandler(models.GetDB())

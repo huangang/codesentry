@@ -166,6 +166,29 @@ func (h *ReviewLogHandler) ImportCommits(c *gin.Context) {
 	response.Success(c, resp)
 }
 
+// UpdateScore manually overrides the score of a review log.
+func (h *ReviewLogHandler) UpdateScore(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		response.BadRequest(c, "invalid review log id")
+		return
+	}
+
+	var req services.UpdateScoreRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	log, err := h.reviewLogService.UpdateScore(uint(id), &req)
+	if err != nil {
+		response.ServerError(c, err.Error())
+		return
+	}
+
+	response.Success(c, log)
+}
+
 // Export exports review logs as CSV with the same filters as List.
 func (h *ReviewLogHandler) Export(c *gin.Context) {
 	var req services.ReviewLogListRequest

@@ -54,6 +54,7 @@ AI-powered Code Review Platform for GitHub, GitLab, and Bitbucket.
 - **Audit Logging**: Automatic audit logging for all admin write operations
 - **Review Diff Cache**: SHA-256 hash deduplication to skip already-reviewed diffs
 - **CSV Export**: Export review logs as CSV for offline analysis
+- **Manual Score Override**: Admin can manually override AI scores with reason tracking and original score preservation
 
 ## Quick Start
 
@@ -289,6 +290,7 @@ The system automatically detects the platform via request headers.
 - `POST /api/review-logs/batch-retry` - Batch retry (admin only)
 - `POST /api/review-logs/batch-delete` - Batch delete (admin only)
 - `DELETE /api/review-logs/:id` - Delete review log (admin only)
+- `PUT /api/review-logs/:id/score` - Manually override review score (admin only)
 
 ### Issue Trackers
 

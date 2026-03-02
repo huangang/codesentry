@@ -328,6 +328,8 @@ export const userApi = {
 
 export const reviewLogApiExtra = {
   delete: (id: number) => api.delete(`/review-logs/${id}`),
+  updateScore: (id: number, data: { score: number; reason: string }) =>
+    api.put<ReviewLog>(`/review-logs/${id}/score`, data),
 };
 
 // Daily Reports
