@@ -255,9 +255,13 @@ func (s *AIService) callOpenAI(ctx context.Context, llmConfig *models.LLMConfig,
 
 // callAnthropic handles Anthropic Claude API using the native SDK
 func (s *AIService) callAnthropic(ctx context.Context, llmConfig *models.LLMConfig, prompt string) (*ReviewResult, error) {
-	client := anthropic.NewClient(
+	opts := []option.RequestOption{
 		option.WithAPIKey(llmConfig.APIKey),
-	)
+	}
+	if llmConfig.BaseURL != "" {
+		opts = append(opts, option.WithBaseURL(llmConfig.BaseURL))
+	}
+	client := anthropic.NewClient(opts...)
 
 	maxTokens := int64(llmConfig.MaxTokens)
 	if maxTokens == 0 {
@@ -350,9 +354,15 @@ func (s *AIService) callOllama(ctx context.Context, llmConfig *models.LLMConfig,
 
 // callGemini handles Google Gemini API using the native SDK
 func (s *AIService) callGemini(ctx context.Context, llmConfig *models.LLMConfig, prompt string) (*ReviewResult, error) {
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+	cfg := &genai.ClientConfig{
 		APIKey: llmConfig.APIKey,
-	})
+	}
+	if llmConfig.BaseURL != "" {
+		cfg.HTTPOptions = genai.HTTPOptions{
+			BaseURL: llmConfig.BaseURL,
+		}
+	}
+	client, err := genai.NewClient(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("Gemini client error: %w", err)
 	}
