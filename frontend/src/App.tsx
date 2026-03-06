@@ -24,8 +24,8 @@ const Users = React.lazy(() => import('./pages/Users'));
 const DailyReports = React.lazy(() => import('./pages/DailyReports'));
 const ReviewTemplates = React.lazy(() => import('./pages/ReviewTemplates'));
 const Reports = React.lazy(() => import('./pages/Reports'));
-const IssueTrackers = React.lazy(() => import('./pages/IssueTrackers'));
-const ReviewRules = React.lazy(() => import('./pages/ReviewRules'));
+// const IssueTrackers = React.lazy(() => import('./pages/IssueTrackers'));
+// const ReviewRules = React.lazy(() => import('./pages/ReviewRules'));
 
 const PageLoader: React.FC = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', minHeight: 300 }}>
@@ -82,8 +82,8 @@ const App: React.FC = () => {
             <Route path="daily-reports" element={<Suspense fallback={<PageLoader />}><DailyReports /></Suspense>} />
             <Route path="review-templates" element={<Suspense fallback={<PageLoader />}><ReviewTemplates /></Suspense>} />
             <Route path="reports" element={<Suspense fallback={<PageLoader />}><Reports /></Suspense>} />
-            <Route path="issue-trackers" element={<Suspense fallback={<PageLoader />}><IssueTrackers /></Suspense>} />
-            <Route path="review-rules" element={<Suspense fallback={<PageLoader />}><ReviewRules /></Suspense>} />
+            {/* <Route path="issue-trackers" element={<Suspense fallback={<PageLoader />}><IssueTrackers /></Suspense>} /> */}
+            {/* <Route path="review-rules" element={<Suspense fallback={<PageLoader />}><ReviewRules /></Suspense>} /> */}
           </Route>
           <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />

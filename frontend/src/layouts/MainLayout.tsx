@@ -17,8 +17,8 @@ import {
   LockOutlined,
   ScheduleOutlined,
   BarChartOutlined,
-  BugOutlined,
-  SafetyOutlined,
+  // BugOutlined,
+  // SafetyOutlined,
   MenuOutlined,
   CloseOutlined,
   SunOutlined,
@@ -79,8 +79,8 @@ const MainLayout: React.FC = () => {
     { key: '/admin/users', icon: <UserOutlined />, label: t('menu.users') },
     { key: '/admin/sys-logs', icon: <FileTextOutlined />, label: t('menu.systemLogs') },
     { key: '/admin/reports', icon: <BarChartOutlined />, label: t('menu.reports', 'Reports') },
-    { key: '/admin/issue-trackers', icon: <BugOutlined />, label: t('menu.issueTrackers', 'Issue Trackers') },
-    { key: '/admin/review-rules', icon: <SafetyOutlined />, label: t('menu.reviewRules', 'Review Rules') },
+    // { key: '/admin/issue-trackers', icon: <BugOutlined />, label: t('menu.issueTrackers', 'Issue Trackers') },
+    // { key: '/admin/review-rules', icon: <SafetyOutlined />, label: t('menu.reviewRules', 'Review Rules') },
     { key: '/admin/settings', icon: <SettingOutlined />, label: t('menu.settings') },
   ];
 
