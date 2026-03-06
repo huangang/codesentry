@@ -32,7 +32,8 @@ var (
 		regexp.MustCompile(`(\d+)\s*/\s*100\s*分?`),
 		regexp.MustCompile(`评分[:：]\s*(\d+)`),
 	}
-	ifBlockRegex = regexp.MustCompile(`(?s)\{\{#if_file_context\}\}(.*?)\{\{/if_file_context\}\}`)
+	ifBlockRegex    = regexp.MustCompile(`(?s)\{\{#if_file_context\}\}(.*?)\{\{/if_file_context\}\}`)
+	thinkBlockRegex = regexp.MustCompile(`(?s)<think>.*?</think>`)
 )
 
 type AIService struct {
@@ -510,14 +511,23 @@ func (s *AIService) processFileContextBlock(prompt string, fileContext string) s
 	return prompt
 }
 
-// extractScore extracts the score from review content
+// extractScore extracts the score from review content.
+// It strips <think> blocks first to avoid matching intermediate scores from AI reasoning,
+// then uses the LAST match of each pattern since the total score is typically at the end.
 func extractScore(content string) float64 {
+	// Strip <think>...</think> blocks to avoid matching scores in AI reasoning
+	cleaned := thinkBlockRegex.ReplaceAllString(content, "")
+
 	for _, re := range scorePatterns {
-		matches := re.FindStringSubmatch(content)
-		if len(matches) >= 2 {
-			if score, err := strconv.ParseFloat(matches[1], 64); err == nil {
-				if score >= 0 && score <= 100 {
-					return score
+		allMatches := re.FindAllStringSubmatch(cleaned, -1)
+		if len(allMatches) > 0 {
+			// Use the last match - total score is typically at the end of the review
+			lastMatch := allMatches[len(allMatches)-1]
+			if len(lastMatch) >= 2 {
+				if score, err := strconv.ParseFloat(lastMatch[1], 64); err == nil {
+					if score >= 0 && score <= 100 {
+						return score
+					}
 				}
 			}
 		}

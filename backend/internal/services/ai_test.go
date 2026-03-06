@@ -75,6 +75,26 @@ func TestExtractScore(t *testing.T) {
 			content:  "total score: 80",
 			expected: 80,
 		},
+		{
+			name:     "think block with wrong score",
+			content:  "<think>\n初步评估总分: 0, 需要重新计算\n</think>\n\n一、问题分析\n...\n三、总分\n总分: 97分",
+			expected: 97,
+		},
+		{
+			name:     "think block score /100",
+			content:  "<think>\nScore: 0/100 initial estimate\n</think>\n\nReview result...\nTotal Score: 85/100",
+			expected: 85,
+		},
+		{
+			name:     "multiple total scores uses last",
+			content:  "评分: 50\n...\n最终评分: 90",
+			expected: 90,
+		},
+		{
+			name:     "sub-scores dont interfere",
+			content:  "代码质量: 40/40\n安全性: 29/30\n总分: 97分",
+			expected: 97,
+		},
 	}
 
 	for _, tt := range tests {
