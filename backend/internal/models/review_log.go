@@ -37,6 +37,8 @@ type ReviewLog struct {
 	MRURL               string         `gorm:"size:500" json:"mr_url"`
 	DiffContent         string         `gorm:"type:MEDIUMTEXT" json:"-"`       // Raw diff for diff viewer (not in list API)
 	DiffHash            string         `gorm:"size:64;index" json:"diff_hash"` // SHA-256 of filtered diff for cache dedup
+	FixPRURL            string         `gorm:"size:500" json:"fix_pr_url"`     // URL of auto-generated fix PR/MR
+	FixStatus           string         `gorm:"size:50" json:"fix_status"`      // pending, completed, failed
 	CreatedAt           time.Time      `gorm:"index" json:"created_at"`
 	UpdatedAt           time.Time      `json:"updated_at"`
 	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`

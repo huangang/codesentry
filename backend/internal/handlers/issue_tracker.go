@@ -71,3 +71,32 @@ func (h *IssueTrackerHandler) Delete(c *gin.Context) {
 	}
 	response.Success(c, gin.H{"message": "deleted"})
 }
+
+func (h *IssueTrackerHandler) TestConnection(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		response.BadRequest(c, "invalid id")
+		return
+	}
+	trackers, err := h.service.List()
+	if err != nil {
+		response.ServerError(c, err.Error())
+		return
+	}
+	var tracker *models.IssueTracker
+	for i := range trackers {
+		if trackers[i].ID == uint(id) {
+			tracker = &trackers[i]
+			break
+		}
+	}
+	if tracker == nil {
+		response.BadRequest(c, "tracker not found")
+		return
+	}
+	if err := h.service.TestConnection(tracker); err != nil {
+		response.ServerError(c, err.Error())
+		return
+	}
+	response.Success(c, gin.H{"message": "connection successful"})
+}

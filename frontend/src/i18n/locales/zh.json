@@ -245,7 +245,14 @@
     "batchRetryConfirm": "确定批量重试所选项？",
     "batchDeleteConfirm": "确定批量删除所选项？",
     "batchRetrySuccess": "批量重试已发起",
-    "batchDeleteSuccess": "批量删除成功"
+    "batchDeleteSuccess": "批量删除成功",
+    "requestFix": "自动修复",
+    "fixInProgress": "修复中...",
+    "fixCompleted": "修复 PR 已创建",
+    "fixFailed": "修复失败",
+    "viewFixPR": "查看修复 PR",
+    "requestFixConfirm": "生成 AI 修复并创建 PR/MR？",
+    "requestFixSuccess": "修复 PR 创建成功"
   },
   "llmModels": {
     "title": "大模型管理",
@@ -602,7 +609,13 @@
     "projectKey": "项目标识",
     "issueType": "Issue 类型",
     "threshold": "分数阈值",
-    "labels": "标签"
+    "labels": "标签",
+    "assigneeField": "自动指派",
+    "testConnection": "测试",
+    "testSuccess": "连接成功",
+    "testFailed": "连接失败",
+    "baseUrlHelp": "Jira: https://company.atlassian.net | GitHub: https://api.github.com | GitLab: https://gitlab.com",
+    "projectKeyHelp": "Jira: 项目 Key | Linear: 团队 ID | GitHub: owner/repo | GitLab: URL 编码的项目路径或 ID"
   },
   "reviewRules": {
     "title": "审查规则（CI/CD 策略）",

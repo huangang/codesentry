@@ -21,7 +21,7 @@ import {
   Spin,
   Tooltip,
 } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined, LinkOutlined, DeleteOutlined, SendOutlined, CommentOutlined, CheckCircleOutlined, CloseCircleOutlined, QuestionCircleOutlined, InfoCircleOutlined, DownloadOutlined, EditOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, EyeOutlined, LinkOutlined, DeleteOutlined, SendOutlined, CommentOutlined, CheckCircleOutlined, CloseCircleOutlined, QuestionCircleOutlined, InfoCircleOutlined, DownloadOutlined, EditOutlined, ToolOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useTranslation } from 'react-i18next';
@@ -38,7 +38,7 @@ import {
   useCreateReviewFeedback,
   type ReviewLogFilters,
 } from '../hooks/queries';
-import { reviewLogBatchApi } from '../services';
+import { reviewLogBatchApi, reviewLogApi } from '../services';
 import { MarkdownContent } from '../components';
 import { REVIEW_STATUS, EVENT_TYPES, getScoreColor, getStatusColor } from '../constants';
 
@@ -172,6 +172,7 @@ const ReviewLogs: React.FC = () => {
   const [editingScore, setEditingScore] = useState(false);
   const [newScore, setNewScore] = useState<number | null>(null);
   const [scoreReason, setScoreReason] = useState('');
+  const [fixLoading, setFixLoading] = useState(false);
 
   const [eventType, setEventType] = useState<string>('');
   const [projectId, setProjectId] = useState<number | undefined>();
@@ -262,6 +263,22 @@ const ReviewLogs: React.FC = () => {
       setDrawerVisible(false);
     } catch (error) {
       message.error(t('common.error'));
+    }
+  };
+
+  const handleRequestFix = async (id: number) => {
+    setFixLoading(true);
+    try {
+      const res = await reviewLogApi.requestFix(id);
+      message.success(t('reviewLogs.requestFixSuccess', 'Fix PR created successfully'));
+      if (selectedLog) {
+        setSelectedLog({ ...selectedLog, fix_status: 'completed', fix_pr_url: res.data.pr_url });
+      }
+      queryClient.invalidateQueries({ queryKey: ['reviewLogs'] });
+    } catch {
+      message.error(t('reviewLogs.fixFailed', 'Fix failed'));
+    } finally {
+      setFixLoading(false);
     }
   };
 
@@ -634,6 +651,41 @@ const ReviewLogs: React.FC = () => {
                     style={{ marginLeft: 8 }}
                   >
                     {t('reviewLogs.retry', 'Retry')}
+                  </Button>
+                )}
+                {isAdmin && selectedLog.review_status === REVIEW_STATUS.COMPLETED && !selectedLog.fix_pr_url && (
+                  <Popconfirm
+                    title={t('reviewLogs.requestFixConfirm', 'Generate AI fix and create PR/MR?')}
+                    onConfirm={() => handleRequestFix(selectedLog.id)}
+                    okText={t('common.yes')}
+                    cancelText={t('common.no')}
+                  >
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<ToolOutlined />}
+                      loading={fixLoading}
+                      style={{ marginLeft: 8 }}
+                    >
+                      {t('reviewLogs.requestFix', 'Auto-Fix')}
+                    </Button>
+                  </Popconfirm>
+                )}
+                {selectedLog.fix_status === 'pending' && (
+                  <Tag color="processing" style={{ marginLeft: 8 }}>
+                    {t('reviewLogs.fixInProgress', 'Fix in progress...')}
+                  </Tag>
+                )}
+                {selectedLog.fix_pr_url && (
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<LinkOutlined />}
+                    href={selectedLog.fix_pr_url}
+                    target="_blank"
+                    style={{ marginLeft: 8 }}
+                  >
+                    {t('reviewLogs.viewFixPR', 'View Fix PR')}
                   </Button>
                 )}
               </Descriptions.Item>

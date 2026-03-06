@@ -89,6 +89,10 @@ export const reviewLogApi = {
     start_date: string;
     end_date: string;
   }) => api.post<{ imported: number; skipped: number; errors?: string[] }>('/review-logs/import', data),
+
+  requestFix: (id: number) => api.post<{ message: string; pr_url: string }>(`/review-logs/${id}/fix`),
+
+  getFixStatus: (id: number) => api.get<{ fix_status: string; fix_pr_url: string }>(`/review-logs/${id}/fix-status`),
 };
 
 // LLM Configs
@@ -566,6 +570,7 @@ export const issueTrackerApi = {
   update: (id: number, data: Partial<IssueTracker> & { api_token?: string }) =>
     api.put<IssueTracker>(`/issue-trackers/${id}`, data),
   delete: (id: number) => api.delete(`/issue-trackers/${id}`),
+  testConnection: (id: number) => api.post<{ message: string }>(`/issue-trackers/${id}/test`),
 };
 
 // ---- Review Rules ----

@@ -138,6 +138,11 @@ func registerRoutes(r *gin.Engine, svc *appServices) {
 			admin.POST("/review-logs/batch-delete", reviewLogHandler.BatchDelete)
 			admin.PUT("/review-logs/:id/score", reviewLogHandler.UpdateScore)
 
+			// Auto-Fix PR (AI-generated code fixes)
+			autoFixHandler := handlers.NewAutoFixHandler(models.GetDB(), svc.openAICfg)
+			admin.POST("/review-logs/:id/fix", autoFixHandler.RequestFix)
+			admin.GET("/review-logs/:id/fix-status", autoFixHandler.GetFixStatus)
+
 			// Users
 			userHandler := handlers.NewUserHandler(models.GetDB())
 			admin.GET("/users", userHandler.List)
@@ -181,6 +186,7 @@ func registerRoutes(r *gin.Engine, svc *appServices) {
 			admin.POST("/issue-trackers", issueTrackerHandler.Create)
 			admin.PUT("/issue-trackers/:id", issueTrackerHandler.Update)
 			admin.DELETE("/issue-trackers/:id", issueTrackerHandler.Delete)
+			admin.POST("/issue-trackers/:id/test", issueTrackerHandler.TestConnection)
 
 			// Review Rules (CI/CD gating policies)
 			reviewRuleHandler := handlers.NewReviewRuleHandler(models.GetDB())

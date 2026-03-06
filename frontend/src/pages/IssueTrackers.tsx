@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Table, Button, Space, Modal, Form, Input, Select, InputNumber, Switch, message, Popconfirm, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, ApiOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { issueTrackerApi, type IssueTracker } from '../services';
@@ -34,6 +34,12 @@ const IssueTrackers: React.FC = () => {
     const deleteMutation = useMutation({
         mutationFn: async (id: number) => { await issueTrackerApi.delete(id); },
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['issueTrackers'] }); message.success('Deleted'); },
+    });
+
+    const testMutation = useMutation({
+        mutationFn: async (id: number) => { const res = await issueTrackerApi.testConnection(id); return res.data; },
+        onSuccess: () => { message.success(t('issueTrackers.testSuccess', 'Connection successful')); },
+        onError: () => { message.error(t('issueTrackers.testFailed', 'Connection failed')); },
     });
 
     const handleSubmit = async (values: any) => {
@@ -80,6 +86,7 @@ const IssueTrackers: React.FC = () => {
             title: t('common.actions', 'Actions'), key: 'actions',
             render: (_: any, record: IssueTracker) => (
                 <Space>
+                    <Button type="link" icon={<ApiOutlined />} loading={testMutation.isPending} onClick={() => testMutation.mutate(record.id)} title={t('issueTrackers.testConnection', 'Test')} />
                     <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(record)} />
                     <Popconfirm title="Delete?" onConfirm={() => deleteMutation.mutate(record.id)}>
                         <Button type="link" danger icon={<DeleteOutlined />} />
@@ -133,6 +140,9 @@ const IssueTrackers: React.FC = () => {
                     </Form.Item>
                     <Form.Item name="labels" label={t('issueTrackers.labels', 'Labels')}>
                         <Input placeholder="code-review, low-score" />
+                    </Form.Item>
+                    <Form.Item name="assignee_field" label={t('issueTrackers.assigneeField', 'Auto Assignee')}>
+                        <Input placeholder="user ID or username" />
                     </Form.Item>
                     <Form.Item name="is_active" label={t('common.status', 'Active')} valuePropName="checked">
                         <Switch />

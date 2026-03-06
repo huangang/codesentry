@@ -37,8 +37,8 @@ type CreateIssueRequest struct {
 
 // CheckAndCreateIssue checks all active issue trackers and creates issues for low-score reviews.
 func (s *IssueTrackerService) CheckAndCreateIssue(reviewLog *models.ReviewLog, projectName string) {
-	if reviewLog.Score == nil || *reviewLog.Score >= 60 {
-		return // Skip if no score or score is acceptable
+	if reviewLog.Score == nil {
+		return // Skip if no score
 	}
 
 	var trackers []models.IssueTracker
@@ -94,6 +94,8 @@ func (s *IssueTrackerService) createIssue(tracker *models.IssueTracker, req *Cre
 		return s.createLinearIssue(tracker, req)
 	case "github_issues":
 		return s.createGitHubIssue(tracker, req)
+	case "gitlab_issues":
+		return s.createGitLabIssue(tracker, req)
 	default:
 		return fmt.Errorf("unsupported issue tracker type: %s", tracker.Type)
 	}
@@ -194,6 +196,97 @@ func (s *IssueTrackerService) createGitHubIssue(tracker *models.IssueTracker, re
 
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("github returned status %d", resp.StatusCode)
+	}
+	return nil
+}
+
+func (s *IssueTrackerService) createGitLabIssue(tracker *models.IssueTracker, req *CreateIssueRequest) error {
+	payload := map[string]interface{}{
+		"title":       req.Title,
+		"description": req.Description,
+	}
+	if tracker.Labels != "" {
+		payload["labels"] = tracker.Labels
+	}
+	if tracker.AssigneeField != "" {
+		payload["assignee_ids"] = []string{tracker.AssigneeField}
+	}
+
+	body, _ := json.Marshal(payload)
+	// ProjectKey should be URL-encoded project path, e.g. "group/project" or project ID
+	url := fmt.Sprintf("%s/api/v4/projects/%s/issues", tracker.BaseURL, tracker.ProjectKey)
+	httpReq, err := http.NewRequest("POST", url, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("PRIVATE-TOKEN", tracker.APIToken)
+
+	resp, err := s.httpClient.Do(httpReq)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("gitlab returned status %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// TestConnection verifies the issue tracker credentials by making a lightweight API call.
+func (s *IssueTrackerService) TestConnection(tracker *models.IssueTracker) error {
+	var testURL, authHeader, authValue string
+
+	switch tracker.Type {
+	case "jira":
+		testURL = tracker.BaseURL + "/rest/api/2/myself"
+		authHeader = "Authorization"
+		authValue = "Basic " + tracker.APIToken
+	case "linear":
+		// Use a simple query to verify the token
+		payload := []byte(`{"query": "{ viewer { id } }"}`)
+		req, err := http.NewRequest("POST", "https://api.linear.app/graphql", bytes.NewReader(payload))
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", tracker.APIToken)
+		resp, err := s.httpClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("connection failed: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode >= 400 {
+			return fmt.Errorf("linear returned status %d", resp.StatusCode)
+		}
+		return nil
+	case "github_issues":
+		testURL = fmt.Sprintf("%s/repos/%s", tracker.BaseURL, tracker.ProjectKey)
+		authHeader = "Authorization"
+		authValue = "Bearer " + tracker.APIToken
+	case "gitlab_issues":
+		testURL = fmt.Sprintf("%s/api/v4/projects/%s", tracker.BaseURL, tracker.ProjectKey)
+		authHeader = "PRIVATE-TOKEN"
+		authValue = tracker.APIToken
+	default:
+		return fmt.Errorf("unsupported tracker type: %s", tracker.Type)
+	}
+
+	req, err := http.NewRequest("GET", testURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set(authHeader, authValue)
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("connection failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("%s returned status %d", tracker.Type, resp.StatusCode)
 	}
 	return nil
 }

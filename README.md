@@ -48,7 +48,8 @@ AI-powered Code Review Platform for GitHub, GitLab, and Bitbucket.
 - **Batch Operations**: Batch retry and batch delete for review logs
 - **Real-time Notifications**: SSE-powered notification bell with unread badge and live review events
 - **Reports**: Weekly/monthly report API with period comparison, daily trends, and author rankings
-- **Issue Tracker Integration**: Auto-create Jira, Linear, or GitHub Issues when review score is below threshold
+- **Issue Tracker Integration**: Auto-create Jira, Linear, GitHub Issues, or GitLab Issues when review score is below threshold
+- **Auto-Fix PR**: AI-generated code fixes — automatically creates branch, commits patches, and opens PR (GitHub) or MR (GitLab)
 - **Rule Engine**: Automated CI/CD policies with conditions (score_below, files_changed_above, has_keyword) and actions (block, warn, notify)
 - **Prometheus Metrics**: `/metrics` endpoint for monitoring
 - **Audit Logging**: Automatic audit logging for all admin write operations
@@ -298,6 +299,12 @@ The system automatically detects the platform via request headers.
 - `POST /api/issue-trackers` - Create integration (admin only)
 - `PUT /api/issue-trackers/:id` - Update integration (admin only)
 - `DELETE /api/issue-trackers/:id` - Delete integration (admin only)
+- `POST /api/issue-trackers/:id/test` - Test connection (admin only)
+
+### Auto-Fix PR
+
+- `POST /api/review-logs/:id/fix` - Request AI-generated fix PR/MR (admin only)
+- `GET /api/review-logs/:id/fix-status` - Get fix status (admin only)
 
 ### Review Rules (CI/CD Policies)
 

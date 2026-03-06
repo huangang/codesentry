@@ -245,7 +245,14 @@
     "batchRetryConfirm": "Retry selected items?",
     "batchDeleteConfirm": "Delete selected items?",
     "batchRetrySuccess": "Batch retry initiated",
-    "batchDeleteSuccess": "Batch delete completed"
+    "batchDeleteSuccess": "Batch delete completed",
+    "requestFix": "Auto-Fix",
+    "fixInProgress": "Fix in progress...",
+    "fixCompleted": "Fix PR created",
+    "fixFailed": "Fix failed",
+    "viewFixPR": "View Fix PR",
+    "requestFixConfirm": "Generate AI fix and create PR/MR?",
+    "requestFixSuccess": "Fix PR created successfully"
   },
   "llmModels": {
     "title": "LLM Models",
@@ -602,7 +609,13 @@
     "projectKey": "Project Key",
     "issueType": "Issue Type",
     "threshold": "Score Threshold",
-    "labels": "Labels"
+    "labels": "Labels",
+    "assigneeField": "Auto Assignee",
+    "testConnection": "Test",
+    "testSuccess": "Connection successful",
+    "testFailed": "Connection failed",
+    "baseUrlHelp": "Jira: https://company.atlassian.net | GitHub: https://api.github.com | GitLab: https://gitlab.com",
+    "projectKeyHelp": "Jira: project key | Linear: team ID | GitHub: owner/repo | GitLab: URL-encoded project path or ID"
   },
   "reviewRules": {
     "title": "Review Rules (CI/CD Policies)",

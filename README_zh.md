@@ -48,7 +48,8 @@
 - **批量操作**: 审查记录批量重试和批量删除
 - **实时通知**: SSE 驱动的通知铃铛，未读徽标和实时审查事件
 - **报表**: 周/月报 API，支持同环比、每日趋势、作者排行
-- **Issue Tracker 集成**: 审查低分时自动创建 Jira、Linear 或 GitHub Issue
+- **Issue Tracker 集成**: 审查低分时自动创建 Jira、Linear、GitHub Issue 或 GitLab Issue
+- **自动修复 PR**: AI 生成代码修复 — 自动创建分支、提交补丁并创建 PR (GitHub) 或 MR (GitLab)
 - **规则引擎**: 自动化 CI/CD 策略，支持条件（分数低于阈值、文件变更过多、包含关键词）和动作（阻断、警告、通知）
 - **Prometheus 指标**: `/metrics` 端点用于监控
 - **审计日志**: 管理员写操作自动记录审计日志
@@ -298,6 +299,12 @@ https://你的域名/review/webhook
 - `POST /api/issue-trackers` - 创建 Issue Tracker（仅管理员）
 - `PUT /api/issue-trackers/:id` - 更新 Issue Tracker（仅管理员）
 - `DELETE /api/issue-trackers/:id` - 删除 Issue Tracker（仅管理员）
+- `POST /api/issue-trackers/:id/test` - 测试连接（仅管理员）
+
+### 自动修复 PR
+
+- `POST /api/review-logs/:id/fix` - 请求 AI 生成修复 PR/MR（仅管理员）
+- `GET /api/review-logs/:id/fix-status` - 获取修复状态（仅管理员）
 
 ### 审查规则（CI/CD 策略）
 

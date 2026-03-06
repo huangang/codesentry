@@ -25,6 +25,7 @@ type Service struct {
 	configService       *services.SystemConfigService
 	fileContextService  *services.FileContextService
 	reviewCacheService  *services.ReviewCacheService
+	issueTrackerService *services.IssueTrackerService
 	httpClient          *http.Client
 }
 
@@ -40,6 +41,7 @@ func NewService(db *gorm.DB, aiCfg *config.OpenAIConfig) *Service {
 		configService:       configService,
 		fileContextService:  services.NewFileContextService(configService),
 		reviewCacheService:  services.NewReviewCacheService(db),
+		issueTrackerService: services.NewIssueTrackerService(db),
 		httpClient:          &http.Client{Timeout: 30 * time.Second},
 	}
 }
@@ -269,6 +271,9 @@ func (s *Service) ProcessReviewTask(ctx context.Context, task *services.ReviewTa
 			MRURL:         task.MRURL,
 		})
 
+		// Auto-create issues for low-score reviews
+		go s.issueTrackerService.CheckAndCreateIssue(reviewLog, project.Name)
+
 		minScore := s.getEffectiveMinScore(project)
 		statusState := "success"
 		statusDesc := fmt.Sprintf("AI Review Passed: %.0f/%.0f [cached]", cached.Score, minScore)
@@ -319,6 +324,9 @@ func (s *Service) ProcessReviewTask(ctx context.Context, task *services.ReviewTa
 		EventType:     task.EventType,
 		MRURL:         task.MRURL,
 	})
+
+	// Auto-create issues for low-score reviews
+	go s.issueTrackerService.CheckAndCreateIssue(reviewLog, project.Name)
 
 	if project.CommentEnabled {
 		comment := s.formatReviewComment(result.Score, result.Content)

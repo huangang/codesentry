@@ -61,6 +61,8 @@ export interface ReviewLog {
   retry_count: number;
   mr_number: number | null;
   mr_url: string;
+  fix_pr_url: string;
+  fix_status: string;
   created_at: string;
   updated_at: string;
 }

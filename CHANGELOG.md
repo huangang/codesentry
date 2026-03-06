@@ -39,7 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Batch Operations**: Batch retry and batch delete for review logs
 - **SSE Notification Bell**: Real-time notification bell with unread badge and live review events
 - **Reports API**: Weekly/monthly report with period comparison, daily trends, and author rankings
-- **Issue Tracker Integration**: Auto-create Jira, Linear, or GitHub Issues when review score is below threshold
+- **Issue Tracker Integration**: Auto-create Jira, Linear, GitHub Issues, or GitLab Issues when review score is below threshold; now wired into review flow with per-tracker threshold and test connection support
+- **Auto-Fix PR**: AI-powered code fix generation — automatically creates a fix branch, commits AI-generated patches, and opens a PR (GitHub) or MR (GitLab) for low-score reviews
 - **Rule Engine**: Automated CI/CD policies with conditions (score_below, files_changed_above, has_keyword) and actions (block, warn, notify)
 - **Prometheus Metrics**: `/metrics` endpoint for monitoring
 - **Audit Logging**: Automatic audit logging for all admin write operations
