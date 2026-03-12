@@ -95,6 +95,31 @@ func TestExtractScore(t *testing.T) {
 			content:  "代码质量: 40/40\n安全性: 29/30\n总分: 97分",
 			expected: 97,
 		},
+		{
+			name:     "bold number chinese",
+			content:  "总分: **85**分",
+			expected: 85,
+		},
+		{
+			name:     "bold score chinese",
+			content:  "总分：**85分**",
+			expected: 85,
+		},
+		{
+			name:     "bold number english",
+			content:  "Total Score: **85**",
+			expected: 85,
+		},
+		{
+			name:     "bold score /100",
+			content:  "Score: **88**/100",
+			expected: 88,
+		},
+		{
+			name:     "bold number in full review",
+			content:  "| 功能实现 | 33/40 |\n\n## 三、总分\n\n总分: **85**分",
+			expected: 85,
+		},
 	}
 
 	for _, tt := range tests {

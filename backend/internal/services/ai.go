@@ -34,6 +34,7 @@ var (
 	}
 	ifBlockRegex    = regexp.MustCompile(`(?s)\{\{#if_file_context\}\}(.*?)\{\{/if_file_context\}\}`)
 	thinkBlockRegex = regexp.MustCompile(`(?s)<think>.*?</think>`)
+	markdownFmtRegex = regexp.MustCompile(`\*{1,2}|_{1,2}|` + "`")
 )
 
 type AIService struct {
@@ -517,6 +518,10 @@ func (s *AIService) processFileContextBlock(prompt string, fileContext string) s
 func extractScore(content string) float64 {
 	// Strip <think>...</think> blocks to avoid matching scores in AI reasoning
 	cleaned := thinkBlockRegex.ReplaceAllString(content, "")
+
+	// Strip markdown formatting (bold, italic, code) that may wrap around scores
+	// e.g. "总分: **85**分" → "总分: 85分"
+	cleaned = markdownFmtRegex.ReplaceAllString(cleaned, "")
 
 	for _, re := range scorePatterns {
 		allMatches := re.FindAllStringSubmatch(cleaned, -1)
