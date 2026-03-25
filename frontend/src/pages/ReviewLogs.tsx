@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Card,
@@ -182,7 +182,12 @@ const ReviewLogs: React.FC = () => {
   const [filters, setFilters] = useState<ReviewLogFilters>({ page: 1, page_size: 10 });
 
   const { data: logsData, isLoading } = useReviewLogs(filters);
-  const { data: projectsData } = useProjects({ page_size: 100 });
+  const [projectSearch, setProjectSearch] = useState('');
+  const { data: projectsData, isFetching: projectsFetching } = useProjects({ page_size: 50, name: projectSearch || undefined });
+  const projectSearchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const projectOptions = useMemo(() => 
+    projectsData?.items?.map(p => ({ value: p.id, label: p.name })) ?? []
+  , [projectsData]);
   const retryReview = useRetryReview();
   const deleteReviewLog = useDeleteReviewLog();
   const updateScore = useUpdateScore();
@@ -465,11 +470,16 @@ const ReviewLogs: React.FC = () => {
             placeholder={t('reviewLogs.project')}
             allowClear
             showSearch
-            optionFilterProp="label"
+            filterOption={false}
+            loading={projectsFetching}
             style={{ minWidth: 140 }}
             value={projectId}
             onChange={setProjectId}
-            options={projectsData?.items?.map(p => ({ value: p.id, label: p.name })) ?? []}
+            onSearch={(val) => {
+              clearTimeout(projectSearchTimer.current);
+              projectSearchTimer.current = setTimeout(() => setProjectSearch(val), 300);
+            }}
+            options={projectOptions}
           />
           <Input
             placeholder={t('reviewLogs.author')}
