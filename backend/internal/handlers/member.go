@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/huangang/codesentry/backend/internal/config"
 	"github.com/huangang/codesentry/backend/internal/services"
 	"github.com/huangang/codesentry/backend/pkg/response"
 	"gorm.io/gorm"
@@ -11,9 +12,10 @@ type MemberHandler struct {
 	memberService *services.MemberService
 }
 
-func NewMemberHandler(db *gorm.DB) *MemberHandler {
+func NewMemberHandler(db *gorm.DB, openAICfg *config.OpenAIConfig) *MemberHandler {
+	aiService := services.NewAIService(db, openAICfg)
 	return &MemberHandler{
-		memberService: services.NewMemberService(db),
+		memberService: services.NewMemberService(db, aiService),
 	}
 }
 
@@ -80,6 +82,29 @@ func (h *MemberHandler) GetHeatmap(c *gin.Context) {
 	}
 
 	result, err := h.memberService.GetHeatmap(&req)
+	if err != nil {
+		response.ServerError(c, err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func (h *MemberHandler) GenerateWorkSummary(c *gin.Context) {
+	var req services.WorkSummaryRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	author := c.Query("author")
+	if author == "" {
+		response.BadRequest(c, "author is required")
+		return
+	}
+	req.Author = author
+
+	result, err := h.memberService.GenerateWorkSummary(&req)
 	if err != nil {
 		response.ServerError(c, err.Error())
 		return

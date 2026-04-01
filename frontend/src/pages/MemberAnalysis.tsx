@@ -13,6 +13,10 @@ import {
   Row,
   Col,
   message,
+  Modal,
+  Spin,
+  Empty,
+  Tooltip as AntTooltip,
 } from 'antd';
 import {
   SearchOutlined,
@@ -24,6 +28,8 @@ import {
   RiseOutlined,
   FallOutlined,
   TeamOutlined,
+  FileTextOutlined,
+  CopyOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -46,9 +52,10 @@ import {
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import { useTranslation } from 'react-i18next';
-import { memberApi } from '../services';
+import { memberApi, type WorkSummaryResponse } from '../services';
 import { useMemberStats, useProjects, useTeamOverview, useHeatmap, type MemberStatsFilters } from '../hooks/queries';
 import { ContributionHeatmap } from '../components';
+import MarkdownContent from '../components/MarkdownContent';
 import { getResponsiveWidth } from '../hooks';
 
 dayjs.extend(isoWeek);
@@ -93,6 +100,12 @@ const MemberAnalysis: React.FC = () => {
     page: 1, page_size: 20, sort_by: 'commit_count', sort_order: 'desc',
     start_date: dayjs().subtract(30, 'day').format('YYYY-MM-DD'), end_date: dayjs().format('YYYY-MM-DD'),
   });
+
+  // Work Summary state
+  const [summaryModalVisible, setSummaryModalVisible] = useState(false);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryData, setSummaryData] = useState<WorkSummaryResponse | null>(null);
+  const [summaryDate, setSummaryDate] = useState<dayjs.Dayjs>(dayjs());
 
   const { data: memberData, isLoading } = useMemberStats(filters);
   const { data: projectsData } = useProjects({ page_size: 100 });
@@ -164,6 +177,31 @@ const MemberAnalysis: React.FC = () => {
     if (score >= 80) return 'success';
     if (score >= 60) return 'warning';
     return 'error';
+  };
+
+  // Work Summary handlers
+  const handleGenerateWorkSummary = async () => {
+    if (!selectedAuthor) return;
+    setSummaryModalVisible(true);
+    setSummaryLoading(true);
+    try {
+      const res = await memberApi.generateWorkSummary({
+        author: selectedAuthor,
+        date: summaryDate.format('YYYY-MM-DD'),
+      });
+      setSummaryData(res.data);
+    } catch {
+      message.error(t('common.error'));
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
+  const handleCopySummary = () => {
+    if (summaryData?.summary) {
+      navigator.clipboard.writeText(summaryData.summary);
+      message.success(t('memberAnalysis.workSummaryCopied'));
+    }
   };
 
   const columns: ColumnsType<MemberStats> = [
@@ -308,6 +346,28 @@ const MemberAnalysis: React.FC = () => {
                 loading={memberHeatmapLoading}
               />
             </Card>
+            {/* Work Summary Button */}
+            <div style={{ marginBottom: 16 }}>
+              <Space>
+                <DatePicker
+                  value={summaryDate}
+                  onChange={(d) => d && setSummaryDate(d)}
+                  allowClear={false}
+                  style={{ width: 140 }}
+                  presets={[
+                    { label: t('memberAnalysis.workSummaryToday'), value: dayjs() },
+                  ]}
+                />
+                <Button
+                  type="primary"
+                  icon={<FileTextOutlined />}
+                  onClick={handleGenerateWorkSummary}
+                  loading={summaryLoading}
+                >
+                  {t('memberAnalysis.generateWorkSummary')}
+                </Button>
+              </Space>
+            </div>
             <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
               <Col span={6}><Card size="small"><Statistic title={t('memberAnalysis.commitCount')} value={memberDetail.total_stats.commit_count} prefix={<CodeOutlined />} /></Card></Col>
               <Col span={6}><Card size="small"><Statistic title={t('memberAnalysis.avgScore')} value={memberDetail.total_stats.avg_score} precision={1} prefix={<TrophyOutlined />} valueStyle={{ color: memberDetail.total_stats.avg_score >= 80 ? '#52c41a' : memberDetail.total_stats.avg_score >= 60 ? '#faad14' : '#ff4d4f' }} /></Card></Col>
@@ -334,6 +394,42 @@ const MemberAnalysis: React.FC = () => {
           </>
         )}
       </Drawer>
+
+      {/* Work Summary Modal */}
+      <Modal
+        title={<Space><FileTextOutlined />{t('memberAnalysis.workSummary')} - {summaryData?.date || summaryDate.format('YYYY-MM-DD')}</Space>}
+        open={summaryModalVisible}
+        onCancel={() => { setSummaryModalVisible(false); setSummaryData(null); }}
+        width={getResponsiveWidth(720)}
+        footer={[
+          <Button key="copy" icon={<CopyOutlined />} onClick={handleCopySummary} disabled={!summaryData?.summary}>
+            {t('memberAnalysis.workSummaryCopy')}
+          </Button>,
+          <Button key="close" type="primary" onClick={() => { setSummaryModalVisible(false); setSummaryData(null); }}>
+            {t('common.close')}
+          </Button>,
+        ]}
+      >
+        {summaryLoading ? (
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <Spin size="large" />
+            <p style={{ marginTop: 16, color: '#888' }}>{t('memberAnalysis.workSummaryGenerating')}</p>
+          </div>
+        ) : summaryData?.summary ? (
+          <div>
+            <MarkdownContent content={summaryData.summary} />
+            {summaryData.ai_model_used && (
+              <div style={{ marginTop: 12, textAlign: 'right', color: '#999', fontSize: 12 }}>
+                <AntTooltip title="AI Model">
+                  Powered by {summaryData.ai_model_used}
+                </AntTooltip>
+              </div>
+            )}
+          </div>
+        ) : (
+          <Empty description={t('memberAnalysis.workSummaryEmpty')} />
+        )}
+      </Modal>
     </>
   );
 };

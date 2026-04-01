@@ -85,11 +85,12 @@ func registerRoutes(r *gin.Engine, svc *appServices) {
 			protected.GET("/review-logs/:id", reviewLogHandler.GetByID)
 
 			// Members (all users)
-			memberHandler := handlers.NewMemberHandler(models.GetDB())
+			memberHandler := handlers.NewMemberHandler(models.GetDB(), svc.openAICfg)
 			protected.GET("/members", memberHandler.List)
 			protected.GET("/members/detail", memberHandler.GetDetail)
 			protected.GET("/members/overview", memberHandler.GetTeamOverview)
 			protected.GET("/members/heatmap", memberHandler.GetHeatmap)
+			protected.GET("/members/work-summary", memberHandler.GenerateWorkSummary)
 
 			// Prompts (read for all users)
 			promptHandler := handlers.NewPromptHandler(models.GetDB())

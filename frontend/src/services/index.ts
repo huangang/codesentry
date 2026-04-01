@@ -182,6 +182,30 @@ export interface HeatmapResponse {
   end_date: string;
 }
 
+export interface WorkSummaryResponse {
+  author: string;
+  date: string;
+  summary: string;
+  raw_data: {
+    commit_count: number;
+    additions: number;
+    deletions: number;
+    files_changed: number;
+    projects: string[];
+    commit_details: Array<{
+      project_name: string;
+      commit_message: string;
+      branch: string;
+      additions: number;
+      deletions: number;
+      files_changed: number;
+      score: number | null;
+      created_at: string;
+    }>;
+  };
+  ai_model_used: string;
+}
+
 export const memberApi = {
   list: (params?: {
     page?: number;
@@ -202,6 +226,9 @@ export const memberApi = {
 
   getHeatmap: (params?: { start_date?: string; end_date?: string; project_id?: number; author?: string }) =>
     api.get<HeatmapResponse>('/members/heatmap', { params }),
+
+  generateWorkSummary: (params: { author: string; date?: string }) =>
+    api.get<WorkSummaryResponse>('/members/work-summary', { params }),
 };
 
 // System Logs

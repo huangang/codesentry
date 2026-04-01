@@ -363,7 +363,15 @@
     "contributionHeatmap": "Contribution Heatmap",
     "contributionsInYear": "{{count}} contributions in the last year",
     "less": "Less",
-    "more": "More"
+    "more": "More",
+    "generateWorkSummary": "Generate Work Summary",
+    "workSummary": "Work Summary",
+    "workSummaryDate": "Date",
+    "workSummaryGenerating": "Generating work summary...",
+    "workSummaryEmpty": "No commits found for this member on this day",
+    "workSummaryCopied": "Summary copied to clipboard",
+    "workSummaryCopy": "Copy Summary",
+    "workSummaryToday": "Today"
   },
   "systemLogs": {
     "title": "System Logs",

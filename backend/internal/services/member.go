@@ -1,18 +1,23 @@
 package services
 
 import (
+	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/huangang/codesentry/backend/internal/models"
+	"github.com/huangang/codesentry/backend/pkg/logger"
 	"gorm.io/gorm"
 )
 
 type MemberService struct {
-	db *gorm.DB
+	db        *gorm.DB
+	aiService *AIService
 }
 
-func NewMemberService(db *gorm.DB) *MemberService {
-	return &MemberService{db: db}
+func NewMemberService(db *gorm.DB, aiService *AIService) *MemberService {
+	return &MemberService{db: db, aiService: aiService}
 }
 
 type MemberListRequest struct {
@@ -520,4 +525,216 @@ func (s *MemberService) GetTeamOverview(req *TeamOverviewRequest) (*TeamOverview
 			NeedWork:  needWork,
 		},
 	}, nil
+}
+
+// Work Summary types and methods
+
+type WorkSummaryRequest struct {
+	Author string `form:"author" binding:"required"`
+	Date   string `form:"date"` // YYYY-MM-DD, defaults to today
+}
+
+type WorkSummaryCommit struct {
+	ProjectName   string   `json:"project_name"`
+	CommitMessage string   `json:"commit_message"`
+	Branch        string   `json:"branch"`
+	Additions     int      `json:"additions"`
+	Deletions     int      `json:"deletions"`
+	FilesChanged  int      `json:"files_changed"`
+	Score         *float64 `json:"score"`
+	CreatedAt     string   `json:"created_at"`
+}
+
+type WorkSummaryData struct {
+	CommitCount   int                 `json:"commit_count"`
+	Additions     int                 `json:"additions"`
+	Deletions     int                 `json:"deletions"`
+	FilesChanged  int                 `json:"files_changed"`
+	Projects      []string            `json:"projects"`
+	CommitDetails []WorkSummaryCommit `json:"commit_details"`
+}
+
+type WorkSummaryResponse struct {
+	Author      string          `json:"author"`
+	Date        string          `json:"date"`
+	Summary     string          `json:"summary"`
+	RawData     WorkSummaryData `json:"raw_data"`
+	AIModelUsed string          `json:"ai_model_used"`
+}
+
+func (s *MemberService) GenerateWorkSummary(req *WorkSummaryRequest) (*WorkSummaryResponse, error) {
+	// Parse date, default to today. Always use local timezone for accurate day boundaries.
+	now := time.Now()
+	year, month, day := now.Year(), now.Month(), now.Day()
+	if req.Date != "" {
+		parsed, err := time.Parse("2006-01-02", req.Date)
+		if err == nil {
+			year, month, day = parsed.Year(), parsed.Month(), parsed.Day()
+		}
+	}
+
+	startOfDay := time.Date(year, month, day, 0, 0, 0, 0, now.Location())
+	endOfDay := time.Date(year, month, day, 23, 59, 59, 999999999, now.Location())
+	dateStr := startOfDay.Format("2006-01-02")
+
+	// Query review logs for this author on this date
+	var logs []models.ReviewLog
+	if err := s.db.Preload("Project").
+		Where("author = ? AND created_at BETWEEN ? AND ?", req.Author, startOfDay, endOfDay).
+		Order("created_at ASC").
+		Find(&logs).Error; err != nil {
+		return nil, fmt.Errorf("failed to query review logs: %w", err)
+	}
+
+	if len(logs) == 0 {
+		return &WorkSummaryResponse{
+			Author:  req.Author,
+			Date:    dateStr,
+			Summary: "",
+			RawData: WorkSummaryData{},
+		}, nil
+	}
+
+	// Build raw data
+	projectSet := make(map[string]bool)
+	var totalAdditions, totalDeletions, totalFiles int
+	var commits []WorkSummaryCommit
+
+	for _, log := range logs {
+		projectName := ""
+		if log.Project != nil {
+			projectName = log.Project.Name
+			projectSet[projectName] = true
+		}
+
+		totalAdditions += log.Additions
+		totalDeletions += log.Deletions
+		totalFiles += log.FilesChanged
+
+		commits = append(commits, WorkSummaryCommit{
+			ProjectName:   projectName,
+			CommitMessage: log.CommitMessage,
+			Branch:        log.Branch,
+			Additions:     log.Additions,
+			Deletions:     log.Deletions,
+			FilesChanged:  log.FilesChanged,
+			Score:         log.Score,
+			CreatedAt:     log.CreatedAt.Format("15:04:05"),
+		})
+	}
+
+	var projects []string
+	for p := range projectSet {
+		projects = append(projects, p)
+	}
+
+	rawData := WorkSummaryData{
+		CommitCount:   len(logs),
+		Additions:     totalAdditions,
+		Deletions:     totalDeletions,
+		FilesChanged:  totalFiles,
+		Projects:      projects,
+		CommitDetails: commits,
+	}
+
+	// Generate AI summary
+	summary, modelUsed := s.generateAISummary(req.Author, dateStr, rawData)
+
+	return &WorkSummaryResponse{
+		Author:      req.Author,
+		Date:        dateStr,
+		Summary:     summary,
+		RawData:     rawData,
+		AIModelUsed: modelUsed,
+	}, nil
+}
+
+func (s *MemberService) generateAISummary(author, date string, data WorkSummaryData) (string, string) {
+	// Build commit details for prompt
+	var commitLines []string
+	for _, c := range data.CommitDetails {
+		line := fmt.Sprintf("- [%s] %s | %s (分支: %s, +%d/-%d, %d 文件)",
+			c.CreatedAt, c.ProjectName, c.CommitMessage, c.Branch, c.Additions, c.Deletions, c.FilesChanged)
+		commitLines = append(commitLines, line)
+	}
+
+	commitList := strings.Join(commitLines, "\n")
+
+	prompt := fmt.Sprintf(`你是一位技术日报助手。请根据以下代码提交记录，为 %s 生成一份 %s 的工作总结（日报格式）。
+
+## 提交记录
+%s
+
+## 统计
+- 总提交数: %d
+- 涉及项目: %s
+- 新增行数: %d
+- 删除行数: %d
+- 变更文件: %d
+
+## 要求
+1. 用中文输出
+2. 按项目分组总结今日工作内容
+3. 从 commit message 中提炼出具体做了什么（功能开发、Bug 修复、重构等）
+4. 输出 Markdown 格式，适合直接粘贴到日报中
+5. 简洁明了，不要重复 commit message 原文，而是归纳总结
+6. 如果有多个相关的小提交，合并为一条工作项
+7. 最后给出一行简短的「今日小结」
+
+格式示例：
+## 今日工作 - YYYY-MM-DD
+
+### 项目名称
+- 完成了 xxx 功能的开发
+- 修复了 xxx 的 Bug
+
+### 另一个项目
+- 重构了 xxx 模块
+
+**今日小结**: 主要完成了 xxx，推进了 xxx 的进度。`,
+		author, date, commitList, data.CommitCount,
+		strings.Join(data.Projects, ", "), data.Additions, data.Deletions, data.FilesChanged)
+
+	if s.aiService == nil {
+		logger.Infof("[Member] AI service not available, using default summary")
+		return s.buildDefaultWorkSummary(author, date, data), ""
+	}
+
+	content, modelName, err := s.aiService.CallWithConfig(context.Background(), 0, prompt)
+	if err != nil {
+		logger.Infof("[Member] AI work summary failed: %v, using default", err)
+		return s.buildDefaultWorkSummary(author, date, data), ""
+	}
+
+	return content, modelName
+}
+
+func (s *MemberService) buildDefaultWorkSummary(author, date string, data WorkSummaryData) string {
+	var sb strings.Builder
+
+	sb.WriteString(fmt.Sprintf("## 今日工作 - %s\n\n", date))
+	sb.WriteString(fmt.Sprintf("**%s** 的工作总结\n\n", author))
+
+	// Group commits by project
+	projectCommits := make(map[string][]WorkSummaryCommit)
+	for _, c := range data.CommitDetails {
+		name := c.ProjectName
+		if name == "" {
+			name = "其他"
+		}
+		projectCommits[name] = append(projectCommits[name], c)
+	}
+
+	for project, commits := range projectCommits {
+		sb.WriteString(fmt.Sprintf("### %s\n", project))
+		for _, c := range commits {
+			sb.WriteString(fmt.Sprintf("- %s (+%d/-%d)\n", c.CommitMessage, c.Additions, c.Deletions))
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString(fmt.Sprintf("**统计**: %d 次提交, +%d/-%d 行, %d 个文件\n",
+		data.CommitCount, data.Additions, data.Deletions, data.FilesChanged))
+
+	return sb.String()
 }

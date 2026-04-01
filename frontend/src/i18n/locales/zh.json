@@ -363,7 +363,15 @@
     "contributionHeatmap": "贡献热力图",
     "contributionsInYear": "过去一年共 {{count}} 次贡献",
     "less": "少",
-    "more": "多"
+    "more": "多",
+    "generateWorkSummary": "生成工作总结",
+    "workSummary": "工作总结",
+    "workSummaryDate": "日期",
+    "workSummaryGenerating": "正在生成工作总结...",
+    "workSummaryEmpty": "该成员当天没有提交记录",
+    "workSummaryCopied": "总结已复制到剪贴板",
+    "workSummaryCopy": "复制总结",
+    "workSummaryToday": "今天"
   },
   "systemLogs": {
     "title": "系统日志",
