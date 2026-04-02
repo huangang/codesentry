@@ -90,7 +90,9 @@ func registerRoutes(r *gin.Engine, svc *appServices) {
 			protected.GET("/members/detail", memberHandler.GetDetail)
 			protected.GET("/members/overview", memberHandler.GetTeamOverview)
 			protected.GET("/members/heatmap", memberHandler.GetHeatmap)
-			protected.GET("/members/work-summary", memberHandler.GenerateWorkSummary)
+			protected.GET("/members/work-summary", memberHandler.GetWorkSummary)
+			protected.POST("/members/work-summary", memberHandler.GenerateWorkSummary)
+			protected.GET("/members/work-summaries", memberHandler.ListWorkSummaries)
 
 			// Prompts (read for all users)
 			promptHandler := handlers.NewPromptHandler(models.GetDB())

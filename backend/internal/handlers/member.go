@@ -90,8 +90,51 @@ func (h *MemberHandler) GetHeatmap(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *MemberHandler) GetWorkSummary(c *gin.Context) {
+	author := c.Query("author")
+	if author == "" {
+		response.BadRequest(c, "author is required")
+		return
+	}
+
+	req := &services.WorkSummaryRequest{
+		Author: author,
+		Date:   c.Query("date"),
+	}
+
+	result, err := h.memberService.GetWorkSummary(req)
+	if err != nil {
+		response.ServerError(c, err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
 func (h *MemberHandler) GenerateWorkSummary(c *gin.Context) {
 	var req services.WorkSummaryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// Fallback to query params for backward compatibility
+		req.Author = c.Query("author")
+		req.Date = c.Query("date")
+	}
+
+	if req.Author == "" {
+		response.BadRequest(c, "author is required")
+		return
+	}
+
+	result, err := h.memberService.GenerateWorkSummary(&req)
+	if err != nil {
+		response.ServerError(c, err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func (h *MemberHandler) ListWorkSummaries(c *gin.Context) {
+	var req services.WorkSummaryListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -104,7 +147,7 @@ func (h *MemberHandler) GenerateWorkSummary(c *gin.Context) {
 	}
 	req.Author = author
 
-	result, err := h.memberService.GenerateWorkSummary(&req)
+	result, err := h.memberService.ListWorkSummaries(&req)
 	if err != nil {
 		response.ServerError(c, err.Error())
 		return

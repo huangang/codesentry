@@ -371,7 +371,13 @@
     "workSummaryEmpty": "该成员当天没有提交记录",
     "workSummaryCopied": "总结已复制到剪贴板",
     "workSummaryCopy": "复制总结",
-    "workSummaryToday": "今天"
+    "workSummaryToday": "今天",
+    "workSummaryHistory": "历史总结",
+    "workSummaryRegenerate": "重新生成",
+    "workSummaryCached": "已缓存",
+    "workSummaryViewHistory": "查看历史",
+    "workSummaryNoHistory": "暂无历史工作总结",
+    "workSummaryLastUpdated": "最后更新"
   },
   "systemLogs": {
     "title": "系统日志",

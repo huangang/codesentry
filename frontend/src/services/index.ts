@@ -183,6 +183,7 @@ export interface HeatmapResponse {
 }
 
 export interface WorkSummaryResponse {
+  id?: number;
   author: string;
   date: string;
   summary: string;
@@ -204,6 +205,17 @@ export interface WorkSummaryResponse {
     }>;
   };
   ai_model_used: string;
+  cached?: boolean;
+  updated_at?: string;
+}
+
+export interface WorkSummaryListItem {
+  id: number;
+  author: string;
+  date: string;
+  ai_model_used: string;
+  has_summary: boolean;
+  updated_at: string;
 }
 
 export const memberApi = {
@@ -227,8 +239,14 @@ export const memberApi = {
   getHeatmap: (params?: { start_date?: string; end_date?: string; project_id?: number; author?: string }) =>
     api.get<HeatmapResponse>('/members/heatmap', { params }),
 
-  generateWorkSummary: (params: { author: string; date?: string }) =>
+  getWorkSummary: (params: { author: string; date?: string }) =>
     api.get<WorkSummaryResponse>('/members/work-summary', { params }),
+
+  generateWorkSummary: (data: { author: string; date?: string }) =>
+    api.post<WorkSummaryResponse>('/members/work-summary', data),
+
+  listWorkSummaries: (params: { author: string; page?: number; page_size?: number }) =>
+    api.get<{ total: number; page: number; page_size: number; items: WorkSummaryListItem[] }>('/members/work-summaries', { params }),
 };
 
 // System Logs

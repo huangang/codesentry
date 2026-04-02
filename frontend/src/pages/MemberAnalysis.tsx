@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   Table,
@@ -17,6 +17,7 @@ import {
   Spin,
   Empty,
   Tooltip as AntTooltip,
+  List,
 } from 'antd';
 import {
   SearchOutlined,
@@ -30,6 +31,9 @@ import {
   TeamOutlined,
   FileTextOutlined,
   CopyOutlined,
+  HistoryOutlined,
+  SyncOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -52,7 +56,7 @@ import {
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import { useTranslation } from 'react-i18next';
-import { memberApi, type WorkSummaryResponse } from '../services';
+import { memberApi, type WorkSummaryResponse, type WorkSummaryListItem } from '../services';
 import { useMemberStats, useProjects, useTeamOverview, useHeatmap, type MemberStatsFilters } from '../hooks/queries';
 import { ContributionHeatmap } from '../components';
 import MarkdownContent from '../components/MarkdownContent';
@@ -106,6 +110,13 @@ const MemberAnalysis: React.FC = () => {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryData, setSummaryData] = useState<WorkSummaryResponse | null>(null);
   const [summaryDate, setSummaryDate] = useState<dayjs.Dayjs>(dayjs());
+
+  // History state
+  const [historyModalVisible, setHistoryModalVisible] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyItems, setHistoryItems] = useState<WorkSummaryListItem[]>([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyPage, setHistoryPage] = useState(1);
 
   const { data: memberData, isLoading } = useMemberStats(filters);
   const { data: projectsData } = useProjects({ page_size: 100 });
@@ -179,10 +190,37 @@ const MemberAnalysis: React.FC = () => {
     return 'error';
   };
 
-  // Work Summary handlers
-  const handleGenerateWorkSummary = async () => {
+  // Auto-load cached summary when date changes or modal opens
+  const loadCachedSummary = useCallback(async (author: string, date: dayjs.Dayjs) => {
+    setSummaryLoading(true);
+    try {
+      const res = await memberApi.getWorkSummary({
+        author,
+        date: date.format('YYYY-MM-DD'),
+      });
+      setSummaryData(res.data);
+    } catch {
+      setSummaryData(null);
+    } finally {
+      setSummaryLoading(false);
+    }
+  }, []);
+
+  // When summaryDate changes and modal is visible, reload cached
+  useEffect(() => {
+    if (summaryModalVisible && selectedAuthor) {
+      loadCachedSummary(selectedAuthor, summaryDate);
+    }
+  }, [summaryDate, summaryModalVisible, selectedAuthor, loadCachedSummary]);
+
+  const handleOpenSummaryModal = () => {
     if (!selectedAuthor) return;
     setSummaryModalVisible(true);
+    // loadCachedSummary will be triggered by useEffect
+  };
+
+  const handleGenerateWorkSummary = async () => {
+    if (!selectedAuthor) return;
     setSummaryLoading(true);
     try {
       const res = await memberApi.generateWorkSummary({
@@ -190,6 +228,7 @@ const MemberAnalysis: React.FC = () => {
         date: summaryDate.format('YYYY-MM-DD'),
       });
       setSummaryData(res.data);
+      message.success(t('common.success'));
     } catch {
       message.error(t('common.error'));
     } finally {
@@ -202,6 +241,34 @@ const MemberAnalysis: React.FC = () => {
       navigator.clipboard.writeText(summaryData.summary);
       message.success(t('memberAnalysis.workSummaryCopied'));
     }
+  };
+
+  // History handlers
+  const loadHistory = useCallback(async (author: string, page: number) => {
+    setHistoryLoading(true);
+    try {
+      const res = await memberApi.listWorkSummaries({ author, page, page_size: 10 });
+      setHistoryItems(res.data.items);
+      setHistoryTotal(res.data.total);
+      setHistoryPage(res.data.page);
+    } catch {
+      message.error(t('common.error'));
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [t]);
+
+  const handleOpenHistory = () => {
+    if (!selectedAuthor) return;
+    setHistoryModalVisible(true);
+    loadHistory(selectedAuthor, 1);
+  };
+
+  const handleViewHistoryItem = async (item: WorkSummaryListItem) => {
+    setHistoryModalVisible(false);
+    setSummaryDate(dayjs(item.date));
+    setSummaryModalVisible(true);
+    // useEffect will load the cached summary for that date
   };
 
   const columns: ColumnsType<MemberStats> = [
@@ -348,7 +415,7 @@ const MemberAnalysis: React.FC = () => {
             </Card>
             {/* Work Summary Button */}
             <div style={{ marginBottom: 16 }}>
-              <Space>
+              <Space wrap>
                 <DatePicker
                   value={summaryDate}
                   onChange={(d) => d && setSummaryDate(d)}
@@ -361,10 +428,15 @@ const MemberAnalysis: React.FC = () => {
                 <Button
                   type="primary"
                   icon={<FileTextOutlined />}
-                  onClick={handleGenerateWorkSummary}
-                  loading={summaryLoading}
+                  onClick={handleOpenSummaryModal}
                 >
-                  {t('memberAnalysis.generateWorkSummary')}
+                  {t('memberAnalysis.workSummary')}
+                </Button>
+                <Button
+                  icon={<HistoryOutlined />}
+                  onClick={handleOpenHistory}
+                >
+                  {t('memberAnalysis.workSummaryViewHistory')}
                 </Button>
               </Space>
             </div>
@@ -397,11 +469,27 @@ const MemberAnalysis: React.FC = () => {
 
       {/* Work Summary Modal */}
       <Modal
-        title={<Space><FileTextOutlined />{t('memberAnalysis.workSummary')} - {summaryData?.date || summaryDate.format('YYYY-MM-DD')}</Space>}
+        title={
+          <Space>
+            <FileTextOutlined />
+            {t('memberAnalysis.workSummary')} - {summaryData?.date || summaryDate.format('YYYY-MM-DD')}
+            {summaryData?.cached && (
+              <Tag icon={<CheckCircleOutlined />} color="success">{t('memberAnalysis.workSummaryCached')}</Tag>
+            )}
+          </Space>
+        }
         open={summaryModalVisible}
         onCancel={() => { setSummaryModalVisible(false); setSummaryData(null); }}
         width={getResponsiveWidth(720)}
         footer={[
+          <Button
+            key="regenerate"
+            icon={<SyncOutlined />}
+            onClick={handleGenerateWorkSummary}
+            loading={summaryLoading}
+          >
+            {t('memberAnalysis.workSummaryRegenerate')}
+          </Button>,
           <Button key="copy" icon={<CopyOutlined />} onClick={handleCopySummary} disabled={!summaryData?.summary}>
             {t('memberAnalysis.workSummaryCopy')}
           </Button>,
@@ -418,17 +506,74 @@ const MemberAnalysis: React.FC = () => {
         ) : summaryData?.summary ? (
           <div>
             <MarkdownContent content={summaryData.summary} />
-            {summaryData.ai_model_used && (
-              <div style={{ marginTop: 12, textAlign: 'right', color: '#999', fontSize: 12 }}>
+            <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', color: '#999', fontSize: 12 }}>
+              {summaryData.updated_at && (
+                <span>{t('memberAnalysis.workSummaryLastUpdated')}: {dayjs(summaryData.updated_at).format('YYYY-MM-DD HH:mm')}</span>
+              )}
+              {summaryData.ai_model_used && (
                 <AntTooltip title="AI Model">
                   Powered by {summaryData.ai_model_used}
                 </AntTooltip>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         ) : (
-          <Empty description={t('memberAnalysis.workSummaryEmpty')} />
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <Empty description={t('memberAnalysis.workSummaryEmpty')} />
+            <Button
+              type="primary"
+              icon={<FileTextOutlined />}
+              onClick={handleGenerateWorkSummary}
+              loading={summaryLoading}
+              style={{ marginTop: 16 }}
+            >
+              {t('memberAnalysis.generateWorkSummary')}
+            </Button>
+          </div>
         )}
+      </Modal>
+
+      {/* Work Summary History Modal */}
+      <Modal
+        title={<Space><HistoryOutlined />{t('memberAnalysis.workSummaryHistory')}</Space>}
+        open={historyModalVisible}
+        onCancel={() => setHistoryModalVisible(false)}
+        width={getResponsiveWidth(520)}
+        footer={null}
+      >
+        <List
+          loading={historyLoading}
+          dataSource={historyItems}
+          locale={{ emptyText: t('memberAnalysis.workSummaryNoHistory') }}
+          pagination={{
+            current: historyPage,
+            total: historyTotal,
+            pageSize: 10,
+            size: 'small',
+            onChange: (page) => selectedAuthor && loadHistory(selectedAuthor, page),
+          }}
+          renderItem={(item: WorkSummaryListItem) => (
+            <List.Item
+              style={{ cursor: 'pointer' }}
+              onClick={() => handleViewHistoryItem(item)}
+              actions={[
+                <Button key="view" type="link" size="small">{t('common.view')}</Button>,
+              ]}
+            >
+              <List.Item.Meta
+                title={item.date}
+                description={
+                  <Space size="small">
+                    {item.ai_model_used && <Tag>{item.ai_model_used}</Tag>}
+                    <span style={{ color: '#999', fontSize: 12 }}>
+                      {dayjs(item.updated_at).format('YYYY-MM-DD HH:mm')}
+                    </span>
+                  </Space>
+                }
+              />
+            </List.Item>
+          )}
+        />
       </Modal>
     </>
   );

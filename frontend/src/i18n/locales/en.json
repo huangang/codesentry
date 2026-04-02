@@ -371,7 +371,13 @@
     "workSummaryEmpty": "No commits found for this member on this day",
     "workSummaryCopied": "Summary copied to clipboard",
     "workSummaryCopy": "Copy Summary",
-    "workSummaryToday": "Today"
+    "workSummaryToday": "Today",
+    "workSummaryHistory": "Summary History",
+    "workSummaryRegenerate": "Regenerate",
+    "workSummaryCached": "Cached",
+    "workSummaryViewHistory": "View History",
+    "workSummaryNoHistory": "No work summaries found",
+    "workSummaryLastUpdated": "Last updated"
   },
   "systemLogs": {
     "title": "System Logs",

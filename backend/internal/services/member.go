@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -555,11 +556,36 @@ type WorkSummaryData struct {
 }
 
 type WorkSummaryResponse struct {
+	ID          uint            `json:"id,omitempty"`
 	Author      string          `json:"author"`
 	Date        string          `json:"date"`
 	Summary     string          `json:"summary"`
 	RawData     WorkSummaryData `json:"raw_data"`
 	AIModelUsed string          `json:"ai_model_used"`
+	Cached      bool            `json:"cached"`
+	UpdatedAt   string          `json:"updated_at,omitempty"`
+}
+
+type WorkSummaryListRequest struct {
+	Author   string `form:"author" binding:"required"`
+	Page     int    `form:"page"`
+	PageSize int    `form:"page_size"`
+}
+
+type WorkSummaryListItem struct {
+	ID          uint   `json:"id"`
+	Author      string `json:"author"`
+	Date        string `json:"date"`
+	AIModelUsed string `json:"ai_model_used"`
+	HasSummary  bool   `json:"has_summary"`
+	UpdatedAt   string `json:"updated_at"`
+}
+
+type WorkSummaryListResponse struct {
+	Total    int64                 `json:"total"`
+	Page     int                   `json:"page"`
+	PageSize int                   `json:"page_size"`
+	Items    []WorkSummaryListItem `json:"items"`
 }
 
 func (s *MemberService) GenerateWorkSummary(req *WorkSummaryRequest) (*WorkSummaryResponse, error) {
@@ -640,12 +666,129 @@ func (s *MemberService) GenerateWorkSummary(req *WorkSummaryRequest) (*WorkSumma
 	// Generate AI summary
 	summary, modelUsed := s.generateAISummary(req.Author, dateStr, rawData)
 
-	return &WorkSummaryResponse{
+	resp := &WorkSummaryResponse{
 		Author:      req.Author,
 		Date:        dateStr,
 		Summary:     summary,
 		RawData:     rawData,
 		AIModelUsed: modelUsed,
+		Cached:      false,
+	}
+
+	// Persist: upsert by author+date
+	if summary != "" {
+		rawDataJSON, _ := json.Marshal(rawData)
+		var existing models.MemberWorkSummary
+		err := s.db.Where("author = ? AND date = ?", req.Author, dateStr).First(&existing).Error
+		if err != nil {
+			// Create new
+			record := models.MemberWorkSummary{
+				Author:      req.Author,
+				Date:        dateStr,
+				Summary:     summary,
+				RawData:     string(rawDataJSON),
+				AIModelUsed: modelUsed,
+			}
+			if createErr := s.db.Create(&record).Error; createErr != nil {
+				logger.Infof("[Member] Failed to save work summary: %v", createErr)
+			} else {
+				resp.ID = record.ID
+				resp.UpdatedAt = record.UpdatedAt.Format(time.RFC3339)
+			}
+		} else {
+			// Update existing
+			existing.Summary = summary
+			existing.RawData = string(rawDataJSON)
+			existing.AIModelUsed = modelUsed
+			if updateErr := s.db.Save(&existing).Error; updateErr != nil {
+				logger.Infof("[Member] Failed to update work summary: %v", updateErr)
+			} else {
+				resp.ID = existing.ID
+				resp.UpdatedAt = existing.UpdatedAt.Format(time.RFC3339)
+			}
+		}
+	}
+
+	return resp, nil
+}
+
+// GetWorkSummary returns a cached work summary for the given author and date.
+func (s *MemberService) GetWorkSummary(req *WorkSummaryRequest) (*WorkSummaryResponse, error) {
+	now := time.Now()
+	year, month, day := now.Year(), now.Month(), now.Day()
+	if req.Date != "" {
+		parsed, err := time.Parse("2006-01-02", req.Date)
+		if err == nil {
+			year, month, day = parsed.Year(), parsed.Month(), parsed.Day()
+		}
+	}
+	dateStr := time.Date(year, month, day, 0, 0, 0, 0, now.Location()).Format("2006-01-02")
+
+	var record models.MemberWorkSummary
+	if err := s.db.Where("author = ? AND date = ?", req.Author, dateStr).First(&record).Error; err != nil {
+		// No cached summary
+		return &WorkSummaryResponse{
+			Author: req.Author,
+			Date:   dateStr,
+			Cached: false,
+		}, nil
+	}
+
+	// Decode raw data
+	var rawData WorkSummaryData
+	if record.RawData != "" {
+		json.Unmarshal([]byte(record.RawData), &rawData)
+	}
+
+	return &WorkSummaryResponse{
+		ID:          record.ID,
+		Author:      record.Author,
+		Date:        record.Date,
+		Summary:     record.Summary,
+		RawData:     rawData,
+		AIModelUsed: record.AIModelUsed,
+		Cached:      true,
+		UpdatedAt:   record.UpdatedAt.Format(time.RFC3339),
+	}, nil
+}
+
+// ListWorkSummaries returns paginated work summary history for an author.
+func (s *MemberService) ListWorkSummaries(req *WorkSummaryListRequest) (*WorkSummaryListResponse, error) {
+	if req.Page <= 0 {
+		req.Page = 1
+	}
+	if req.PageSize <= 0 {
+		req.PageSize = 20
+	}
+
+	var total int64
+	s.db.Model(&models.MemberWorkSummary{}).Where("author = ?", req.Author).Count(&total)
+
+	var records []models.MemberWorkSummary
+	offset := (req.Page - 1) * req.PageSize
+	s.db.Where("author = ?", req.Author).
+		Order("date DESC").
+		Offset(offset).
+		Limit(req.PageSize).
+		Find(&records)
+
+	items := make([]WorkSummaryListItem, len(records))
+	for i, r := range records {
+		items[i] = WorkSummaryListItem{
+			ID:          r.ID,
+			Author:      r.Author,
+			Date:        r.Date,
+			AIModelUsed: r.AIModelUsed,
+			HasSummary:  r.Summary != "",
+			UpdatedAt:   r.UpdatedAt.Format(time.RFC3339),
+		}
+	}
+
+	return &WorkSummaryListResponse{
+		Total:    total,
+		Page:     req.Page,
+		PageSize: req.PageSize,
+		Items:    items,
 	}, nil
 }
 

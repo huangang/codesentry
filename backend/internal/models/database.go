@@ -60,6 +60,7 @@ func AutoMigrate() error {
 		&ProjectMember{},
 		&IssueTracker{},
 		&ReviewRule{},
+		&MemberWorkSummary{},
 	)
 }
 
