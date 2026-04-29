@@ -377,7 +377,18 @@
     "workSummaryCached": "Cached",
     "workSummaryViewHistory": "View History",
     "workSummaryNoHistory": "No work summaries found",
-    "workSummaryLastUpdated": "Last updated"
+    "workSummaryLastUpdated": "Last updated",
+    "manageAliases": "Merge Members",
+    "alias": "Alias",
+    "canonicalName": "Canonical Name",
+    "aliasInput": "Alias (e.g. bo.xiong)",
+    "canonicalInput": "Canonical name (e.g. 熊波)",
+    "addAlias": "Add Mapping",
+    "aliasFormRequired": "Alias and canonical name are required",
+    "aliasCannotSame": "Alias and canonical name cannot be the same",
+    "aliasCreateSuccess": "Alias mapping created",
+    "aliasDeleteSuccess": "Alias mapping deleted",
+    "aliasDeleteConfirm": "Delete this alias mapping?"
   },
   "systemLogs": {
     "title": "System Logs",

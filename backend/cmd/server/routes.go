@@ -93,6 +93,7 @@ func registerRoutes(r *gin.Engine, svc *appServices) {
 			protected.GET("/members/work-summary", memberHandler.GetWorkSummary)
 			protected.POST("/members/work-summary", memberHandler.GenerateWorkSummary)
 			protected.GET("/members/work-summaries", memberHandler.ListWorkSummaries)
+			protected.GET("/members/aliases", memberHandler.ListAliases)
 
 			// Prompts (read for all users)
 			promptHandler := handlers.NewPromptHandler(models.GetDB())
@@ -160,6 +161,11 @@ func registerRoutes(r *gin.Engine, svc *appServices) {
 			admin.POST("/llm-configs", llmConfigHandler.Create)
 			admin.PUT("/llm-configs/:id", llmConfigHandler.Update)
 			admin.DELETE("/llm-configs/:id", llmConfigHandler.Delete)
+
+			// Member Aliases (admin write)
+			memberAliasHandler := handlers.NewMemberHandler(models.GetDB(), svc.openAICfg)
+			admin.POST("/members/aliases", memberAliasHandler.CreateAlias)
+			admin.DELETE("/members/aliases/:id", memberAliasHandler.DeleteAlias)
 
 			// IM Bots
 			imBotHandler := handlers.NewIMBotHandler(models.GetDB())

@@ -61,6 +61,7 @@ func AutoMigrate() error {
 		&IssueTracker{},
 		&ReviewRule{},
 		&MemberWorkSummary{},
+		&MemberAlias{},
 	)
 }
 

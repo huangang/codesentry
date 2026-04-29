@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"fmt"
+
 	"github.com/gin-gonic/gin"
 	"github.com/huangang/codesentry/backend/internal/config"
 	"github.com/huangang/codesentry/backend/internal/services"
@@ -154,4 +156,42 @@ func (h *MemberHandler) ListWorkSummaries(c *gin.Context) {
 	}
 
 	response.Success(c, result)
+}
+
+// Alias management
+
+func (h *MemberHandler) ListAliases(c *gin.Context) {
+	items, err := h.memberService.ListAliases()
+	if err != nil {
+		response.ServerError(c, err.Error())
+		return
+	}
+	response.Success(c, items)
+}
+
+func (h *MemberHandler) CreateAlias(c *gin.Context) {
+	var req services.CreateAliasRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	item, err := h.memberService.CreateAlias(&req)
+	if err != nil {
+		response.ServerError(c, err.Error())
+		return
+	}
+	response.Success(c, item)
+}
+
+func (h *MemberHandler) DeleteAlias(c *gin.Context) {
+	var id uint
+	if _, err := fmt.Sscanf(c.Param("id"), "%d", &id); err != nil {
+		response.BadRequest(c, "invalid id")
+		return
+	}
+	if err := h.memberService.DeleteAlias(id); err != nil {
+		response.ServerError(c, err.Error())
+		return
+	}
+	response.Success(c, gin.H{"message": "deleted"})
 }

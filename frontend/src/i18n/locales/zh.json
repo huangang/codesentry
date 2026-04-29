@@ -377,7 +377,18 @@
     "workSummaryCached": "已缓存",
     "workSummaryViewHistory": "查看历史",
     "workSummaryNoHistory": "暂无历史工作总结",
-    "workSummaryLastUpdated": "最后更新"
+    "workSummaryLastUpdated": "最后更新",
+    "manageAliases": "成员合并",
+    "alias": "别名",
+    "canonicalName": "标准名称",
+    "aliasInput": "输入别名（如 bo.xiong）",
+    "canonicalInput": "输入标准名称（如 熊波）",
+    "addAlias": "添加映射",
+    "aliasFormRequired": "别名和标准名称不能为空",
+    "aliasCannotSame": "别名和标准名称不能相同",
+    "aliasCreateSuccess": "别名映射创建成功",
+    "aliasDeleteSuccess": "别名映射删除成功",
+    "aliasDeleteConfirm": "确定删除该别名映射吗？"
   },
   "systemLogs": {
     "title": "系统日志",

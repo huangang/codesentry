@@ -22,6 +22,8 @@ import {
 import {
   SearchOutlined,
   ReloadOutlined,
+  PlusOutlined,
+  DeleteOutlined,
   UserOutlined,
   CodeOutlined,
   TrophyOutlined,
@@ -56,11 +58,12 @@ import {
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import { useTranslation } from 'react-i18next';
-import { memberApi, type WorkSummaryResponse, type WorkSummaryListItem } from '../services';
+import { memberApi, memberAliasApi, type MemberAlias, type WorkSummaryResponse, type WorkSummaryListItem } from '../services';
 import { useMemberStats, useProjects, useTeamOverview, useHeatmap, type MemberStatsFilters } from '../hooks/queries';
 import { ContributionHeatmap } from '../components';
 import MarkdownContent from '../components/MarkdownContent';
 import { getResponsiveWidth } from '../hooks';
+import { useAuthStore } from '../stores/authStore';
 
 dayjs.extend(isoWeek);
 
@@ -90,6 +93,7 @@ interface MemberDetail {
 
 
 const MemberAnalysis: React.FC = () => {
+  const { isAdmin } = useAuthStore();
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [memberDetail, setMemberDetail] = useState<MemberDetail | null>(null);
@@ -117,6 +121,13 @@ const MemberAnalysis: React.FC = () => {
   const [historyItems, setHistoryItems] = useState<WorkSummaryListItem[]>([]);
   const [historyTotal, setHistoryTotal] = useState(0);
   const [historyPage, setHistoryPage] = useState(1);
+
+  // Alias management state
+  const [aliasModalVisible, setAliasModalVisible] = useState(false);
+  const [aliasLoading, setAliasLoading] = useState(false);
+  const [aliases, setAliases] = useState<MemberAlias[]>([]);
+  const [aliasInput, setAliasInput] = useState('');
+  const [canonicalInput, setCanonicalInput] = useState('');
 
   const { data: memberData, isLoading } = useMemberStats(filters);
   const { data: projectsData } = useProjects({ page_size: 100 });
@@ -271,6 +282,63 @@ const MemberAnalysis: React.FC = () => {
     // useEffect will load the cached summary for that date
   };
 
+  const loadAliases = useCallback(async () => {
+    setAliasLoading(true);
+    try {
+      const res = await memberAliasApi.list();
+      setAliases(res.data);
+    } catch {
+      message.error(t('common.error'));
+    } finally {
+      setAliasLoading(false);
+    }
+  }, [t]);
+
+  const handleOpenAliasModal = () => {
+    setAliasModalVisible(true);
+    loadAliases();
+  };
+
+  const handleCreateAlias = async () => {
+    const alias = aliasInput.trim();
+    const canonicalName = canonicalInput.trim();
+    if (!alias || !canonicalName) {
+      message.warning(t('memberAnalysis.aliasFormRequired'));
+      return;
+    }
+    if (alias === canonicalName) {
+      message.warning(t('memberAnalysis.aliasCannotSame'));
+      return;
+    }
+    setAliasLoading(true);
+    try {
+      await memberAliasApi.create({ alias, canonical_name: canonicalName });
+      message.success(t('memberAnalysis.aliasCreateSuccess'));
+      setAliasInput('');
+      setCanonicalInput('');
+      await loadAliases();
+      handleSearch();
+    } catch {
+      message.error(t('common.error'));
+    } finally {
+      setAliasLoading(false);
+    }
+  };
+
+  const handleDeleteAlias = async (id: number) => {
+    setAliasLoading(true);
+    try {
+      await memberAliasApi.delete(id);
+      message.success(t('memberAnalysis.aliasDeleteSuccess'));
+      await loadAliases();
+      handleSearch();
+    } catch {
+      message.error(t('common.error'));
+    } finally {
+      setAliasLoading(false);
+    }
+  };
+
   const columns: ColumnsType<MemberStats> = [
     { title: t('memberAnalysis.author'), dataIndex: 'author', key: 'author', width: 150, render: (author: string) => <a onClick={() => showMemberDetail(author)}>{author}</a> },
     { title: t('memberAnalysis.commitCount'), dataIndex: 'commit_count', key: 'commit_count', width: 100, sorter: true },
@@ -395,6 +463,11 @@ const MemberAnalysis: React.FC = () => {
           />
           <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>{t('common.search')}</Button>
           <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
+          {isAdmin && (
+            <Button icon={<PlusOutlined />} onClick={handleOpenAliasModal}>
+              {t('memberAnalysis.manageAliases')}
+            </Button>
+          )}
         </Space>
 
         <Table columns={columns} dataSource={memberData?.items ?? []} rowKey="author" loading={isLoading} onChange={handleTableChange} scroll={{ x: 800 }}
@@ -573,6 +646,65 @@ const MemberAnalysis: React.FC = () => {
               />
             </List.Item>
           )}
+        />
+      </Modal>
+
+      {/* Member Alias Management Modal */}
+      <Modal
+        title={t('memberAnalysis.manageAliases')}
+        open={aliasModalVisible}
+        onCancel={() => setAliasModalVisible(false)}
+        width={getResponsiveWidth(720)}
+        footer={null}
+      >
+        <Space wrap style={{ marginBottom: 16, width: '100%' }}>
+          <Input
+            placeholder={t('memberAnalysis.aliasInput')}
+            value={aliasInput}
+            onChange={(e) => setAliasInput(e.target.value)}
+            style={{ width: 220 }}
+          />
+          <Input
+            placeholder={t('memberAnalysis.canonicalInput')}
+            value={canonicalInput}
+            onChange={(e) => setCanonicalInput(e.target.value)}
+            style={{ width: 220 }}
+          />
+          <Button type="primary" onClick={handleCreateAlias} loading={aliasLoading}>
+            {t('memberAnalysis.addAlias')}
+          </Button>
+        </Space>
+
+        <Table<MemberAlias>
+          rowKey="id"
+          loading={aliasLoading}
+          dataSource={aliases}
+          pagination={false}
+          scroll={{ x: 600 }}
+          columns={[
+            { title: t('memberAnalysis.alias'), dataIndex: 'alias', key: 'alias' },
+            { title: t('memberAnalysis.canonicalName'), dataIndex: 'canonical_name', key: 'canonical_name' },
+            {
+              title: t('common.actions'),
+              key: 'actions',
+              width: 120,
+              render: (_, record) => (
+                <Button
+                  danger
+                  size="small"
+                  icon={<DeleteOutlined />}
+                  onClick={() => {
+                    Modal.confirm({
+                      title: t('memberAnalysis.aliasDeleteConfirm'),
+                      onOk: () => handleDeleteAlias(record.id),
+                    });
+                  }}
+                >
+                  {t('common.delete')}
+                </Button>
+              ),
+            },
+          ]}
         />
       </Modal>
     </>

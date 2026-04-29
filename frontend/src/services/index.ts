@@ -249,6 +249,19 @@ export const memberApi = {
     api.get<{ total: number; page: number; page_size: number; items: WorkSummaryListItem[] }>('/members/work-summaries', { params }),
 };
 
+export interface MemberAlias {
+  id: number;
+  alias: string;
+  canonical_name: string;
+}
+
+export const memberAliasApi = {
+  list: () => api.get<MemberAlias[]>('/members/aliases'),
+  create: (data: { alias: string; canonical_name: string }) =>
+    api.post<MemberAlias>('/members/aliases', data),
+  delete: (id: number) => api.delete(`/members/aliases/${id}`),
+};
+
 // System Logs
 export interface SystemLog {
   id: number;

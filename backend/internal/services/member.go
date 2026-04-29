@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -19,6 +20,175 @@ type MemberService struct {
 
 func NewMemberService(db *gorm.DB, aiService *AIService) *MemberService {
 	return &MemberService{db: db, aiService: aiService}
+}
+
+// loadAliasMap returns a map of alias -> canonical_name for all defined aliases.
+func (s *MemberService) loadAliasMap() map[string]string {
+	var aliases []models.MemberAlias
+	s.db.Find(&aliases)
+	m := make(map[string]string, len(aliases))
+	for _, a := range aliases {
+		m[a.Alias] = a.CanonicalName
+	}
+	return m
+}
+
+// expandAuthors returns all author names (including aliases) that map to the given name.
+// If name is itself an alias it is resolved to its canonical name first.
+func (s *MemberService) expandAuthors(name string) (canonical string, authors []string) {
+	// Check if name is itself an alias
+	var selfAlias models.MemberAlias
+	if err := s.db.Where("alias = ?", name).First(&selfAlias).Error; err == nil {
+		canonical = selfAlias.CanonicalName
+	} else {
+		canonical = name
+	}
+	authors = []string{canonical}
+	// Add all aliases that map to canonical
+	var aliases []models.MemberAlias
+	s.db.Where("canonical_name = ?", canonical).Find(&aliases)
+	for _, a := range aliases {
+		if a.Alias != canonical {
+			authors = append(authors, a.Alias)
+		}
+	}
+	return canonical, authors
+}
+
+// applyAliasesToMembers merges members with the same canonical name.
+func applyAliasesToMembers(members []MemberStats, aliasMap map[string]string) []MemberStats {
+	if len(aliasMap) == 0 {
+		return members
+	}
+	type mergedEntry struct {
+		stats      MemberStats
+		scoreSum   float64
+		scoreCount int64
+	}
+	order := make([]string, 0, len(members))
+	merged := make(map[string]*mergedEntry)
+
+	for _, m := range members {
+		canonical := m.Author
+		if c, ok := aliasMap[m.Author]; ok {
+			canonical = c
+		}
+		if e, exists := merged[canonical]; exists {
+			e.stats.CommitCount += m.CommitCount
+			e.stats.Additions += m.Additions
+			e.stats.Deletions += m.Deletions
+			e.stats.FilesChanged += m.FilesChanged
+			if m.ProjectCount > e.stats.ProjectCount {
+				e.stats.ProjectCount = m.ProjectCount
+			}
+			if m.MaxScore > e.stats.MaxScore {
+				e.stats.MaxScore = m.MaxScore
+			}
+			if m.MinScore > 0 && (e.stats.MinScore == 0 || m.MinScore < e.stats.MinScore) {
+				e.stats.MinScore = m.MinScore
+			}
+			e.scoreSum += m.AvgScore * float64(m.CommitCount)
+			e.scoreCount += m.CommitCount
+		} else {
+			order = append(order, canonical)
+			merged[canonical] = &mergedEntry{
+				stats: MemberStats{
+					Author:       canonical,
+					AuthorEmail:  m.AuthorEmail,
+					CommitCount:  m.CommitCount,
+					AvgScore:     m.AvgScore,
+					MaxScore:     m.MaxScore,
+					MinScore:     m.MinScore,
+					Additions:    m.Additions,
+					Deletions:    m.Deletions,
+					FilesChanged: m.FilesChanged,
+					ProjectCount: m.ProjectCount,
+				},
+				scoreSum:   m.AvgScore * float64(m.CommitCount),
+				scoreCount: m.CommitCount,
+			}
+		}
+	}
+
+	result := make([]MemberStats, 0, len(order))
+	for _, canonical := range order {
+		e := merged[canonical]
+		if e.scoreCount > 0 {
+			e.stats.AvgScore = e.scoreSum / float64(e.scoreCount)
+		}
+		result = append(result, e.stats)
+	}
+	return result
+}
+
+// Alias CRUD
+
+type MemberAliasItem struct {
+	ID            uint   `json:"id"`
+	Alias         string `json:"alias"`
+	CanonicalName string `json:"canonical_name"`
+}
+
+func (s *MemberService) ListAliases() ([]MemberAliasItem, error) {
+	var aliases []models.MemberAlias
+	if err := s.db.Order("canonical_name, alias").Find(&aliases).Error; err != nil {
+		return nil, err
+	}
+	items := make([]MemberAliasItem, len(aliases))
+	for i, a := range aliases {
+		items[i] = MemberAliasItem{ID: a.ID, Alias: a.Alias, CanonicalName: a.CanonicalName}
+	}
+	return items, nil
+}
+
+type CreateAliasRequest struct {
+	Alias         string `json:"alias" binding:"required"`
+	CanonicalName string `json:"canonical_name" binding:"required"`
+}
+
+func (s *MemberService) CreateAlias(req *CreateAliasRequest) (*MemberAliasItem, error) {
+	alias := models.MemberAlias{
+		Alias:         req.Alias,
+		CanonicalName: req.CanonicalName,
+	}
+	if err := s.db.Create(&alias).Error; err != nil {
+		return nil, err
+	}
+	return &MemberAliasItem{ID: alias.ID, Alias: alias.Alias, CanonicalName: alias.CanonicalName}, nil
+}
+
+func (s *MemberService) DeleteAlias(id uint) error {
+	return s.db.Delete(&models.MemberAlias{}, id).Error
+}
+
+// sortMembers sorts a slice of MemberStats in place.
+func sortMembers(members []MemberStats, sortBy, sortOrder string) {
+	asc := strings.EqualFold(sortOrder, "ASC")
+	sort.Slice(members, func(i, j int) bool {
+		var leftLessRight bool
+		var leftGreaterRight bool
+		switch sortBy {
+		case "avg_score":
+			leftLessRight = members[i].AvgScore < members[j].AvgScore
+			leftGreaterRight = members[i].AvgScore > members[j].AvgScore
+		case "additions":
+			leftLessRight = members[i].Additions < members[j].Additions
+			leftGreaterRight = members[i].Additions > members[j].Additions
+		case "deletions":
+			leftLessRight = members[i].Deletions < members[j].Deletions
+			leftGreaterRight = members[i].Deletions > members[j].Deletions
+		case "files_changed":
+			leftLessRight = members[i].FilesChanged < members[j].FilesChanged
+			leftGreaterRight = members[i].FilesChanged > members[j].FilesChanged
+		default: // commit_count
+			leftLessRight = members[i].CommitCount < members[j].CommitCount
+			leftGreaterRight = members[i].CommitCount > members[j].CommitCount
+		}
+		if asc {
+			return leftLessRight
+		}
+		return leftGreaterRight
+	})
 }
 
 type MemberListRequest struct {
@@ -111,22 +281,6 @@ func (s *MemberService) List(req *MemberListRequest) (*MemberListResponse, error
 		endDate = time.Now()
 	}
 
-	var total int64
-	countQuery := s.db.Model(&models.ReviewLog{}).
-		Where("created_at BETWEEN ? AND ?", startDate, endDate).
-		Where("author != ''")
-
-	if req.Name != "" {
-		countQuery = countQuery.Where("author LIKE ?", "%"+req.Name+"%")
-	}
-	if req.ProjectID != nil {
-		countQuery = countQuery.Where("project_id = ?", *req.ProjectID)
-	}
-
-	countQuery.Distinct("author").Count(&total)
-
-	var members []MemberStats
-
 	query := s.db.Model(&models.ReviewLog{}).
 		Select(`
 			author,
@@ -144,9 +298,6 @@ func (s *MemberService) List(req *MemberListRequest) (*MemberListResponse, error
 		Where("author != ''").
 		Group("author")
 
-	if req.Name != "" {
-		query = query.Where("author LIKE ?", "%"+req.Name+"%")
-	}
 	if req.ProjectID != nil {
 		query = query.Where("project_id = ?", *req.ProjectID)
 	}
@@ -161,8 +312,38 @@ func (s *MemberService) List(req *MemberListRequest) (*MemberListResponse, error
 	}
 	query = query.Order(sortBy + " " + sortOrder)
 
+	// Fetch all (no pagination yet) so aliases can be merged across pages
+	var allMembers []MemberStats
+	query.Scan(&allMembers)
+
+	// Apply alias merging
+	aliasMap := s.loadAliasMap()
+	allMembers = applyAliasesToMembers(allMembers, aliasMap)
+
+	// Re-sort after merging
+	sortMembers(allMembers, sortBy, sortOrder)
+
+	// Filter by name after alias merge
+	if req.Name != "" {
+		filtered := allMembers[:0]
+		for _, m := range allMembers {
+			if strings.Contains(strings.ToLower(m.Author), strings.ToLower(req.Name)) {
+				filtered = append(filtered, m)
+			}
+		}
+		allMembers = filtered
+	}
+
+	total := int64(len(allMembers))
 	offset := (req.Page - 1) * req.PageSize
-	query.Offset(offset).Limit(req.PageSize).Scan(&members)
+	end := offset + req.PageSize
+	if offset > len(allMembers) {
+		offset = len(allMembers)
+	}
+	if end > len(allMembers) {
+		end = len(allMembers)
+	}
+	members := allMembers[offset:end]
 
 	return &MemberListResponse{
 		Total:    total,
@@ -195,10 +376,13 @@ func (s *MemberService) GetDetail(req *MemberDetailRequest) (*MemberDetailRespon
 		endDate = time.Now()
 	}
 
+	// Resolve aliases: query for all author names that belong to this person
+	canonical, authorNames := s.expandAuthors(req.Author)
+
 	var totalStats MemberStats
 	s.db.Model(&models.ReviewLog{}).
 		Select(`
-			author,
+			MAX(author) as author,
 			MAX(author_email) as author_email,
 			COUNT(*) as commit_count,
 			COALESCE(AVG(CASE WHEN is_manual = false THEN score END), 0) as avg_score,
@@ -209,10 +393,10 @@ func (s *MemberService) GetDetail(req *MemberDetailRequest) (*MemberDetailRespon
 			COALESCE(SUM(files_changed), 0) as files_changed,
 			COUNT(DISTINCT project_id) as project_count
 		`).
-		Where("author = ?", req.Author).
+		Where("author IN ?", authorNames).
 		Where("created_at BETWEEN ? AND ?", startDate, endDate).
-		Group("author").
 		Scan(&totalStats)
+	totalStats.Author = canonical
 
 	var projectStats []MemberProjectStats
 	s.db.Model(&models.ReviewLog{}).
@@ -223,7 +407,7 @@ func (s *MemberService) GetDetail(req *MemberDetailRequest) (*MemberDetailRespon
 			COALESCE(SUM(additions), 0) as additions,
 			COALESCE(SUM(deletions), 0) as deletions
 		`).
-		Where("author = ?", req.Author).
+		Where("author IN ?", authorNames).
 		Where("created_at BETWEEN ? AND ?", startDate, endDate).
 		Group("project_id").
 		Order("commit_count DESC").
@@ -243,14 +427,14 @@ func (s *MemberService) GetDetail(req *MemberDetailRequest) (*MemberDetailRespon
 			COUNT(*) as commit_count,
 			COALESCE(AVG(CASE WHEN is_manual = false THEN score END), 0) as avg_score
 		`).
-		Where("author = ?", req.Author).
+		Where("author IN ?", authorNames).
 		Where("created_at BETWEEN ? AND ?", startDate, endDate).
 		Group("DATE(created_at)").
 		Order("date ASC").
 		Scan(&trend)
 
 	return &MemberDetailResponse{
-		Author:       req.Author,
+		Author:       canonical,
 		AuthorEmail:  totalStats.AuthorEmail,
 		TotalStats:   totalStats,
 		ProjectStats: projectStats,
@@ -345,7 +529,8 @@ func (s *MemberService) GetHeatmap(req *HeatmapRequest) (*HeatmapResponse, error
 		query = query.Where("project_id = ?", *req.ProjectID)
 	}
 	if req.Author != "" {
-		query = query.Where("author = ?", req.Author)
+		_, authorNames := s.expandAuthors(req.Author)
+		query = query.Where("author IN ?", authorNames)
 	}
 
 	var rawData []struct {
