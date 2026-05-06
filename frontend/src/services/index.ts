@@ -218,17 +218,6 @@ export interface WorkSummaryListItem {
   updated_at: string;
 }
 
-export interface WorkPeriodDailySummary {
-  date: string;
-  commit_count: number;
-  additions: number;
-  deletions: number;
-  files_changed: number;
-  projects: string[];
-  summary: string;
-  cached: boolean;
-}
-
 export interface WorkPeriodSummaryResponse {
   id?: number;
   author: string;
@@ -241,7 +230,6 @@ export interface WorkPeriodSummaryResponse {
     deletions: number;
     files_changed: number;
     projects: string[];
-    daily_summaries: WorkPeriodDailySummary[];
   };
   ai_model_used: string;
   cached?: boolean;

@@ -18,7 +18,6 @@ import {
   Empty,
   Tooltip as AntTooltip,
   List,
-  Collapse,
   Typography,
 } from 'antd';
 import {
@@ -63,7 +62,7 @@ import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import { useTranslation } from 'react-i18next';
-import { memberApi, memberAliasApi, type MemberAlias, type WorkSummaryResponse, type WorkSummaryListItem, type WorkPeriodSummaryResponse } from '../services';
+import { memberApi, memberAliasApi, type MemberAlias, type WorkSummaryResponse, type WorkSummaryListItem, type WorkPeriodSummaryResponse, type WorkPeriodSummaryListItem } from '../services';
 import { useMemberStats, useProjects, useTeamOverview, useHeatmap, type MemberStatsFilters } from '../hooks/queries';
 import { ContributionHeatmap } from '../components';
 import MarkdownContent from '../components/MarkdownContent';
@@ -125,6 +124,13 @@ const MemberAnalysis: React.FC = () => {
   const [periodSummaryLoading, setPeriodSummaryLoading] = useState(false);
   const [periodSummaryData, setPeriodSummaryData] = useState<WorkPeriodSummaryResponse | null>(null);
   const [periodSummaryRange, setPeriodSummaryRange] = useState<[Dayjs, Dayjs]>([dayjs().subtract(6, 'day'), dayjs()]);
+
+  // Work Period Summary History state
+  const [periodHistoryModalVisible, setPeriodHistoryModalVisible] = useState(false);
+  const [periodHistoryLoading, setPeriodHistoryLoading] = useState(false);
+  const [periodHistoryItems, setPeriodHistoryItems] = useState<WorkPeriodSummaryListItem[]>([]);
+  const [periodHistoryTotal, setPeriodHistoryTotal] = useState(0);
+  const [periodHistoryPage, setPeriodHistoryPage] = useState(1);
 
   // History state
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
@@ -322,6 +328,33 @@ const MemberAnalysis: React.FC = () => {
       navigator.clipboard.writeText(periodSummaryData.summary);
       message.success(t('memberAnalysis.workSummaryCopied'));
     }
+  };
+
+  const loadPeriodHistory = useCallback(async (author: string, page: number) => {
+    setPeriodHistoryLoading(true);
+    try {
+      const res = await memberApi.listWorkPeriodSummaries({ author, page, page_size: 10 });
+      setPeriodHistoryItems(res.data.items);
+      setPeriodHistoryTotal(res.data.total);
+      setPeriodHistoryPage(res.data.page);
+    } catch {
+      message.error(t('common.error'));
+    } finally {
+      setPeriodHistoryLoading(false);
+    }
+  }, [t]);
+
+  const handleOpenPeriodHistory = () => {
+    if (!selectedAuthor) return;
+    setPeriodHistoryModalVisible(true);
+    loadPeriodHistory(selectedAuthor, 1);
+  };
+
+  const handleViewPeriodHistoryItem = (item: WorkPeriodSummaryListItem) => {
+    setPeriodHistoryModalVisible(false);
+    setPeriodSummaryData(null);
+    setPeriodSummaryRange([dayjs(item.start_date), dayjs(item.end_date)]);
+    setPeriodSummaryModalVisible(true);
   };
 
   // History handlers
@@ -587,6 +620,12 @@ const MemberAnalysis: React.FC = () => {
                 >
                   {t('memberAnalysis.workPeriodSummary')}
                 </Button>
+                <Button
+                  icon={<HistoryOutlined />}
+                  onClick={handleOpenPeriodHistory}
+                >
+                  {t('memberAnalysis.workPeriodSummaryViewHistory')}
+                </Button>
               </Space>
             </div>
             <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
@@ -736,38 +775,6 @@ const MemberAnalysis: React.FC = () => {
         ) : periodSummaryData?.summary ? (
           <div>
             <MarkdownContent content={periodSummaryData.summary} />
-            {(periodSummaryData.raw_data.daily_summaries?.length ?? 0) > 0 && (
-              <Collapse
-                size="small"
-                style={{ marginTop: 16 }}
-                items={[
-                  {
-                    key: 'daily-summaries',
-                    label: t('memberAnalysis.workPeriodDailySummaries'),
-                    children: (
-                      <List
-                        size="small"
-                        dataSource={periodSummaryData.raw_data.daily_summaries ?? []}
-                        renderItem={(item) => (
-                          <List.Item>
-                            <List.Item.Meta
-                              title={
-                                <Space wrap size="small">
-                                  <span>{item.date}</span>
-                                  <Tag>{t('memberAnalysis.commitCount')}: {item.commit_count}</Tag>
-                                  <Tag>+{item.additions} / -{item.deletions}</Tag>
-                                </Space>
-                              }
-                              description={<MarkdownContent content={item.summary} />}
-                            />
-                          </List.Item>
-                        )}
-                      />
-                    ),
-                  },
-                ]}
-              />
-            )}
             <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
               {periodSummaryData.updated_at && (
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -797,6 +804,49 @@ const MemberAnalysis: React.FC = () => {
             </Button>
           </div>
         )}
+      </Modal>
+
+      {/* Work Period Summary History Modal */}
+      <Modal
+        title={<Space><HistoryOutlined />{t('memberAnalysis.workPeriodSummaryHistory')}</Space>}
+        open={periodHistoryModalVisible}
+        onCancel={() => setPeriodHistoryModalVisible(false)}
+        width={getResponsiveWidth(560)}
+        footer={null}
+      >
+        <List
+          loading={periodHistoryLoading}
+          dataSource={periodHistoryItems}
+          locale={{ emptyText: t('memberAnalysis.workPeriodSummaryNoHistory') }}
+          pagination={{
+            current: periodHistoryPage,
+            total: periodHistoryTotal,
+            pageSize: 10,
+            size: 'small',
+            onChange: (page) => selectedAuthor && loadPeriodHistory(selectedAuthor, page),
+          }}
+          renderItem={(item: WorkPeriodSummaryListItem) => (
+            <List.Item
+              style={{ cursor: 'pointer' }}
+              onClick={() => handleViewPeriodHistoryItem(item)}
+              actions={[
+                <Button key="view" type="link" size="small">{t('common.view')}</Button>,
+              ]}
+            >
+              <List.Item.Meta
+                title={`${item.start_date} ~ ${item.end_date}`}
+                description={
+                  <Space size="small" wrap>
+                    {item.ai_model_used && <Tag>{item.ai_model_used}</Tag>}
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      {dayjs(item.updated_at).format('YYYY-MM-DD HH:mm')}
+                    </Typography.Text>
+                  </Space>
+                }
+              />
+            </List.Item>
+          )}
+        />
       </Modal>
 
       {/* Work Summary History Modal */}

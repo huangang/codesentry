@@ -791,12 +791,11 @@ type WorkPeriodDailySummary struct {
 }
 
 type WorkPeriodSummaryData struct {
-	CommitCount    int                      `json:"commit_count"`
-	Additions      int                      `json:"additions"`
-	Deletions      int                      `json:"deletions"`
-	FilesChanged   int                      `json:"files_changed"`
-	Projects       []string                 `json:"projects"`
-	DailySummaries []WorkPeriodDailySummary `json:"daily_summaries"`
+	CommitCount  int      `json:"commit_count"`
+	Additions    int      `json:"additions"`
+	Deletions    int      `json:"deletions"`
+	FilesChanged int      `json:"files_changed"`
+	Projects     []string `json:"projects"`
 }
 
 type WorkPeriodSummaryResponse struct {
@@ -1092,6 +1091,7 @@ func (s *MemberService) GenerateWorkPeriodSummary(req *WorkPeriodSummaryRequest)
 	endStr := end.Format("2006-01-02")
 	projectSet := make(map[string]bool)
 	rawData := WorkPeriodSummaryData{}
+	var dailySummaries []WorkPeriodDailySummary
 
 	for day := start; !day.After(end); day = day.AddDate(0, 0, 1) {
 		dateStr := day.Format("2006-01-02")
@@ -1122,7 +1122,7 @@ func (s *MemberService) GenerateWorkPeriodSummary(req *WorkPeriodSummaryRequest)
 			Summary:      daySummary.Summary,
 			Cached:       daySummary.Cached,
 		}
-		rawData.DailySummaries = append(rawData.DailySummaries, daily)
+		dailySummaries = append(dailySummaries, daily)
 		rawData.CommitCount += daily.CommitCount
 		rawData.Additions += daily.Additions
 		rawData.Deletions += daily.Deletions
@@ -1139,7 +1139,7 @@ func (s *MemberService) GenerateWorkPeriodSummary(req *WorkPeriodSummaryRequest)
 	}
 	sort.Strings(rawData.Projects)
 
-	if len(rawData.DailySummaries) == 0 {
+	if len(dailySummaries) == 0 {
 		return &WorkPeriodSummaryResponse{
 			Author:    req.Author,
 			StartDate: startStr,
@@ -1148,7 +1148,7 @@ func (s *MemberService) GenerateWorkPeriodSummary(req *WorkPeriodSummaryRequest)
 		}, nil
 	}
 
-	summary, modelUsed := s.generateAIPeriodSummary(req.Author, startStr, endStr, rawData)
+	summary, modelUsed := s.generateAIPeriodSummary(req.Author, startStr, endStr, rawData, dailySummaries)
 	resp := &WorkPeriodSummaryResponse{
 		Author:      req.Author,
 		StartDate:   startStr,
@@ -1330,9 +1330,9 @@ func (s *MemberService) generateAISummary(author, date string, data WorkSummaryD
 	return content, modelName
 }
 
-func (s *MemberService) generateAIPeriodSummary(author, startDate, endDate string, data WorkPeriodSummaryData) (string, string) {
+func (s *MemberService) generateAIPeriodSummary(author, startDate, endDate string, data WorkPeriodSummaryData, dailySummaries []WorkPeriodDailySummary) (string, string) {
 	var dailySections []string
-	for _, daily := range data.DailySummaries {
+	for _, daily := range dailySummaries {
 		summary := truncateRunes(strings.TrimSpace(daily.Summary), 2000)
 		section := fmt.Sprintf(`### %s
 - 提交数: %d
@@ -1398,13 +1398,13 @@ func (s *MemberService) generateAIPeriodSummary(author, startDate, endDate strin
 
 	if s.aiService == nil {
 		logger.Infof("[Member] AI service not available, using default period summary")
-		return s.buildDefaultWorkPeriodSummary(author, startDate, endDate, data), ""
+		return s.buildDefaultWorkPeriodSummary(author, startDate, endDate, data, dailySummaries), ""
 	}
 
 	content, modelName, err := s.aiService.CallWithConfig(context.Background(), 0, prompt)
 	if err != nil {
 		logger.Infof("[Member] AI work period summary failed: %v, using default", err)
-		return s.buildDefaultWorkPeriodSummary(author, startDate, endDate, data), ""
+		return s.buildDefaultWorkPeriodSummary(author, startDate, endDate, data, dailySummaries), ""
 	}
 
 	return content, modelName
@@ -1448,7 +1448,7 @@ func (s *MemberService) buildDefaultWorkSummary(author, date string, data WorkSu
 	return sb.String()
 }
 
-func (s *MemberService) buildDefaultWorkPeriodSummary(author, startDate, endDate string, data WorkPeriodSummaryData) string {
+func (s *MemberService) buildDefaultWorkPeriodSummary(author, startDate, endDate string, data WorkPeriodSummaryData, dailySummaries []WorkPeriodDailySummary) string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("## 工作总结 - %s 至 %s\n\n", startDate, endDate))
@@ -1458,7 +1458,7 @@ func (s *MemberService) buildDefaultWorkPeriodSummary(author, startDate, endDate
 		data.CommitCount, len(data.Projects), data.Additions, data.Deletions, data.FilesChanged))
 
 	sb.WriteString("### 每日摘要\n")
-	for _, daily := range data.DailySummaries {
+	for _, daily := range dailySummaries {
 		if strings.TrimSpace(daily.Summary) == "" {
 			continue
 		}
