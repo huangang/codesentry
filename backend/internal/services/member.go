@@ -716,8 +716,8 @@ func (s *MemberService) GetTeamOverview(req *TeamOverviewRequest) (*TeamOverview
 // Work Summary types and methods
 
 type WorkSummaryRequest struct {
-	Author string `form:"author" binding:"required"`
-	Date   string `form:"date"` // YYYY-MM-DD, defaults to today
+	Author string `form:"author" json:"author" binding:"required"`
+	Date   string `form:"date" json:"date"` // YYYY-MM-DD, defaults to today
 }
 
 type WorkSummaryCommit struct {
@@ -772,6 +772,69 @@ type WorkSummaryListResponse struct {
 	PageSize int                   `json:"page_size"`
 	Items    []WorkSummaryListItem `json:"items"`
 }
+
+type WorkPeriodSummaryRequest struct {
+	Author    string `form:"author" json:"author" binding:"required"`
+	StartDate string `form:"start_date" json:"start_date"` // YYYY-MM-DD, defaults to last 7 days
+	EndDate   string `form:"end_date" json:"end_date"`     // YYYY-MM-DD, defaults to today
+}
+
+type WorkPeriodDailySummary struct {
+	Date         string   `json:"date"`
+	CommitCount  int      `json:"commit_count"`
+	Additions    int      `json:"additions"`
+	Deletions    int      `json:"deletions"`
+	FilesChanged int      `json:"files_changed"`
+	Projects     []string `json:"projects"`
+	Summary      string   `json:"summary"`
+	Cached       bool     `json:"cached"`
+}
+
+type WorkPeriodSummaryData struct {
+	CommitCount    int                      `json:"commit_count"`
+	Additions      int                      `json:"additions"`
+	Deletions      int                      `json:"deletions"`
+	FilesChanged   int                      `json:"files_changed"`
+	Projects       []string                 `json:"projects"`
+	DailySummaries []WorkPeriodDailySummary `json:"daily_summaries"`
+}
+
+type WorkPeriodSummaryResponse struct {
+	ID          uint                  `json:"id,omitempty"`
+	Author      string                `json:"author"`
+	StartDate   string                `json:"start_date"`
+	EndDate     string                `json:"end_date"`
+	Summary     string                `json:"summary"`
+	RawData     WorkPeriodSummaryData `json:"raw_data"`
+	AIModelUsed string                `json:"ai_model_used"`
+	Cached      bool                  `json:"cached"`
+	UpdatedAt   string                `json:"updated_at,omitempty"`
+}
+
+type WorkPeriodSummaryListRequest struct {
+	Author   string `form:"author" binding:"required"`
+	Page     int    `form:"page"`
+	PageSize int    `form:"page_size"`
+}
+
+type WorkPeriodSummaryListItem struct {
+	ID          uint   `json:"id"`
+	Author      string `json:"author"`
+	StartDate   string `json:"start_date"`
+	EndDate     string `json:"end_date"`
+	AIModelUsed string `json:"ai_model_used"`
+	HasSummary  bool   `json:"has_summary"`
+	UpdatedAt   string `json:"updated_at"`
+}
+
+type WorkPeriodSummaryListResponse struct {
+	Total    int64                       `json:"total"`
+	Page     int                         `json:"page"`
+	PageSize int                         `json:"page_size"`
+	Items    []WorkPeriodSummaryListItem `json:"items"`
+}
+
+const maxWorkPeriodSummaryDays = 366
 
 func (s *MemberService) GenerateWorkSummary(req *WorkSummaryRequest) (*WorkSummaryResponse, error) {
 	// Parse date, default to today. Always use local timezone for accurate day boundaries.
@@ -838,6 +901,7 @@ func (s *MemberService) GenerateWorkSummary(req *WorkSummaryRequest) (*WorkSumma
 	for p := range projectSet {
 		projects = append(projects, p)
 	}
+	sort.Strings(projects)
 
 	rawData := WorkSummaryData{
 		CommitCount:   len(logs),
@@ -977,6 +1041,235 @@ func (s *MemberService) ListWorkSummaries(req *WorkSummaryListRequest) (*WorkSum
 	}, nil
 }
 
+func parseWorkPeriodSummaryRange(startDate, endDate string) (time.Time, time.Time, error) {
+	now := time.Now()
+	loc := now.Location()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	start := today.AddDate(0, 0, -6)
+	end := today
+
+	if startDate != "" {
+		parsed, err := time.Parse("2006-01-02", startDate)
+		if err != nil {
+			return time.Time{}, time.Time{}, fmt.Errorf("invalid start_date, expected YYYY-MM-DD")
+		}
+		start = time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 0, 0, 0, 0, loc)
+	}
+
+	if endDate != "" {
+		parsed, err := time.Parse("2006-01-02", endDate)
+		if err != nil {
+			return time.Time{}, time.Time{}, fmt.Errorf("invalid end_date, expected YYYY-MM-DD")
+		}
+		end = time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 0, 0, 0, 0, loc)
+	}
+
+	if startDate == "" && endDate != "" {
+		start = end
+	}
+	if endDate == "" && startDate != "" {
+		end = start
+	}
+	if start.After(end) {
+		return time.Time{}, time.Time{}, fmt.Errorf("start_date cannot be after end_date")
+	}
+
+	dayCount := int(end.Sub(start).Hours()/24) + 1
+	if dayCount > maxWorkPeriodSummaryDays {
+		return time.Time{}, time.Time{}, fmt.Errorf("date range cannot exceed %d days", maxWorkPeriodSummaryDays)
+	}
+
+	return start, end, nil
+}
+
+func (s *MemberService) GenerateWorkPeriodSummary(req *WorkPeriodSummaryRequest) (*WorkPeriodSummaryResponse, error) {
+	start, end, err := parseWorkPeriodSummaryRange(req.StartDate, req.EndDate)
+	if err != nil {
+		return nil, err
+	}
+
+	startStr := start.Format("2006-01-02")
+	endStr := end.Format("2006-01-02")
+	projectSet := make(map[string]bool)
+	rawData := WorkPeriodSummaryData{}
+
+	for day := start; !day.After(end); day = day.AddDate(0, 0, 1) {
+		dateStr := day.Format("2006-01-02")
+		dayReq := &WorkSummaryRequest{Author: req.Author, Date: dateStr}
+		daySummary, err := s.GetWorkSummary(dayReq)
+		if err != nil {
+			return nil, err
+		}
+
+		if strings.TrimSpace(daySummary.Summary) == "" {
+			daySummary, err = s.GenerateWorkSummary(dayReq)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if daySummary.RawData.CommitCount == 0 && strings.TrimSpace(daySummary.Summary) == "" {
+			continue
+		}
+
+		daily := WorkPeriodDailySummary{
+			Date:         dateStr,
+			CommitCount:  daySummary.RawData.CommitCount,
+			Additions:    daySummary.RawData.Additions,
+			Deletions:    daySummary.RawData.Deletions,
+			FilesChanged: daySummary.RawData.FilesChanged,
+			Projects:     daySummary.RawData.Projects,
+			Summary:      daySummary.Summary,
+			Cached:       daySummary.Cached,
+		}
+		rawData.DailySummaries = append(rawData.DailySummaries, daily)
+		rawData.CommitCount += daily.CommitCount
+		rawData.Additions += daily.Additions
+		rawData.Deletions += daily.Deletions
+		rawData.FilesChanged += daily.FilesChanged
+		for _, project := range daily.Projects {
+			if project != "" {
+				projectSet[project] = true
+			}
+		}
+	}
+
+	for project := range projectSet {
+		rawData.Projects = append(rawData.Projects, project)
+	}
+	sort.Strings(rawData.Projects)
+
+	if len(rawData.DailySummaries) == 0 {
+		return &WorkPeriodSummaryResponse{
+			Author:    req.Author,
+			StartDate: startStr,
+			EndDate:   endStr,
+			RawData:   rawData,
+		}, nil
+	}
+
+	summary, modelUsed := s.generateAIPeriodSummary(req.Author, startStr, endStr, rawData)
+	resp := &WorkPeriodSummaryResponse{
+		Author:      req.Author,
+		StartDate:   startStr,
+		EndDate:     endStr,
+		Summary:     summary,
+		RawData:     rawData,
+		AIModelUsed: modelUsed,
+		Cached:      false,
+	}
+
+	if summary != "" {
+		rawDataJSON, _ := json.Marshal(rawData)
+		var existing models.MemberWorkPeriodSummary
+		err := s.db.Where("author = ? AND start_date = ? AND end_date = ?", req.Author, startStr, endStr).First(&existing).Error
+		if err != nil {
+			record := models.MemberWorkPeriodSummary{
+				Author:      req.Author,
+				StartDate:   startStr,
+				EndDate:     endStr,
+				Summary:     summary,
+				RawData:     string(rawDataJSON),
+				AIModelUsed: modelUsed,
+			}
+			if createErr := s.db.Create(&record).Error; createErr != nil {
+				logger.Infof("[Member] Failed to save work period summary: %v", createErr)
+			} else {
+				resp.ID = record.ID
+				resp.UpdatedAt = record.UpdatedAt.Format(time.RFC3339)
+			}
+		} else {
+			existing.Summary = summary
+			existing.RawData = string(rawDataJSON)
+			existing.AIModelUsed = modelUsed
+			if updateErr := s.db.Save(&existing).Error; updateErr != nil {
+				logger.Infof("[Member] Failed to update work period summary: %v", updateErr)
+			} else {
+				resp.ID = existing.ID
+				resp.UpdatedAt = existing.UpdatedAt.Format(time.RFC3339)
+			}
+		}
+	}
+
+	return resp, nil
+}
+
+func (s *MemberService) GetWorkPeriodSummary(req *WorkPeriodSummaryRequest) (*WorkPeriodSummaryResponse, error) {
+	start, end, err := parseWorkPeriodSummaryRange(req.StartDate, req.EndDate)
+	if err != nil {
+		return nil, err
+	}
+
+	startStr := start.Format("2006-01-02")
+	endStr := end.Format("2006-01-02")
+	var record models.MemberWorkPeriodSummary
+	if err := s.db.Where("author = ? AND start_date = ? AND end_date = ?", req.Author, startStr, endStr).First(&record).Error; err != nil {
+		return &WorkPeriodSummaryResponse{
+			Author:    req.Author,
+			StartDate: startStr,
+			EndDate:   endStr,
+			Cached:    false,
+		}, nil
+	}
+
+	var rawData WorkPeriodSummaryData
+	if record.RawData != "" {
+		json.Unmarshal([]byte(record.RawData), &rawData)
+	}
+
+	return &WorkPeriodSummaryResponse{
+		ID:          record.ID,
+		Author:      record.Author,
+		StartDate:   record.StartDate,
+		EndDate:     record.EndDate,
+		Summary:     record.Summary,
+		RawData:     rawData,
+		AIModelUsed: record.AIModelUsed,
+		Cached:      true,
+		UpdatedAt:   record.UpdatedAt.Format(time.RFC3339),
+	}, nil
+}
+
+func (s *MemberService) ListWorkPeriodSummaries(req *WorkPeriodSummaryListRequest) (*WorkPeriodSummaryListResponse, error) {
+	if req.Page <= 0 {
+		req.Page = 1
+	}
+	if req.PageSize <= 0 {
+		req.PageSize = 20
+	}
+
+	var total int64
+	s.db.Model(&models.MemberWorkPeriodSummary{}).Where("author = ?", req.Author).Count(&total)
+
+	var records []models.MemberWorkPeriodSummary
+	offset := (req.Page - 1) * req.PageSize
+	s.db.Where("author = ?", req.Author).
+		Order("start_date DESC, end_date DESC").
+		Offset(offset).
+		Limit(req.PageSize).
+		Find(&records)
+
+	items := make([]WorkPeriodSummaryListItem, len(records))
+	for i, r := range records {
+		items[i] = WorkPeriodSummaryListItem{
+			ID:          r.ID,
+			Author:      r.Author,
+			StartDate:   r.StartDate,
+			EndDate:     r.EndDate,
+			AIModelUsed: r.AIModelUsed,
+			HasSummary:  r.Summary != "",
+			UpdatedAt:   r.UpdatedAt.Format(time.RFC3339),
+		}
+	}
+
+	return &WorkPeriodSummaryListResponse{
+		Total:    total,
+		Page:     req.Page,
+		PageSize: req.PageSize,
+		Items:    items,
+	}, nil
+}
+
 func (s *MemberService) generateAISummary(author, date string, data WorkSummaryData) (string, string) {
 	// Build commit details for prompt
 	var commitLines []string
@@ -1037,6 +1330,94 @@ func (s *MemberService) generateAISummary(author, date string, data WorkSummaryD
 	return content, modelName
 }
 
+func (s *MemberService) generateAIPeriodSummary(author, startDate, endDate string, data WorkPeriodSummaryData) (string, string) {
+	var dailySections []string
+	for _, daily := range data.DailySummaries {
+		summary := truncateRunes(strings.TrimSpace(daily.Summary), 2000)
+		section := fmt.Sprintf(`### %s
+- 提交数: %d
+- 涉及项目: %s
+- 代码变更: +%d/-%d, %d 个文件
+
+%s`,
+			daily.Date,
+			daily.CommitCount,
+			strings.Join(daily.Projects, ", "),
+			daily.Additions,
+			daily.Deletions,
+			daily.FilesChanged,
+			summary,
+		)
+		dailySections = append(dailySections, section)
+	}
+
+	prompt := fmt.Sprintf(`你是一位技术周报/阶段总结助手。请根据下面的「每日工作总结」为 %s 生成一份 %s 至 %s 的跨周期工作总结。
+
+## 每日工作总结
+%s
+
+## 周期统计
+- 总提交数: %d
+- 涉及项目: %s
+- 新增行数: %d
+- 删除行数: %d
+- 变更文件: %d
+
+## 要求
+1. 用中文输出
+2. 先归纳周期内最重要的成果，不要逐天流水账
+3. 按项目或主题合并相关工作，体现连续推进关系
+4. 保留必要的关键数字，但不要堆砌所有统计
+5. 如果发现重复修复、风险收敛、跨项目协作等模式，要单独指出
+6. 输出 Markdown 格式，适合直接粘贴到周报、月报或阶段总结中
+7. 最后给出一行简短的「周期小结」
+
+格式示例：
+## 工作总结 - YYYY-MM-DD 至 YYYY-MM-DD
+
+### 总体概览
+- 本周期主要完成了 xxx
+
+### 重点工作
+- 围绕 xxx，完成了 xxx
+
+### 风险与跟进
+- xxx 仍需继续观察
+
+**周期小结**: 本周期围绕 xxx 持续推进，主要产出是 xxx。`,
+		author,
+		startDate,
+		endDate,
+		strings.Join(dailySections, "\n\n"),
+		data.CommitCount,
+		strings.Join(data.Projects, ", "),
+		data.Additions,
+		data.Deletions,
+		data.FilesChanged,
+	)
+
+	if s.aiService == nil {
+		logger.Infof("[Member] AI service not available, using default period summary")
+		return s.buildDefaultWorkPeriodSummary(author, startDate, endDate, data), ""
+	}
+
+	content, modelName, err := s.aiService.CallWithConfig(context.Background(), 0, prompt)
+	if err != nil {
+		logger.Infof("[Member] AI work period summary failed: %v, using default", err)
+		return s.buildDefaultWorkPeriodSummary(author, startDate, endDate, data), ""
+	}
+
+	return content, modelName
+}
+
+func truncateRunes(text string, maxRunes int) string {
+	runes := []rune(text)
+	if len(runes) <= maxRunes {
+		return text
+	}
+	return string(runes[:maxRunes]) + "\n...(已截断)"
+}
+
 func (s *MemberService) buildDefaultWorkSummary(author, date string, data WorkSummaryData) string {
 	var sb strings.Builder
 
@@ -1063,6 +1444,31 @@ func (s *MemberService) buildDefaultWorkSummary(author, date string, data WorkSu
 
 	sb.WriteString(fmt.Sprintf("**统计**: %d 次提交, +%d/-%d 行, %d 个文件\n",
 		data.CommitCount, data.Additions, data.Deletions, data.FilesChanged))
+
+	return sb.String()
+}
+
+func (s *MemberService) buildDefaultWorkPeriodSummary(author, startDate, endDate string, data WorkPeriodSummaryData) string {
+	var sb strings.Builder
+
+	sb.WriteString(fmt.Sprintf("## 工作总结 - %s 至 %s\n\n", startDate, endDate))
+	sb.WriteString(fmt.Sprintf("**%s** 的周期工作总结\n\n", author))
+	sb.WriteString("### 总体概览\n")
+	sb.WriteString(fmt.Sprintf("- 本周期共 %d 次提交，涉及 %d 个项目，代码变更 +%d/-%d，影响 %d 个文件。\n\n",
+		data.CommitCount, len(data.Projects), data.Additions, data.Deletions, data.FilesChanged))
+
+	sb.WriteString("### 每日摘要\n")
+	for _, daily := range data.DailySummaries {
+		if strings.TrimSpace(daily.Summary) == "" {
+			continue
+		}
+		sb.WriteString(fmt.Sprintf("- **%s**: %d 次提交，涉及 %s。\n",
+			daily.Date, daily.CommitCount, strings.Join(daily.Projects, ", ")))
+	}
+
+	sb.WriteString("\n")
+	sb.WriteString(fmt.Sprintf("**周期小结**: %s 至 %s 期间主要围绕 %s 推进工作。\n",
+		startDate, endDate, strings.Join(data.Projects, ", ")))
 
 	return sb.String()
 }

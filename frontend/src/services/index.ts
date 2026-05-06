@@ -218,6 +218,46 @@ export interface WorkSummaryListItem {
   updated_at: string;
 }
 
+export interface WorkPeriodDailySummary {
+  date: string;
+  commit_count: number;
+  additions: number;
+  deletions: number;
+  files_changed: number;
+  projects: string[];
+  summary: string;
+  cached: boolean;
+}
+
+export interface WorkPeriodSummaryResponse {
+  id?: number;
+  author: string;
+  start_date: string;
+  end_date: string;
+  summary: string;
+  raw_data: {
+    commit_count: number;
+    additions: number;
+    deletions: number;
+    files_changed: number;
+    projects: string[];
+    daily_summaries: WorkPeriodDailySummary[];
+  };
+  ai_model_used: string;
+  cached?: boolean;
+  updated_at?: string;
+}
+
+export interface WorkPeriodSummaryListItem {
+  id: number;
+  author: string;
+  start_date: string;
+  end_date: string;
+  ai_model_used: string;
+  has_summary: boolean;
+  updated_at: string;
+}
+
 export const memberApi = {
   list: (params?: {
     page?: number;
@@ -247,6 +287,15 @@ export const memberApi = {
 
   listWorkSummaries: (params: { author: string; page?: number; page_size?: number }) =>
     api.get<{ total: number; page: number; page_size: number; items: WorkSummaryListItem[] }>('/members/work-summaries', { params }),
+
+  getWorkPeriodSummary: (params: { author: string; start_date?: string; end_date?: string }) =>
+    api.get<WorkPeriodSummaryResponse>('/members/work-period-summary', { params }),
+
+  generateWorkPeriodSummary: (data: { author: string; start_date?: string; end_date?: string }) =>
+    api.post<WorkPeriodSummaryResponse>('/members/work-period-summary', data),
+
+  listWorkPeriodSummaries: (params: { author: string; page?: number; page_size?: number }) =>
+    api.get<{ total: number; page: number; page_size: number; items: WorkPeriodSummaryListItem[] }>('/members/work-period-summaries', { params }),
 };
 
 export interface MemberAlias {

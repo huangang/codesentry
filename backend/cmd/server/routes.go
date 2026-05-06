@@ -93,6 +93,9 @@ func registerRoutes(r *gin.Engine, svc *appServices) {
 			protected.GET("/members/work-summary", memberHandler.GetWorkSummary)
 			protected.POST("/members/work-summary", memberHandler.GenerateWorkSummary)
 			protected.GET("/members/work-summaries", memberHandler.ListWorkSummaries)
+			protected.GET("/members/work-period-summary", memberHandler.GetWorkPeriodSummary)
+			protected.POST("/members/work-period-summary", memberHandler.GenerateWorkPeriodSummary)
+			protected.GET("/members/work-period-summaries", memberHandler.ListWorkPeriodSummaries)
 			protected.GET("/members/aliases", memberHandler.ListAliases)
 
 			// Prompts (read for all users)

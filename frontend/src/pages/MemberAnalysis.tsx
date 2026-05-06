@@ -18,6 +18,8 @@ import {
   Empty,
   Tooltip as AntTooltip,
   List,
+  Collapse,
+  Typography,
 } from 'antd';
 import {
   SearchOutlined,
@@ -36,8 +38,10 @@ import {
   HistoryOutlined,
   SyncOutlined,
   CheckCircleOutlined,
+  CalendarOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import type { RangePickerProps } from 'antd/es/date-picker';
 import {
   BarChart,
   Bar,
@@ -56,9 +60,10 @@ import {
   Area,
 } from 'recharts';
 import dayjs from 'dayjs';
+import type { Dayjs } from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import { useTranslation } from 'react-i18next';
-import { memberApi, memberAliasApi, type MemberAlias, type WorkSummaryResponse, type WorkSummaryListItem } from '../services';
+import { memberApi, memberAliasApi, type MemberAlias, type WorkSummaryResponse, type WorkSummaryListItem, type WorkPeriodSummaryResponse } from '../services';
 import { useMemberStats, useProjects, useTeamOverview, useHeatmap, type MemberStatsFilters } from '../hooks/queries';
 import { ContributionHeatmap } from '../components';
 import MarkdownContent from '../components/MarkdownContent';
@@ -114,6 +119,12 @@ const MemberAnalysis: React.FC = () => {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryData, setSummaryData] = useState<WorkSummaryResponse | null>(null);
   const [summaryDate, setSummaryDate] = useState<dayjs.Dayjs>(dayjs());
+
+  // Work Period Summary state
+  const [periodSummaryModalVisible, setPeriodSummaryModalVisible] = useState(false);
+  const [periodSummaryLoading, setPeriodSummaryLoading] = useState(false);
+  const [periodSummaryData, setPeriodSummaryData] = useState<WorkPeriodSummaryResponse | null>(null);
+  const [periodSummaryRange, setPeriodSummaryRange] = useState<[Dayjs, Dayjs]>([dayjs().subtract(6, 'day'), dayjs()]);
 
   // History state
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
@@ -250,6 +261,65 @@ const MemberAnalysis: React.FC = () => {
   const handleCopySummary = () => {
     if (summaryData?.summary) {
       navigator.clipboard.writeText(summaryData.summary);
+      message.success(t('memberAnalysis.workSummaryCopied'));
+    }
+  };
+
+  const loadCachedPeriodSummary = useCallback(async (author: string, range: [Dayjs, Dayjs]) => {
+    setPeriodSummaryLoading(true);
+    try {
+      const res = await memberApi.getWorkPeriodSummary({
+        author,
+        start_date: range[0].format('YYYY-MM-DD'),
+        end_date: range[1].format('YYYY-MM-DD'),
+      });
+      setPeriodSummaryData(res.data);
+    } catch {
+      setPeriodSummaryData(null);
+    } finally {
+      setPeriodSummaryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (periodSummaryModalVisible && selectedAuthor) {
+      loadCachedPeriodSummary(selectedAuthor, periodSummaryRange);
+    }
+  }, [periodSummaryRange, periodSummaryModalVisible, selectedAuthor, loadCachedPeriodSummary]);
+
+  const handleOpenPeriodSummaryModal = () => {
+    if (!selectedAuthor) return;
+    setPeriodSummaryRange(dateRange);
+    setPeriodSummaryModalVisible(true);
+  };
+
+  const handlePeriodRangeChange: RangePickerProps['onChange'] = (dates) => {
+    if (dates?.[0] && dates?.[1]) {
+      setPeriodSummaryRange([dates[0], dates[1]]);
+    }
+  };
+
+  const handleGenerateWorkPeriodSummary = async () => {
+    if (!selectedAuthor) return;
+    setPeriodSummaryLoading(true);
+    try {
+      const res = await memberApi.generateWorkPeriodSummary({
+        author: selectedAuthor,
+        start_date: periodSummaryRange[0].format('YYYY-MM-DD'),
+        end_date: periodSummaryRange[1].format('YYYY-MM-DD'),
+      });
+      setPeriodSummaryData(res.data);
+      message.success(t('common.success'));
+    } catch {
+      message.error(t('common.error'));
+    } finally {
+      setPeriodSummaryLoading(false);
+    }
+  };
+
+  const handleCopyPeriodSummary = () => {
+    if (periodSummaryData?.summary) {
+      navigator.clipboard.writeText(periodSummaryData.summary);
       message.success(t('memberAnalysis.workSummaryCopied'));
     }
   };
@@ -511,6 +581,12 @@ const MemberAnalysis: React.FC = () => {
                 >
                   {t('memberAnalysis.workSummaryViewHistory')}
                 </Button>
+                <Button
+                  icon={<CalendarOutlined />}
+                  onClick={handleOpenPeriodSummaryModal}
+                >
+                  {t('memberAnalysis.workPeriodSummary')}
+                </Button>
               </Space>
             </div>
             <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
@@ -601,6 +677,123 @@ const MemberAnalysis: React.FC = () => {
               style={{ marginTop: 16 }}
             >
               {t('memberAnalysis.generateWorkSummary')}
+            </Button>
+          </div>
+        )}
+      </Modal>
+
+      {/* Work Period Summary Modal */}
+      <Modal
+        title={
+          <Space>
+            <CalendarOutlined />
+            {t('memberAnalysis.workPeriodSummary')} - {periodSummaryData?.start_date || periodSummaryRange[0].format('YYYY-MM-DD')} ~ {periodSummaryData?.end_date || periodSummaryRange[1].format('YYYY-MM-DD')}
+            {periodSummaryData?.cached && (
+              <Tag icon={<CheckCircleOutlined />} color="success">{t('memberAnalysis.workSummaryCached')}</Tag>
+            )}
+          </Space>
+        }
+        open={periodSummaryModalVisible}
+        onCancel={() => { setPeriodSummaryModalVisible(false); setPeriodSummaryData(null); }}
+        width={getResponsiveWidth(840)}
+        footer={[
+          <Button
+            key="regenerate"
+            icon={<SyncOutlined />}
+            onClick={handleGenerateWorkPeriodSummary}
+            loading={periodSummaryLoading}
+          >
+            {t('memberAnalysis.workSummaryRegenerate')}
+          </Button>,
+          <Button key="copy" icon={<CopyOutlined />} onClick={handleCopyPeriodSummary} disabled={!periodSummaryData?.summary}>
+            {t('memberAnalysis.workSummaryCopy')}
+          </Button>,
+          <Button key="close" type="primary" onClick={() => { setPeriodSummaryModalVisible(false); setPeriodSummaryData(null); }}>
+            {t('common.close')}
+          </Button>,
+        ]}
+      >
+        <Space wrap style={{ marginBottom: 16 }}>
+          <RangePicker
+            value={periodSummaryRange}
+            onChange={handlePeriodRangeChange}
+            allowClear={false}
+            presets={[
+              { label: t('memberAnalysis.last7Days'), value: [dayjs().subtract(6, 'day'), dayjs()] },
+              { label: t('memberAnalysis.last30Days'), value: [dayjs().subtract(29, 'day'), dayjs()] },
+              { label: t('memberAnalysis.thisMonth'), value: [dayjs().startOf('month'), dayjs()] },
+              { label: t('memberAnalysis.lastMonth'), value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
+            ]}
+          />
+        </Space>
+        {periodSummaryLoading ? (
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <Spin size="large" />
+            <Typography.Text type="secondary" style={{ display: 'block', marginTop: 16 }}>
+              {t('memberAnalysis.workPeriodSummaryGenerating')}
+            </Typography.Text>
+          </div>
+        ) : periodSummaryData?.summary ? (
+          <div>
+            <MarkdownContent content={periodSummaryData.summary} />
+            {(periodSummaryData.raw_data.daily_summaries?.length ?? 0) > 0 && (
+              <Collapse
+                size="small"
+                style={{ marginTop: 16 }}
+                items={[
+                  {
+                    key: 'daily-summaries',
+                    label: t('memberAnalysis.workPeriodDailySummaries'),
+                    children: (
+                      <List
+                        size="small"
+                        dataSource={periodSummaryData.raw_data.daily_summaries ?? []}
+                        renderItem={(item) => (
+                          <List.Item>
+                            <List.Item.Meta
+                              title={
+                                <Space wrap size="small">
+                                  <span>{item.date}</span>
+                                  <Tag>{t('memberAnalysis.commitCount')}: {item.commit_count}</Tag>
+                                  <Tag>+{item.additions} / -{item.deletions}</Tag>
+                                </Space>
+                              }
+                              description={<MarkdownContent content={item.summary} />}
+                            />
+                          </List.Item>
+                        )}
+                      />
+                    ),
+                  },
+                ]}
+              />
+            )}
+            <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+              {periodSummaryData.updated_at && (
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  {t('memberAnalysis.workSummaryLastUpdated')}: {dayjs(periodSummaryData.updated_at).format('YYYY-MM-DD HH:mm')}
+                </Typography.Text>
+              )}
+              {periodSummaryData.ai_model_used && (
+                <AntTooltip title="AI Model">
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    Powered by {periodSummaryData.ai_model_used}
+                  </Typography.Text>
+                </AntTooltip>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <Empty description={t('memberAnalysis.workPeriodSummaryEmpty')} />
+            <Button
+              type="primary"
+              icon={<CalendarOutlined />}
+              onClick={handleGenerateWorkPeriodSummary}
+              loading={periodSummaryLoading}
+              style={{ marginTop: 16 }}
+            >
+              {t('memberAnalysis.generateWorkPeriodSummary')}
             </Button>
           </div>
         )}

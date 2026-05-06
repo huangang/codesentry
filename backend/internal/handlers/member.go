@@ -158,6 +158,73 @@ func (h *MemberHandler) ListWorkSummaries(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *MemberHandler) GetWorkPeriodSummary(c *gin.Context) {
+	author := c.Query("author")
+	if author == "" {
+		response.BadRequest(c, "author is required")
+		return
+	}
+
+	req := &services.WorkPeriodSummaryRequest{
+		Author:    author,
+		StartDate: c.Query("start_date"),
+		EndDate:   c.Query("end_date"),
+	}
+
+	result, err := h.memberService.GetWorkPeriodSummary(req)
+	if err != nil {
+		response.ServerError(c, err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func (h *MemberHandler) GenerateWorkPeriodSummary(c *gin.Context) {
+	var req services.WorkPeriodSummaryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		req.Author = c.Query("author")
+		req.StartDate = c.Query("start_date")
+		req.EndDate = c.Query("end_date")
+	}
+
+	if req.Author == "" {
+		response.BadRequest(c, "author is required")
+		return
+	}
+
+	result, err := h.memberService.GenerateWorkPeriodSummary(&req)
+	if err != nil {
+		response.ServerError(c, err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
+func (h *MemberHandler) ListWorkPeriodSummaries(c *gin.Context) {
+	var req services.WorkPeriodSummaryListRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	author := c.Query("author")
+	if author == "" {
+		response.BadRequest(c, "author is required")
+		return
+	}
+	req.Author = author
+
+	result, err := h.memberService.ListWorkPeriodSummaries(&req)
+	if err != nil {
+		response.ServerError(c, err.Error())
+		return
+	}
+
+	response.Success(c, result)
+}
+
 // Alias management
 
 func (h *MemberHandler) ListAliases(c *gin.Context) {
